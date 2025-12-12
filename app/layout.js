@@ -29,6 +29,11 @@ export async function generateMetadata() {
     title: seo?.title || "The Diet Cascade | Clinical Dietitian & Lifestyle Coach",
     description: seo?.description || "Discover effective diet transformations with The Diet Cascade program. Personalized regimens for health, nutrition, and weight management.",
     keywords: seo?.keywords || "diet, nutrition, weight loss, health, wellness, clinical dietitian",
+    icons: {
+      icon: '/images/logo.png', // Main favicon
+      shortcut: '/images/logo.png', // Shortcut icon
+      apple: '/images/logo.png', // Apple touch icon
+    },
   };
 }
 
