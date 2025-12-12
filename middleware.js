@@ -39,9 +39,16 @@ export async function middleware(request) {
         }
     )
 
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    let user = null
+    try {
+        const {
+            data: { user: authUser },
+        } = await supabase.auth.getUser()
+        user = authUser
+    } catch (e) {
+        console.error('Middleware Auth Error:', e)
+        // Fail open: Treat as unauthenticated rather than crashing
+    }
 
     if (request.nextUrl.pathname.startsWith('/admin') && !user) {
         return NextResponse.redirect(new URL('/login', request.url))
