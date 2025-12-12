@@ -43,23 +43,30 @@ export default function ShareStoryPage() {
 
     if (success) {
         return (
-            <main className="min-h-screen bg-white">
+            <main className="min-h-screen bg-white flex flex-col"> {/* 1. Added flex & flex-col */}
                 <Navbar />
-                <Section className="flex flex-col items-center justify-center text-center">
-                    <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center text-green-600 mb-6 animate-bounce">
-                        <Send size={40} />
+
+                {/* 2. Added flex-grow (or flex-1) to push the footer down */}
+                <Section className="grow flex flex-col items-center justify-center text-center">
+                    <div className="flex items-center justify-center mb-6">
+                        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center text-green-600 mb-6 animate-bounce">
+                            <Send size={40} />
+                        </div>
                     </div>
                     <h1 className="text-4xl font-heading font-bold text-heading mb-4">Thank You!</h1>
-                    <p className="text-gray-600 max-w-lg mb-8 text-lg">
-                        Your story has been submitted successfully. It will be reviewed by our team and published soon.
-                    </p>
+                    <div className="flex items-center justify-center">
+                        <p className="text-gray-600 max-w-lg mb-8 text-lg">
+                            Your story has been submitted successfully. It will be reviewed by our team and published soon.
+                        </p>
+                    </div>
                     <button
                         onClick={() => router.push('/')}
-                        className="px-8 py-3 bg-primary text-black font-bold rounded-xl hover:bg-primary-dark transition"
+                        className="px-8 py-3 bg-primary text-black font-bold rounded-xl border-2 border-primary-dark/20 shadow-md hover:shadow-lg hover:bg-primary-dark hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm transition-all duration-200 ease-in-out cursor-pointer"
                     >
                         Back to Home
                     </button>
                 </Section>
+
                 <Footer />
             </main>
         )
@@ -129,7 +136,7 @@ export default function ShareStoryPage() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full py-4 bg-primary text-black font-bold rounded-xl hover:bg-primary-dark transition shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+                        className="w-full py-4 bg-primary text-black font-bold rounded-xl hover:bg-primary-dark transition shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 hover:cursor-pointer"
                     >
                         {loading ? 'Submitting...' : 'Submit Story'} <Send size={20} />
                     </button>
