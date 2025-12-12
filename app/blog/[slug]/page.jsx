@@ -10,13 +10,29 @@ import { notFound } from 'next/navigation';
 export async function generateMetadata({ params }) {
     const supabase = await createClient();
     const { slug } = await params;
-    const { data: post } = await supabase.from('posts').select('title, excerpt').eq('slug', slug).single();
+    const route = `/blog/${slug}`;
 
-    if (!post) return { title: 'Post Not Found' };
+    // Parallel fetch for simplified performance
+    const [
+        { data: seo },
+        { data: post }
+    ] = await Promise.all([
+        supabase.from('seo_metadata').select('*').eq('route', route).single(),
+        supabase.from('posts').select('title, excerpt, cover_image').eq('slug', slug).single()
+    ]);
 
+    if (!post && !seo) return { title: 'Post Not Found' };
+
+    // Priority: SEO Table > Post Data > Defaults
     return {
-        title: `${post.title} | The Diet Cascade`,
-        description: post.excerpt,
+        title: seo?.title || (post?.title ? `${post.title} | The Diet Cascade` : 'The Diet Cascade'),
+        description: seo?.description || post?.excerpt || 'Read this article on The Diet Cascade',
+        keywords: seo?.keywords || "health, diet, nutrition, blog",
+        openGraph: {
+            title: seo?.title || post?.title,
+            description: seo?.description || post?.excerpt,
+            images: [seo?.image || post?.cover_image || '/images/logo.png']
+        }
     };
 }
 
