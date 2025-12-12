@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+@theme {
+  --color-heading: rgb(0 10 45);
+  --color-para: #777;
+  --color-para-tint: #e4e4e4;
+  --color-brand-white: #fff;
+  --color-brand-black: #212529;
+  --color-helper: #8490ff;
+  --color-overlay: #3e64ff;
+  --color-helper-tint: #f3f4ff;
+  --color-bg-tint: rgb(249 249 255);
+  --color-icons-bg: rgba(144, 172, 209, 0.2);
+  --color-card-dark: #161922;
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Lenis Smooth Scroll */
+html.lenis, html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.lenis.lenis-scrolling iframe {
+  pointer-events: none;
+}

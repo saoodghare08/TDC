@@ -1,0 +1,243 @@
+{
+    "hero": {
+        "title": "The Diet Cascade",
+        "subtitle": "Dt. Sabah Ghare",
+        "role": "Clinical Dietitian & Lifestyle Coach",
+        "media": "/images/hero1.jpg"
+    },
+    "about": {
+        "title": "About The Diet Cascade",
+        "paragraphs": [
+            "Welcome to The Diet Cascade (TDC), your holistic health clinic specializing in lifestyle and weight management through customized diet programs. With a global clientele spanning six countries, we have a proven track record of helping individuals achieve their health targets successfully.",
+            "At TDC, we go beyond simply addressing medical conditions – we're committed to fostering healthy lifestyles and promoting physical activity. Our approach involves formulating diet plans tailored to your preferences and routines, offering modern solutions that empower you to take charge of your fitness and nutrition. We prioritize education about nutrition, ensuring you understand your body and make informed choices. When it comes to physical fitness, we emphasize all components of fitness, not just the number on the scale.",
+            "With a personal touch, our team crafts simple and manageable diet plans that are easy to follow. Our founder, Dt. Sabah Ghare, leads by example, advocating for a balanced approach to diet and exercise that integrates seamlessly into your daily routine. Her vision is to empower clients to sustain a healthy lifestyle for the long-term.",
+            "Adapting to a healthy lifestyle may not be easy, but at TDC, we believe that growth happens when you embrace challenges with consistency and patience. Remember, true transformation starts from within – with our guidance and your commitment, achieving your goals is not just possible, but inevitable."
+        ],
+        "stats": [
+            {
+                "label": "Diet Plans",
+                "value": "10000+"
+            },
+            {
+                "label": "Happy Clients",
+                "value": "5000+"
+            },
+            {
+                "label": "Countries",
+                "value": "8+"
+            },
+            {
+                "label": "Transformations",
+                "value": "300+"
+            }
+        ]
+    },
+    "tagline": "Elevate Your Health Journey at The Diet Cascade– Your Holistic Health Clinic for Lifestyle, Weight Management, and Comprehensive Care Spanning Feminine, Masculine, Athletes, Kids, and Geriatric Well-being.",
+    "dietPerspective": {
+        "title": "Dt. Sabah Ghare's Diet Perspective",
+        "text": "Diet is a form of respect and discipline one offers to their body and soul. There is no specific food group that will assist you in reaching your fitness goal; rather it is a holistic approach that includes a protein-rich balanced diet, physical activity, and adequate sleep. It takes one to be focused, have patience and most importantly, be consistent to adapt to a balanced lifestyle.",
+        "quote": "Intervene today for a better quality of life.",
+        "images": {
+            "left": "/images/diet-p.jpg",
+            "right": "/images/diet4.jpg"
+        }
+    },
+    "regimens": [
+        {
+            "title": "Body Transformation Regimen",
+            "image": "/images/bt.jpg",
+            "description": [
+                "Tailored Diet Plans for Body Fat Reduction",
+                "Holistic Diet Solutions for Fat Loss, Muscle Gain, and Toned Physique",
+                "Individuals ready for a body transformation, embracing a fitness lifestyle, and opting for a healthy diet can embark on this journey.",
+                "Achievable diet plans tailored to individual goals and schedules, making the journey to a healthier lifestyle simple and effective"
+            ]
+        },
+        {
+            "title": "Weight Loss Regimen",
+            "image": "/images/weight Gain.png",
+            "description": [
+                "Customized diet plans designed for those eager to shed pounds",
+                "Facilitating a shift to a healthier lifestyle while targeting weight loss, reducing body fat, and upgrading food choices",
+                "Encouraging the initiation of physical activity as a vital component for healthy weight loss",
+                "Ideal for beginners seeking weight loss and a nutritious diet, offering a kickstart to their wellness journey",
+                "Achievable diet plans tailored to individual goals and schedules, making the journey to a healthier lifestyle simple and effective"
+            ]
+        },
+        {
+            "title": "Weight Gain Diet",
+            "image": "/images/WG3.jpg",
+            "description": [
+                "Tailored diet plans crafted for individuals enthusiastic about building muscle and gaining weight",
+                "Supporting the transition to a healthier lifestyle by focusing on muscle gain, reducing body fat, and enhancing dietary choices",
+                "Promoting the commencement of physical activity as a crucial element for enhancing muscle mass",
+                "Suitable for individuals who are underweight, engaged in regular physical activities, and looking to elevate their energy levels",
+                "Achievable diet plans tailored to individual goals and schedules, making the journey to a healthier lifestyle simple and effective"
+            ]
+        },
+        {
+            "title": "Pcos Management Diet",
+            "image": "/images/pcos.jpg",
+            "description": [
+                "Personalized diet plans designed for women dealing with PCOS, emphasizing weight control and fostering a healthier lifestyle with a focus on reproductive health",
+                "Encouraging the initiation of physical activity as a critical factor for achieving hormonal balance in the body",
+                "Ideal for women seeking weight loss, managing PCOS, and addressing hormonal imbalances",
+                "Achievable diet plans tailored to individual goals and schedules, making the journey to a healthier lifestyle simple and effective"
+            ]
+        },
+        {
+            "title": "Gestational Diet Regimen",
+            "image": "/images/gm.jpg",
+            "description": [
+                "Tailored nutritional plans crafted for expectant mothers, prioritizing wholesome eating and promoting a healthier lifestyle with a holistic focus on overall well-being",
+                "Promoting self-care among mothers-to-be through nutritious diets and foundational physical activities like yoga and walking, fostering mental well-being and stability during the gestational period",
+                "Suitable for expectant mothers aiming for a healthier dietary approach and steering clear of unhealthy habits",
+                "Attainable dietary plans customized to individual objectives and routines, ensuring a beautiful, healthy, and effective journey throughout pregnancy"
+            ]
+        },
+        {
+            "title": "Postnatal Diet Regimen",
+            "image": "/images/pcare4.png",
+            "description": [
+                "Customized nutrition plans designed for mothers, emphasizing healthy weight management, prioritizing nutritious eating, and fostering a well-rounded lifestyle for overall well-being",
+                "Encouraging optimal recovery for mothers through nutritious diets, placing emphasis on well-being rather than hastening weight loss",
+                "Ideal for postpartum mothers seeking a healthier dietary approach, avoiding unhealthy habits, and maintaining a balanced weight",
+                "Achievable dietary plans tailored to individual goals and routines, ensuring a positive, healthy, and effective postpartum phase"
+            ]
+        },
+        {
+            "title": "Therapeutic Diet Regimen",
+            "image": "/images/db.jpg",
+            "description": [
+                "Tailored nutrition plans crafted for those committed to enhancing overall well-being, shedding excess weight, and elevating their lifestyle",
+                "Guiding a transition to a healthier lifestyle, focusing on reversing metabolic disorders, managing weight loss, and fostering improved dietary habits",
+                "Encouraging the incorporation of regular physical activity as a crucial element for cultivating a healthy lifestyle",
+                "Designed for individuals proactively managing health and preventing ongoing issues, providing a solid foundation for their wellness journey",
+                "Achievable diet plans tailored to individual goals and schedules, making the journey to a healthier lifestyle simple and effective"
+            ]
+        }
+    ],
+    "services": [
+        "Diet counseling and diet recall with Dt.Sabah Ghare",
+        "Clinical and anthropometric record acquisition",
+        "Customized diet plans with recipes",
+        "Follow up calls",
+        "Utilizing WhatsApp for effortless meal monitoring",
+        "Plan periodisation (aligning dietary habits with exercise goals)",
+        "Workout guidance/Plan",
+        "Progress tracking(weight, photos & measurements)",
+        "Follow up calls",
+        "Nutritional guidance and personalized diet solutions",
+        "Travel guide (only if required)",
+        "Maintenance diet counseling (closing call)"
+    ],
+    "pricing": [
+        {
+            "title": "1 Month Plan",
+            "icon": "1",
+            "features": [
+                "2 Number of Meal Plans",
+                "Analysis of Blood Reports",
+                "Meal Tracking",
+                "2 Progress Monitoring Calls",
+                "Efficient Service Suite"
+            ]
+        },
+        {
+            "title": "3 Month Plan",
+            "icon": "3",
+            "features": [
+                "6 Number of Meal Plans",
+                "Analysis of Blood Reports",
+                "Multivitamin Prescription (if needed)",
+                "Meal Tracking",
+                "6 Progress Monitoring Calls",
+                "Efficient Service Suite"
+            ]
+        },
+        {
+            "title": "6 Month Plan",
+            "icon": "6",
+            "features": [
+                "12 Number of Meal Plans",
+                "Analysis of Blood Reports",
+                "Multivitamin Prescription (if needed)",
+                "Meal Tracking",
+                "14 Progress Monitoring Calls",
+                "Efficient Service Suite"
+            ]
+        }
+    ],
+    "perfectMatch": [
+        "If you are seeking personalized, sustainable diet plans tailored to your tastes and preferences? Look no further – we're the perfect match.",
+        "If you need budget-friendly diet solutions that prioritize results and elevate your lifestyle? You've found your ideal fit.",
+        "If you want to say goodbye to unnecessary supplements with our supplement-free diet plans, customized to your needs.",
+        "If you're health is a top priority and you're in search of expert guidance to address health concerns, we're the perfect match for you."
+    ],
+    "workouts": [
+        {
+            "title": "Weight Loss",
+            "image": "/images/wl.jpg"
+        },
+        {
+            "title": "Muscle Gain",
+            "image": "/images/muscle-gain3.jpg"
+        },
+        {
+            "title": "Functional Training",
+            "image": "/images/dl3.png"
+        },
+        {
+            "title": "Flexibility",
+            "image": "/images/flex3.jpg"
+        },
+        {
+            "title": "HIIT",
+            "image": "/images/ropes2.jpg"
+        },
+        {
+            "title": "Sports Specific Condition",
+            "image": "/images/pexels-rdne-stock-project-7187828.jpg"
+        }
+    ],
+    "testimonials": [
+        {
+            "name": "Kamal Bohra",
+            "location": "Hyderabad, India",
+            "text": "So firstly I was very skeptical that will I be able to do it with all the busy work and all. But the overall journey for 3 months was very good, the aim to get back to a balanced lifestyle was achieved I have lost good amount of weight learned a lot about my eating style and how to have a balance. Coming to the plans were very good with enough were very good with enough options to make them with everything within the kitchen nothing extraordinary. I am overall quite satisfied with my journey 💫"
+        },
+        {
+            "name": "Shifa Mehran",
+            "location": "Dubai, UAE",
+            "text": "I am so grateful ! Since I started your programme I lost around 4 kgs in a month, lost an inch and I am atleast confident now that I can go on and stay fit without compromising a lot . And sabse badi baat My cravings have reduced a lotttt I will definitely resume after wedding and I am relieved actually because I am more aware now and cutting down is not a very big deal now. So Thankyou Dt.Sabah for keeping me on my toes , keeping a daily check and motivating me always🙌🏻❤️"
+        },
+        {
+            "name": "Anusha parvati",
+            "location": "Navi-Mumbai, India",
+            "text": "How should I start this ! So when I actually enquired you on the diet plan, I was very much doubtful coz u won't believe me I was trying to reduce my weight for like around one and half years ! I never understood that diet played a huge part though I am a person who workout at gym ! I again thought ok let me try but I was very unsure of the result. But then it was 15 days of diet and i saw the weight scale and my energy improving... And Sabah thank you so much for being there for me and making me look like a new me."
+        }
+    ],
+    "aboutDt": {
+        "name": "Dt. Sabah Ghare",
+        "subtitle": "Bridging Expertise and Passion for Your Health Journey",
+        "description": [
+            "Dt. Sabah Ghare, the driving force behind the Diet Cascade. With a solid foundation in clinical nutrition, Dt. Sabah earned her bachelor's in microbiology and seamlessly transitioned into the world of health and wellness during her master's program. Immersed in clinical internships, she honed her skills, paving the way for her role as a dietitian at One Above Fitness, Navi Mumbai.",
+            "Dt. Sabah extends her expertise as a visiting dietitian in various healthcare clinics and offers personalized online consultations. Currently, Dt. Sabah wears multiple hats—as a nutrition professor at Laxmi College of Optometry and a mentor for diploma students. Committed to perpetual growth, Dt. Sabah Ghare has pursued her advanced exercise physiology course, deepening her knowledge of the critical connection between physical activity and fundamental human health. She is a certified fitness coach in the field. Her unwavering passion reflects in her commitment to helping individuals reshape their lifestyles, fostering enduring positivity and sustained well-being."
+        ],
+        "image": "/images/dietitian.jpg"
+    },
+    "footer": {
+        "about": "Welcome to The Diet Cascade (TDC), where personalized diet programs redefine health, led by Dt. Sabah Ghare, prioritizing education, crafting manageable plans, and ensuring true transformation.",
+        "address": "Navi-Mumbai",
+        "phone": "+919004491160",
+        "email": "sabahghare24@gmail.com",
+        "instagram": "https://www.instagram.com/thedietcascade/",
+        "linkedin": "https://www.linkedin.com/in/sabah-aslam-ghare-9125a3213/"
+    },
+    "contact": {
+        "email": "sabahghare24@gmail.com",
+        "phone": "+919004491160",
+        "instagram": "https://www.instagram.com/thedietcascade/",
+        "linkedin": "https://www.linkedin.com/in/sabah-aslam-ghare-9125a3213/"
+    }
+}
