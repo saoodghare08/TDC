@@ -1,6 +1,7 @@
 import { Work_Sans, Poppins } from "next/font/google"; // Import standard fonts
 import "./globals.css";
 import Providers from "@/components/Providers";
+import Script from "next/script";
 
 const workSans = Work_Sans({
   subsets: ["latin"],
@@ -46,6 +47,19 @@ export default function RootLayout({ children }) {
       <body
         className={`${workSans.variable} ${poppins.variable} font-sans antialiased bg-gray-50`}
       >
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-1D06V6TYFC"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+
+            gtag('config', 'G-1D06V6TYFC');
+          `}
+        </Script>
         <Providers>
           {children}
         </Providers>
