@@ -18,6 +18,7 @@ const poppins = Poppins({
 
 import { createClient } from '@/utils/supabase/server';
 
+
 export async function generateMetadata() {
   const supabase = await createClient();
   const { data: seo } = await supabase
@@ -26,14 +27,47 @@ export async function generateMetadata() {
     .eq('route', '/')
     .single();
 
+  const title = seo?.title || "The Diet Cascade | Clinical Dietitian & Lifestyle Coach";
+  const description = seo?.description || "Discover effective diet transformations with The Diet Cascade program. Personalized regimens for health, nutrition, and weight management.";
+  const url = process.env.NEXT_PUBLIC_SITE_URL || 'https://thedietcascade.com';
+
   return {
-    title: seo?.title || "The Diet Cascade | Clinical Dietitian & Lifestyle Coach",
-    description: seo?.description || "Discover effective diet transformations with The Diet Cascade program. Personalized regimens for health, nutrition, and weight management.",
+    metadataBase: new URL(url),
+    title: {
+      default: title,
+      template: `%s | The Diet Cascade`,
+    },
+    description: description,
     keywords: seo?.keywords || "diet, nutrition, weight loss, health, wellness, clinical dietitian",
     icons: {
       icon: '/images/logo.png', // Main favicon
       shortcut: '/images/logo.png', // Shortcut icon
       apple: '/images/logo.png', // Apple touch icon
+    },
+    openGraph: {
+      title: title,
+      description: description,
+      url: url,
+      siteName: 'The Diet Cascade',
+      images: [
+        {
+          url: '/images/logo.png', // Replace with a dedicated OG image if available
+          width: 800,
+          height: 600,
+          alt: 'The Diet Cascade Logo',
+        },
+      ],
+      locale: 'en_US',
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: title,
+      description: description,
+      images: ['/images/logo.png'], // Replace with a dedicated Twitter image if available
+    },
+    alternates: {
+      canonical: url,
     },
     verification: {
       google: 'guS34CTX4qg6zjDiGQFWarDgoqN90f41xhAIm5Ubn9Y',
@@ -41,7 +75,60 @@ export async function generateMetadata() {
   };
 }
 
+function StructuredData() {
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'HealthAndBeautyBusiness',
+    name: 'The Diet Cascade',
+    image: 'https://thedietcascade.com/images/logo.png',
+    '@id': 'https://thedietcascade.com',
+    url: 'https://thedietcascade.com',
+    telephone: '+919004491160',
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: 'Nerul',
+      addressLocality: 'Navi Mumbai',
+      addressRegion: 'Maharashtra',
+      addressCountry: 'IN',
+    },
+    geo: {
+      '@type': 'GeoCoordinates',
+      latitude: 19.0330,
+      longitude: 73.0297,
+    },
+    areaServed: {
+      '@type': 'Place',
+      name: 'Worldwide'
+    },
+    openingHoursSpecification: {
+      '@type': 'OpeningHoursSpecification',
+      dayOfWeek: [
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+      ],
+      opens: '09:00',
+      closes: '21:00',
+    },
+    sameAs: [
+      'https://www.instagram.com/thedietcascade',
+      'https://twitter.com/thedietcascade',
+    ],
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+    />
+  );
+}
+
 export default function RootLayout({ children }) {
+
   return (
     <html lang="en" className="lenis">
       <body
@@ -88,6 +175,7 @@ export default function RootLayout({ children }) {
         <Providers>
           {children}
         </Providers>
+        <StructuredData />
       </body>
     </html>
   );
