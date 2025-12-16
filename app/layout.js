@@ -35,7 +35,7 @@ export async function generateMetadata() {
       apple: '/images/logo.png', // Apple touch icon
     },
     verification: {
-      google: 'google-site-verification=guS34CTX4qg6zjDiGQFWarDgoqN90f41xhAIm5Ubn9Y',
+      google: 'guS34CTX4qg6zjDiGQFWarDgoqN90f41xhAIm5Ubn9Y',
     },
   };
 }
