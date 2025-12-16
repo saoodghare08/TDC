@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Quote } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Quote, X } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
 import data from '@/data/content.json';
@@ -10,6 +10,7 @@ import Section from '@/components/ui/Section';
 export default function Testimonials() {
     const scrollRef = useRef(null);
     const [reviews, setReviews] = useState(data.testimonials); // Initial state from JSON
+    const [selectedReview, setSelectedReview] = useState(null);
     const supabase = createClient();
 
     useEffect(() => {
@@ -69,9 +70,17 @@ export default function Testimonials() {
                         className="min-w-[300px] md:min-w-[400px] bg-gray-50 p-8 rounded-3xl snap-start border border-gray-100 flex flex-col"
                     >
                         <Quote className="text-primary/20 mb-4" size={40} />
-                        <p className="text-gray-600 italic mb-6 leading-relaxed flex-1 line-clamp-6">
-                            "{t.content || t.text}"
-                        </p>
+                        <div
+                            className="cursor-pointer group flex-1 mb-6"
+                            onClick={() => setSelectedReview(t)}
+                        >
+                            <p className="text-gray-600 italic leading-relaxed line-clamp-6 group-hover:text-gray-900 transition-colors">
+                                "{t.content || t.text}"
+                            </p>
+                            <span className="text-xs font-bold uppercase tracking-wider text-gray-400 mt-3 inline-block group-hover:text-black transition-colors border-b border-transparent group-hover:border-black">
+                                Read Full Review
+                            </span>
+                        </div>
                         <div className="flex items-center gap-4 mt-auto">
                             <div>
                                 <h4 className="font-bold text-heading">{t.name}</h4>
@@ -81,6 +90,41 @@ export default function Testimonials() {
                     </div>
                 ))}
             </div>
+
+            {/* Review Modal */}
+            {selectedReview && (
+                <div
+                    className="fixed inset-0 z-1000000 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-all"
+                    onClick={() => setSelectedReview(null)}
+                >
+                    <div
+                        className="bg-white rounded-3xl p-8 max-w-2xl w-full shadow-2xl relative animate-in fade-in zoom-in duration-200"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <button
+                            onClick={() => setSelectedReview(null)}
+                            className="absolute top-6 right-6 p-2 bg-gray-100 hover:bg-black hover:text-white rounded-full transition-colors z-101"
+                        >
+                            <X size={20} />
+                        </button>
+
+                        <Quote className="text-black/10 mb-6" size={60} />
+
+                        <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                            <p className="text-xl text-gray-800 italic leading-relaxed mb-8 font-medium">
+                                "{selectedReview.content || selectedReview.text}"
+                            </p>
+                        </div>
+
+                        <div className="flex items-center gap-4 pt-6 border-t border-gray-100">
+                            <div>
+                                <h4 className="font-bold text-heading text-lg">{selectedReview.name}</h4>
+                                <p className="text-sm text-gray-400">{selectedReview.location}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </Section>
     );
 }
