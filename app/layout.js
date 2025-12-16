@@ -34,6 +34,9 @@ export async function generateMetadata() {
       shortcut: '/images/logo.png', // Shortcut icon
       apple: '/images/logo.png', // Apple touch icon
     },
+    verification: {
+      google: 'google-site-verification=guS34CTX4qg6zjDiGQFWarDgoqN90f41xhAIm5Ubn9Y',
+    },
   };
 }
 
