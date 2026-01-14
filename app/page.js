@@ -10,6 +10,7 @@ import Testimonials from '@/components/home/Testimonials';
 import Footer from '@/components/layout/Footer';
 import data from '@/data/content.json';
 import { Analytics } from "@vercel/analytics/next"
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 export default function Home() {
   const jsonLd = {
@@ -34,6 +35,7 @@ export default function Home() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <Analytics />
+      <SpeedInsights/>
       <Navbar />
       <Hero />
       <About />
