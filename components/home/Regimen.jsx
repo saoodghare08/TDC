@@ -1,12 +1,14 @@
 'use client';
 
 import { useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
 import data from '@/data/content.json';
 import Section from '@/components/ui/Section';
 import Image from 'next/image';
 
 export default function Regimen() {
+    const router = useRouter();
     const scrollRef = useRef(null);
 
     const scroll = (direction) => {
@@ -77,8 +79,8 @@ export default function Regimen() {
                                 ))}
                             </ul>
                             <button
-                                className="mt-8 px-8 py-3 bg-heading text-white rounded-xl self-start hover:bg-primary transition-colors hover:shadow-lg transform active:scale-95"
-                                onClick={() => window.open(`https://wa.me/+919004491160?text=I'm interested in ${item.title}`)}
+                                className="mt-8 px-8 py-3 bg-heading text-white rounded-xl self-start hover:bg-primary transition-colors hover:shadow-lg transform active:scale-95 cursor-pointer"
+                                onClick={() => router.push(`/checkout?regimen=${encodeURIComponent(item.title)}`)}
                             >
                                 Enroll Now
                             </button>

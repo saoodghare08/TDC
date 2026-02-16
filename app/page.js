@@ -12,7 +12,18 @@ import data from '@/data/content.json';
 import { Analytics } from "@vercel/analytics/next"
 import { SpeedInsights } from "@vercel/speed-insights/next"
 
-export default function Home() {
+import { createClient } from '@/utils/supabase/server';
+
+export const revalidate = 518400; // 6 days in seconds
+
+export default async function Home() {
+  const supabase = await createClient();
+  const { data: dbReviews } = await supabase
+    .from('reviews')
+    .select('*')
+    .eq('is_approved', true)
+    .order('created_at', { ascending: false });
+
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'HealthAndBeautyBusiness',
@@ -35,7 +46,7 @@ export default function Home() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <Analytics />
-      <SpeedInsights/>
+      <SpeedInsights />
       <Navbar />
       <Hero />
       <About />
@@ -44,7 +55,7 @@ export default function Home() {
       <ServiceSuite />
       <Pricing />
       <Workouts />
-      <Testimonials />
+      <Testimonials initialReviews={dbReviews} />
       <Footer />
     </main>
   );

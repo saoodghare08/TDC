@@ -50,12 +50,19 @@ export async function middleware(request) {
         // Fail open: Treat as unauthenticated rather than crashing
     }
 
-    if (request.nextUrl.pathname.startsWith('/admin') && !user) {
-        return NextResponse.redirect(new URL('/login', request.url))
+    if (request.nextUrl.pathname.startsWith('/admin')) {
+        const sessionExpiry = request.cookies.get('admin_session_expiry')
+        if (!user || !sessionExpiry) {
+            // If session expired (cookie gone) or no user, redirect to login
+            return NextResponse.redirect(new URL('/login', request.url))
+        }
     }
 
     if (request.nextUrl.pathname.startsWith('/login') && user) {
-        return NextResponse.redirect(new URL('/admin', request.url))
+        const sessionExpiry = request.cookies.get('admin_session_expiry')
+        if (sessionExpiry) {
+            return NextResponse.redirect(new URL('/admin', request.url))
+        }
     }
 
     return supabaseResponse

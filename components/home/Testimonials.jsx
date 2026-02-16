@@ -7,27 +7,13 @@ import Link from 'next/link';
 import data from '@/data/content.json';
 import Section from '@/components/ui/Section';
 
-export default function Testimonials() {
+export default function Testimonials({ initialReviews }) {
     const scrollRef = useRef(null);
-    const [reviews, setReviews] = useState(data.testimonials); // Initial state from JSON
+    const [reviews, setReviews] = useState(initialReviews && initialReviews.length > 0 ? initialReviews : data.testimonials);
     const [selectedReview, setSelectedReview] = useState(null);
-    const supabase = createClient();
 
-    useEffect(() => {
-        async function fetchReviews() {
-            const { data: dbReviews } = await supabase
-                .from('reviews')
-                .select('*')
-                .eq('is_approved', true)
-                .order('created_at', { ascending: false });
-
-            // Only override if we have approved reviews
-            if (dbReviews && dbReviews.length > 0) {
-                setReviews(dbReviews);
-            }
-        }
-        fetchReviews();
-    }, []);
+    // Initial state is already set from prop or fallback, no need for client-side useEffect fetch
+    // unless we wanted real-time updates, which contradicts the 6-day cache requirement.
 
     const scroll = (direction) => {
         if (scrollRef.current) {

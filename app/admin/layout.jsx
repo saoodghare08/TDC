@@ -24,6 +24,8 @@ export default function AdminLayout({ children }) {
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
+        // Clear the session expiry cookie
+        document.cookie = "admin_session_expiry=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
         router.push('/login');
         router.refresh();
     };

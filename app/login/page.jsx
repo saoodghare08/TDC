@@ -27,6 +27,11 @@ export default function LoginPage() {
             setError(error.message);
             setLoading(false);
         } else {
+            // Set a cookie that expires in 2 days to track admin session length manually
+            const expiryDate = new Date();
+            expiryDate.setDate(expiryDate.getDate() + 2);
+            document.cookie = `admin_session_expiry=true; expires=${expiryDate.toUTCString()}; path=/; SameSite=Lax`;
+
             router.push('/admin');
             router.refresh();
         }

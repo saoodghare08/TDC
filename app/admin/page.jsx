@@ -6,8 +6,13 @@ import { MessageSquareQuote, FileText, Settings, Users } from 'lucide-react';
 import Link from 'next/link';
 import clsx from 'clsx';
 
+import { clearGlobalCache } from './actions';
+import { RefreshCcw } from 'lucide-react';
+
 export default function AdminDashboard() {
     const [stats, setStats] = useState({ reviews: 0, posts: 0 });
+    const [clearing, setClearing] = useState(false);
+    const [message, setMessage] = useState(null);
     const supabase = createClient();
 
     useEffect(() => {
@@ -19,6 +24,15 @@ export default function AdminDashboard() {
         fetchStats();
     }, []);
 
+    const handleClearCache = async () => {
+        setClearing(true);
+        setMessage(null);
+        const result = await clearGlobalCache();
+        setClearing(false);
+        setMessage(result.message);
+        setTimeout(() => setMessage(null), 3000);
+    };
+
     const cards = [
         { label: 'Total Reviews', value: stats.reviews, icon: MessageSquareQuote, color: 'text-blue-500', bg: 'bg-blue-50', link: '/admin/reviews' },
         { label: 'Blog Posts', value: stats.posts, icon: FileText, color: 'text-purple-500', bg: 'bg-purple-50', link: '/admin/blog' },
@@ -27,7 +41,24 @@ export default function AdminDashboard() {
 
     return (
         <div>
-            <h1 className="text-3xl font-bold text-heading mb-8">Dashboard Overview</h1>
+            <div className="flex justify-between items-center mb-8">
+                <h1 className="text-3xl font-bold text-heading">Dashboard Overview</h1>
+                <div className="flex items-center gap-4">
+                    {message && (
+                        <span className="text-sm font-medium text-green-600 animate-in fade-in slide-in-from-right-4">
+                            {message}
+                        </span>
+                    )}
+                    <button
+                        onClick={handleClearCache}
+                        disabled={clearing}
+                        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all font-medium text-sm disabled:opacity-50"
+                    >
+                        <RefreshCcw size={16} className={clearing ? "animate-spin" : ""} />
+                        {clearing ? 'Clearing...' : 'Clear Cache'}
+                    </button>
+                </div>
+            </div>
 
             <div className="grid md:grid-cols-3 gap-6">
                 {cards.map((card, i) => {

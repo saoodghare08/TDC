@@ -18,6 +18,7 @@ const poppins = Poppins({
 
 import { createClient } from '@/utils/supabase/server';
 
+export const revalidate = 518400; // 6 days in seconds
 
 export async function generateMetadata() {
   const supabase = await createClient();

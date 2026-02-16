@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server';
+export const revalidate = 518400; // 6 days
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import Section from '@/components/ui/Section';

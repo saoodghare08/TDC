@@ -3,13 +3,13 @@
 import data from '@/data/content.json';
 import Section from '@/components/ui/Section';
 import { Package, Check } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
 
 export default function Pricing() {
+    const router = useRouter();
     const handleEnroll = (planTitle) => {
-        const message = `Hi, I am interested in the ${planTitle} and would like to know more.`;
-        const url = `https://wa.me/+919004491160?text=${encodeURIComponent(message)}`;
-        window.open(url, '_blank');
+        router.push(`/checkout?plan=${encodeURIComponent(planTitle)}`);
     };
 
     return (
