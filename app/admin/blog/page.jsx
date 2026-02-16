@@ -88,7 +88,13 @@ export default function BlogListPage() {
                                 >
                                     <Eye size={20} />
                                 </button>
-                                {/* Edit functionality to be implemented if needed, for now just create new */}
+                                <Link
+                                    href={`/admin/blog/edit/${post.id}`}
+                                    className="p-2 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition"
+                                    title="Edit"
+                                >
+                                    <Edit2 size={20} />
+                                </Link>
                                 <button
                                     onClick={() => handleDelete(post.id)}
                                     className="p-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition"

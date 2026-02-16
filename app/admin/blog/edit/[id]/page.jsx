@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, use } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, Save } from 'lucide-react';
 import Link from 'next/link';
 
-export default function CreateBlogPage() {
+export default function EditBlogPage({ params: paramsPromise }) {
+    const params = use(paramsPromise);
+    const { id } = params;
     const [formData, setFormData] = useState({
         title: '',
         slug: '',
@@ -15,9 +17,37 @@ export default function CreateBlogPage() {
         cover_image: '',
         published: false
     });
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
     const router = useRouter();
     const supabase = createClient();
+
+    useEffect(() => {
+        const fetchPost = async () => {
+            const { data, error } = await supabase
+                .from('posts')
+                .select('*')
+                .eq('id', id)
+                .single();
+
+            if (data) {
+                setFormData({
+                    title: data.title || '',
+                    slug: data.slug || '',
+                    excerpt: data.excerpt || '',
+                    content: data.content || '',
+                    cover_image: data.cover_image || '',
+                    published: data.published || false
+                });
+            } else if (error) {
+                alert('Error fetching post: ' + error.message);
+                router.push('/admin/blog');
+            }
+            setLoading(false);
+        };
+
+        fetchPost();
+    }, [id, supabase, router]);
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -27,7 +57,6 @@ export default function CreateBlogPage() {
         }));
     };
 
-    // Auto-generate slug from title
     const handleTitleChange = (e) => {
         const title = e.target.value;
         const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
@@ -38,18 +67,25 @@ export default function CreateBlogPage() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setLoading(true);
+        setSaving(true);
 
-        const { error } = await supabase.from('posts').insert([formData]);
+        const { error } = await supabase
+            .from('posts')
+            .update(formData)
+            .eq('id', id);
 
         if (error) {
-            alert('Error creating post: ' + error.message);
-            setLoading(false);
+            alert('Error updating post: ' + error.message);
+            setSaving(false);
         } else {
             router.push('/admin/blog');
             router.refresh();
         }
     };
+
+    if (loading) {
+        return <div className="p-8 text-center text-gray-500">Loading post details...</div>;
+    }
 
     return (
         <div className="max-w-5xl mx-auto">
@@ -58,7 +94,7 @@ export default function CreateBlogPage() {
                     <Link href="/admin/blog" className="p-2 rounded-full hover:bg-gray-100 transition">
                         <ChevronLeft size={24} />
                     </Link>
-                    <h1 className="text-3xl font-bold text-heading">Create New Post</h1>
+                    <h1 className="text-3xl font-bold text-heading">Edit Post</h1>
                 </div>
                 <div className="flex bg-gray-100 p-1 rounded-xl">
                     <button
@@ -91,7 +127,7 @@ export default function CreateBlogPage() {
                                     {formData.title || 'Untitled Post'}
                                 </h1>
                                 <div className="flex items-center gap-2 text-white/80">
-                                    <span>{new Date().toLocaleDateString()}</span>
+                                    <span>Last updated: {new Date().toLocaleDateString()}</span>
                                 </div>
                             </div>
                         </div>
@@ -185,17 +221,17 @@ export default function CreateBlogPage() {
                             onChange={handleChange}
                             className="w-5 h-5 text-primary rounded focus:ring-primary"
                         />
-                        <label htmlFor="published" className="font-medium text-gray-700">Publish Immediately?</label>
+                        <label htmlFor="published" className="font-medium text-gray-700">Published</label>
                     </div>
 
                     <div className="pt-4 border-t border-gray-100 flex justify-end">
                         <button
                             type="submit"
-                            disabled={loading}
+                            disabled={saving}
                             className="flex items-center gap-2 px-8 py-3 bg-primary text-black font-bold rounded-xl hover:bg-primary-dark transition disabled:opacity-50 hover:cursor-pointer"
                         >
                             <Save size={20} />
-                            {loading ? 'Saving...' : 'Create Post'}
+                            {saving ? 'Saving...' : 'Update Post'}
                         </button>
                     </div>
 
