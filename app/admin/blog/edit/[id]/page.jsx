@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, Save } from 'lucide-react';
 import Link from 'next/link';
+import Swal from 'sweetalert2';
 
 export default function EditBlogPage({ params: paramsPromise }) {
     const params = use(paramsPromise);
@@ -40,7 +41,12 @@ export default function EditBlogPage({ params: paramsPromise }) {
                     published: data.published || false
                 });
             } else if (error) {
-                alert('Error fetching post: ' + error.message);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error Loading Post',
+                    text: error.message,
+                    confirmButtonColor: '#fdbc00'
+                });
                 router.push('/admin/blog');
             }
             setLoading(false);
@@ -75,9 +81,21 @@ export default function EditBlogPage({ params: paramsPromise }) {
             .eq('id', id);
 
         if (error) {
-            alert('Error updating post: ' + error.message);
+            Swal.fire({
+                icon: 'error',
+                title: 'Update Failed',
+                text: error.message,
+                confirmButtonColor: '#fdbc00'
+            });
             setSaving(false);
         } else {
+            await Swal.fire({
+                icon: 'success',
+                title: 'Post Updated!',
+                text: 'Your blog post has been updated successfully.',
+                confirmButtonColor: '#fdbc00',
+                timer: 1500
+            });
             router.push('/admin/blog');
             router.refresh();
         }

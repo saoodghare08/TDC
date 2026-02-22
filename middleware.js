@@ -50,19 +50,43 @@ export async function middleware(request) {
         // Fail open: Treat as unauthenticated rather than crashing
     }
 
-    if (request.nextUrl.pathname.startsWith('/admin')) {
+    // ADMIN ROUTES PROTECTION
+    if (request.nextUrl.pathname.startsWith('/admin') && !request.nextUrl.pathname.startsWith('/admin/login')) {
         const sessionExpiry = request.cookies.get('admin_session_expiry')
+
+        // 1. Check for basic auth and session cookie
         if (!user || !sessionExpiry) {
-            // If session expired (cookie gone) or no user, redirect to login
-            return NextResponse.redirect(new URL('/login', request.url))
+            // If session expired (cookie gone) or no user, redirect to admin login
+            return NextResponse.redirect(new URL('/admin/login', request.url))
+        }
+
+        // 2. Check for Admin Email (if configured)
+        const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
+        if (adminEmail && user.email !== adminEmail) {
+            // Logged in user is NOT the authorized admin -> redirect to client portal
+            return NextResponse.redirect(new URL('/portal/dashboard', request.url))
         }
     }
 
-    if (request.nextUrl.pathname.startsWith('/login') && user) {
+    // If already logged in as admin and trying to access admin login, redirect to dashboard
+    if (request.nextUrl.pathname.startsWith('/admin/login') && user) {
         const sessionExpiry = request.cookies.get('admin_session_expiry')
         if (sessionExpiry) {
             return NextResponse.redirect(new URL('/admin', request.url))
         }
+    }
+
+    // CLIENT PORTAL ROUTES PROTECTION
+    if (request.nextUrl.pathname.startsWith('/portal') && !request.nextUrl.pathname.startsWith('/portal/login')) {
+        if (!user) {
+            // Not authenticated, redirect to client login
+            return NextResponse.redirect(new URL('/portal/login', request.url))
+        }
+    }
+
+    // If already logged in and trying to access portal login, redirect to dashboard
+    if (request.nextUrl.pathname === '/portal/login' && user) {
+        return NextResponse.redirect(new URL('/portal/dashboard', request.url))
     }
 
     return supabaseResponse

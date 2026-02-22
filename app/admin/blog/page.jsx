@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client';
 import { Plus, Edit2, Trash2, Eye } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import Swal from 'sweetalert2';
 
 export default function BlogListPage() {
     const [posts, setPosts] = useState([]);
@@ -27,11 +28,29 @@ export default function BlogListPage() {
     }, []);
 
     const handleDelete = async (id) => {
-        if (!confirm('Are you sure you want to delete this post?')) return;
+        const result = await Swal.fire({
+            title: 'Delete Blog Post?',
+            text: 'This action cannot be undone!',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: 'Yes, delete it!',
+            cancelButtonText: 'Cancel'
+        });
+
+        if (!result.isConfirmed) return;
 
         const { error } = await supabase.from('posts').delete().eq('id', id);
         if (!error) {
             setPosts(posts.filter(p => p.id !== id));
+            Swal.fire({
+                icon: 'success',
+                title: 'Deleted!',
+                text: 'Blog post has been deleted.',
+                confirmButtonColor: '#fdbc00',
+                timer: 1500
+            });
         }
     };
 

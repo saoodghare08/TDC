@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, Save } from 'lucide-react';
 import Link from 'next/link';
+import Swal from 'sweetalert2';
 
 export default function CreateBlogPage() {
     const [formData, setFormData] = useState({
@@ -43,9 +44,21 @@ export default function CreateBlogPage() {
         const { error } = await supabase.from('posts').insert([formData]);
 
         if (error) {
-            alert('Error creating post: ' + error.message);
+            Swal.fire({
+                icon: 'error',
+                title: 'Creation Failed',
+                text: error.message,
+                confirmButtonColor: '#fdbc00'
+            });
             setLoading(false);
         } else {
+            await Swal.fire({
+                icon: 'success',
+                title: 'Post Created!',
+                text: 'Your blog post has been created successfully.',
+                confirmButtonColor: '#fdbc00',
+                timer: 1500
+            });
             router.push('/admin/blog');
             router.refresh();
         }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { Save, Plus, Trash2 } from 'lucide-react';
+import Swal from 'sweetalert2';
 
 export default function SEOPage() {
     const [seoEntries, setSeoEntries] = useState([]);
@@ -45,8 +46,22 @@ export default function SEOPage() {
             })
             .eq('id', id);
 
-        if (error) alert('Error saving: ' + error.message);
-        else alert('Saved successfully!');
+        if (error) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Save Failed',
+                text: error.message,
+                confirmButtonColor: '#fdbc00'
+            });
+        } else {
+            Swal.fire({
+                icon: 'success',
+                title: 'Saved!',
+                text: 'SEO metadata updated successfully.',
+                confirmButtonColor: '#fdbc00',
+                timer: 1500
+            });
+        }
         setSaving(false);
     };
 
@@ -61,16 +76,47 @@ export default function SEOPage() {
         if (data) {
             setSeoEntries([...seoEntries, data[0]]);
             setNewRoute('');
+            Swal.fire({
+                icon: 'success',
+                title: 'Created!',
+                text: 'New SEO entry added successfully.',
+                confirmButtonColor: '#fdbc00',
+                timer: 1500
+            });
         } else if (error) {
-            alert('Error creating: ' + error.message);
+            Swal.fire({
+                icon: 'error',
+                title: 'Creation Failed',
+                text: error.message,
+                confirmButtonColor: '#fdbc00'
+            });
         }
     };
 
     const handleDelete = async (id) => {
-        if (!confirm('Delete this SEO entry?')) return;
+        const result = await Swal.fire({
+            title: 'Delete SEO Entry?',
+            text: 'This action cannot be undone!',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: 'Yes, delete it!',
+            cancelButtonText: 'Cancel'
+        });
+
+        if (!result.isConfirmed) return;
+
         const { error } = await supabase.from('seo_metadata').delete().eq('id', id);
         if (!error) {
             setSeoEntries(seoEntries.filter(e => e.id !== id));
+            Swal.fire({
+                icon: 'success',
+                title: 'Deleted!',
+                text: 'SEO entry has been deleted.',
+                confirmButtonColor: '#fdbc00',
+                timer: 1500
+            });
         }
     };
 

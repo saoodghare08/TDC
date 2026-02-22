@@ -7,6 +7,7 @@ import { Send, MapPin, User, Quote } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import Section from '@/components/ui/Section';
+import Swal from 'sweetalert2';
 
 export default function ShareStoryPage() {
     const [formData, setFormData] = useState({
@@ -33,7 +34,12 @@ export default function ShareStoryPage() {
         }]);
 
         if (error) {
-            alert('Error submitting story: ' + error.message);
+            Swal.fire({
+                icon: 'error',
+                title: 'Submission Failed',
+                text: error.message,
+                confirmButtonColor: '#fdbc00'
+            });
             setLoading(false);
         } else {
             setSuccess(true);

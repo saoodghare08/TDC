@@ -5,12 +5,13 @@ import { usePathname } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { LayoutDashboard, MessageSquareQuote, FileText, Settings, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, MessageSquareQuote, FileText, Settings, LogOut, Menu, X, Users } from 'lucide-react';
 import clsx from 'clsx';
 import Image from 'next/image';
 
 const navItems = [
     { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/admin/clients', label: 'Clients', icon: Users },
     { href: '/admin/reviews', label: 'Reviews', icon: MessageSquareQuote },
     { href: '/admin/blog', label: 'Blog', icon: FileText },
     { href: '/admin/seo', label: 'SEO', icon: Settings },
@@ -26,9 +27,14 @@ export default function AdminLayout({ children }) {
         await supabase.auth.signOut();
         // Clear the session expiry cookie
         document.cookie = "admin_session_expiry=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-        router.push('/login');
+        router.push('/admin/login');
         router.refresh();
     };
+
+    // Render login page without the sidebar shell
+    if (pathname === '/admin/login') {
+        return <>{children}</>;
+    }
 
     return (
         <div className="flex h-screen bg-gray-50">

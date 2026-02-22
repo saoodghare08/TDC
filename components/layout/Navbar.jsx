@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import gsap from 'gsap';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, LogIn, User } from 'lucide-react';
 
 const links = [
     { href: '#home', label: 'Home' },
@@ -47,6 +47,16 @@ export default function Navbar() {
 
     return (
         <>
+            {/* Client Login — Fixed Top-Left */}
+            <Link
+                href="/portal/login"
+                className=" fixed top-5 left-5 z-10000 flex items-center gap-2 px-4 py-2.5 bg-white/15 hover:bg-white/30 backdrop-blur-md border border-white/25 text-black font-semibold rounded-full transition-all hover:scale-105 active:scale-95 shadow-lg text-sm"
+                aria-label="Client Login"
+            >
+                <User size={16} />
+                <span className="hidden sm:inline">Client Login</span>
+            </Link>
+
             {/* Toggle Button (Fixed Top-Right) */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
@@ -80,6 +90,18 @@ export default function Navbar() {
                                 </Link>
                             </li>
                         ))}
+
+                        {/* Client Portal CTA */}
+                        <li>
+                            <Link
+                                href="/portal/login"
+                                onClick={() => setIsOpen(false)}
+                                className="inline-flex items-center gap-3 px-8 py-3 bg-primary text-black text-xl md:text-2xl font-bold rounded-full hover:bg-primary-dark transition-all duration-300 hover:scale-105 active:scale-95"
+                            >
+                                <LogIn size={22} />
+                                Client Portal
+                            </Link>
+                        </li>
                     </ul>
                 </div>
             </nav>

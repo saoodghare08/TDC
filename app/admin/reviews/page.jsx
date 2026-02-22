@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { Trash2, CheckCircle, XCircle } from 'lucide-react';
 import Image from 'next/image';
+import Swal from 'sweetalert2';
 
 export default function ReviewsPage() {
     const [reviews, setReviews] = useState([]);
@@ -26,11 +27,29 @@ export default function ReviewsPage() {
     }, []);
 
     const handleDelete = async (id) => {
-        if (!confirm('Are you sure you want to delete this review?')) return;
+        const result = await Swal.fire({
+            title: 'Delete Review?',
+            text: 'This action cannot be undone!',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: 'Yes, delete it!',
+            cancelButtonText: 'Cancel'
+        });
+
+        if (!result.isConfirmed) return;
 
         const { error } = await supabase.from('reviews').delete().eq('id', id);
         if (!error) {
             setReviews(reviews.filter(r => r.id !== id));
+            Swal.fire({
+                icon: 'success',
+                title: 'Deleted!',
+                text: 'Review has been deleted.',
+                confirmButtonColor: '#fdbc00',
+                timer: 1500
+            });
         }
     };
 
