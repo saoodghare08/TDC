@@ -48,7 +48,7 @@ export default function CreateClientPage() {
                 email: formData.email,
                 password: formData.password,
                 options: {
-                    emailRedirectTo: `${window.location.origin}/portal/dashboard`,
+                    emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.thedietcascade.com'}/portal/dashboard`,
                 }
             });
 
