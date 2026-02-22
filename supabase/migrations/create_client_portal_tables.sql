@@ -221,3 +221,23 @@ ON storage.objects FOR SELECT
 TO authenticated
 USING (bucket_id = 'progress-photos');
 */
+
+-- ============================================
+-- BLOG IMAGES BUCKET (blog-images)
+-- ============================================
+-- Run in Supabase Dashboard → SQL Editor if not already applied:
+/*
+INSERT INTO storage.buckets (id, name, public) VALUES ('blog-images', 'blog-images', true);
+
+CREATE POLICY "Authenticated users can upload blog images"
+ON storage.objects FOR INSERT TO authenticated
+WITH CHECK (bucket_id = 'blog-images');
+
+CREATE POLICY "Public can read blog images"
+ON storage.objects FOR SELECT TO public
+USING (bucket_id = 'blog-images');
+
+CREATE POLICY "Authenticated users can delete blog images"
+ON storage.objects FOR DELETE TO authenticated
+USING (bucket_id = 'blog-images');
+*/
