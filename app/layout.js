@@ -85,13 +85,30 @@ function StructuredData() {
     '@id': 'https://thedietcascade.com',
     url: 'https://thedietcascade.com',
     telephone: '+919004491160',
-    address: {
-      '@type': 'PostalAddress',
-      streetAddress: 'Nerul',
-      addressLocality: 'Navi Mumbai',
-      addressRegion: 'Maharashtra',
-      addressCountry: 'IN',
-    },
+    address: [
+      {
+        '@type': 'PostalAddress',
+        streetAddress: 'Nerul',
+        addressLocality: 'Navi Mumbai',
+        addressRegion: 'Maharashtra',
+        addressCountry: 'IN',
+      },
+      {
+        "@type": "PostalAddress",
+        "addressLocality": "Ajman",
+        "addressCountry": "UAE"
+      },
+      {
+        "@type": "PostalAddress",
+        "addressLocality": "Dubai",
+        "addressCountry": "UAE"
+      },
+      {
+        "@type": "PostalAddress",
+        "addressLocality": "Sharjah",
+        "addressCountry": "UAE"
+      }
+    ],
     geo: {
       '@type': 'GeoCoordinates',
       latitude: 19.0330,
@@ -117,6 +134,7 @@ function StructuredData() {
     sameAs: [
       'https://www.instagram.com/thedietcascade',
       'https://twitter.com/thedietcascade',
+      'https://www.linkedin.com/in/sabah-aslam-ghare-9125a3213/'
     ],
   };
 
