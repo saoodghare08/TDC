@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { Trash2, CheckCircle, XCircle } from 'lucide-react';
+import { Trash2, CheckCircle, XCircle, Sparkles } from 'lucide-react';
 import Image from 'next/image';
 import Swal from 'sweetalert2';
 
@@ -65,52 +65,62 @@ export default function ReviewsPage() {
     };
 
     return (
-        <div>
-            <div className="flex justify-between items-center mb-8">
-                <h1 className="text-3xl font-bold text-heading">Reviews Management</h1>
-            </div>
-
-            {loading ? (
-                <div className="text-gray-500">Loading reviews...</div>
-            ) : (
-                <div className="grid gap-4">
-                    {reviews.length === 0 && <p className="text-gray-500">No reviews found.</p>}
-
-                    {reviews.map((review) => (
-                        <div key={review.id} className="bg-white p-6 rounded-2xl border border-gray-100 flex items-start gap-4 shadow-sm hover:shadow-md transition">
-                            <div className="flex-1">
-                                <div className="flex justify-between items-start mb-2">
-                                    <div>
-                                        <h3 className="font-bold text-lg text-heading">{review.name}</h3>
-                                        <p className="text-sm text-gray-400">{review.location}</p>
-                                    </div>
-                                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${review.is_approved ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'}`}>
-                                        {review.is_approved ? 'Published' : 'Pending'}
-                                    </span>
-                                </div>
-                                <p className="text-gray-600 italic">"{review.content}"</p>
+        <div className="min-h-screen bg-gray-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+                <div className="flex items-start sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h1 className="text-2xl sm:text-3xl font-bold text-heading flex items-center gap-3">
+                            <div className="p-2 bg-primary/10 rounded-xl">
+                                <Sparkles size={22} className="text-primary" />
                             </div>
-
-                            <div className="flex flex-col gap-2">
-                                <button
-                                    onClick={() => toggleApproval(review.id, review.is_approved)}
-                                    className={`p-2 rounded-lg transition-colors ${review.is_approved ? 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
-                                    title={review.is_approved ? "Unpublish" : "Approve"}
-                                >
-                                    {review.is_approved ? <XCircle size={20} /> : <CheckCircle size={20} />}
-                                </button>
-                                <button
-                                    onClick={() => handleDelete(review.id)}
-                                    className="p-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition-colors"
-                                    title="Delete"
-                                >
-                                    <Trash2 size={20} />
-                                </button>
-                            </div>
-                        </div>
-                    ))}
+                            Reviews Management
+                        </h1>
+                        <p className="text-gray-400 text-sm mt-1 ml-1">Manage all client reviews - Publish, Hide, Delete</p>
+                    </div>
                 </div>
-            )}
+
+                {loading ? (
+                    <div className="text-gray-500">Loading reviews...</div>
+                ) : (
+                    <div className="grid gap-4">
+                        {reviews.length === 0 && <p className="text-gray-500">No reviews found.</p>}
+
+                        {reviews.map((review) => (
+                            <div key={review.id} className="bg-white p-6 rounded-2xl border border-gray-100 flex items-start gap-4 shadow-sm hover:shadow-md transition">
+                                <div className="flex-1">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div>
+                                            <h3 className="font-bold text-lg text-heading">{review.name}</h3>
+                                            <p className="text-sm text-gray-400">{review.location}</p>
+                                        </div>
+                                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${review.is_approved ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'}`}>
+                                            {review.is_approved ? 'Published' : 'Pending'}
+                                        </span>
+                                    </div>
+                                    <p className="text-gray-600 italic">"{review.content}"</p>
+                                </div>
+
+                                <div className="flex flex-col gap-2">
+                                    <button
+                                        onClick={() => toggleApproval(review.id, review.is_approved)}
+                                        className={`p-2 rounded-lg transition-colors ${review.is_approved ? 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
+                                        title={review.is_approved ? "Unpublish" : "Approve"}
+                                    >
+                                        {review.is_approved ? <XCircle size={20} /> : <CheckCircle size={20} />}
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(review.id)}
+                                        className="p-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition-colors"
+                                        title="Delete"
+                                    >
+                                        <Trash2 size={20} />
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
