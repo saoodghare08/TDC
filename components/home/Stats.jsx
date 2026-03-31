@@ -20,7 +20,7 @@ const StatItem = ({ label, value }) => {
                 ease: 'power2.out',
                 scrollTrigger: {
                     trigger: activeRef.current,
-                    start: 'top 85%',
+                    start: 'top 55%',
                     toggleActions: 'play none none reverse' // Play on enter, reverse on leave up
                 },
                 onUpdate: () => {
@@ -34,19 +34,19 @@ const StatItem = ({ label, value }) => {
     }, [numericValue, suffix]);
 
     return (
-        <div className="flex flex-col items-center justify-center p-8 bg-white rounded-2xl shadow-xl border border-gray-100 hover:-translate-y-2 transition-transform duration-300">
-            <h3 ref={activeRef} className="text-5xl md:text-6xl font-bold text-transparent bg-clip-text bg-linear-to-r from-primary to-blue-600 mb-2 font-heading">
+        <div className="flex flex-col items-center justify-center p-4 md:p-8 bg-white rounded-xl md:rounded-2xl shadow-lg md:shadow-xl border border-gray-100 hover:-translate-y-2 transition-transform duration-300">
+            <h3 ref={activeRef} className="text-3xl md:text-6xl font-bold text-transparent bg-clip-text bg-linear-to-r from-primary to-blue-600 mb-1 md:mb-2 font-heading">
                 0
             </h3>
-            <p className="text-gray-500 font-medium uppercase tracking-wider text-sm">{label}</p>
+            <p className="text-gray-500 font-medium uppercase tracking-wider text-xs md:text-sm">{label}</p>
         </div>
     );
 };
 
 export default function Stats() {
     return (
-        <Section className="bg-gray-50 -mt-10 md:-mt-20 relative z-10">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
+        <Section className="bg-gray-50 -mt-10 md:-mt-20 relative z-10 !py-10 md:!py-32">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-8">
                 {data.about.stats.map((stat, idx) => (
                     <StatItem key={idx} {...stat} />
                 ))}
