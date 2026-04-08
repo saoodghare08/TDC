@@ -20,7 +20,7 @@ const StatItem = ({ label, value }) => {
                 ease: 'power2.out',
                 scrollTrigger: {
                     trigger: activeRef.current,
-                    start: 'top 55%',
+                    start: 'top 100%',
                     toggleActions: 'play none none reverse' // Play on enter, reverse on leave up
                 },
                 onUpdate: () => {
