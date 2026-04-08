@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import Section from '@/components/ui/Section';
+import { Calendar, ChevronRight } from 'lucide-react';
 
 export async function generateMetadata() {
     const supabase = await createClient();
@@ -30,44 +31,60 @@ export default async function BlogIndexPage() {
         .order('created_at', { ascending: false });
 
     return (
-        <main className="bg-white min-h-screen">
+        <main className="bg-surface min-h-screen">
             <Navbar />
 
             {/* Header */}
-            <div className="bg-heading text-white pt-40 pb-20 px-6 text-center rounded-b-[3rem]">
-                <h1 className="text-5xl font-heading font-bold mb-4">Our Blog</h1>
-                <p className="text-gray-400 max-w-2xl mx-auto text-lg">
-                    Expert insights on nutrition, wellness, and healthy living.
-                </p>
+            <div className="relative pt-32 pb-24 md:pt-48 md:pb-32 overflow-hidden bg-heading rounded-b-[2.5rem] md:rounded-b-[4rem]">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2" />
+                <div className="absolute bottom-0 left-0 w-80 h-80 bg-primary/5 rounded-full blur-[120px] translate-y-1/2 -translate-x-1/3" />
+                
+                <div className="relative z-10 px-6 max-w-3xl mx-auto text-center">
+                    <h1 className="text-4xl md:text-6xl font-heading font-bold text-white mb-6 leading-tight">
+                        Our <span className="text-primary-200">Insights</span>
+                    </h1>
+                    <p className="text-white/60 max-w-xl mx-auto text-base md:text-xl font-light leading-relaxed">
+                        Expert nutrition advice, wellness strategies, and healthy recipes curated for your lifestyle.
+                    </p>
+                </div>
             </div>
 
-            <Section id="posts" className="bg-white">
+            <Section id="posts" className="bg-surface pb-24">
                 {!posts || posts.length === 0 ? (
-                    <div className="text-center py-20 text-gray-500">
-                        <p>No posts published yet. Check back soon!</p>
+                    <div className="text-center py-20 px-6 bg-white rounded-[2rem] border border-gray-50 shadow-sm">
+                        <p className="text-para font-medium italic">New insights are being drafted. Check back shortly!</p>
                     </div>
                 ) : (
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
                         {posts.map((post) => (
-                            <Link href={`/blog/${post.slug}`} key={post.id} className="group flex flex-col bg-white border border-gray-100 rounded-3xl overflow-hidden hover:shadow-xl transition-shadow">
-                                <div className="relative h-64 w-full overflow-hidden">
+                            <Link href={`/blog/${post.slug}`} key={post.id} className="group flex flex-col bg-white border border-gray-100 rounded-[2rem] overflow-hidden hover:shadow-2xl hover:shadow-heading/5 transition-shadow duration-300 active:scale-[0.98]">
+                                <div className="relative h-60 md:h-72 w-full overflow-hidden">
                                     {post.cover_image ? (
                                         <Image
                                             src={post.cover_image}
                                             alt={post.title}
                                             fill
-                                            className="object-cover transition-transform duration-700 group-hover:scale-110"
+                                            className="object-cover transition-transform duration-1000 group-hover:scale-110"
                                         />
                                     ) : (
-                                        <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400">TDC</div>
+                                        <div className="w-full h-full bg-surface flex items-center justify-center text-para/20 font-heading font-black text-4xl">TDC</div>
                                     )}
+                                    <div className="absolute top-4 left-4">
+                                        <span className="bg-white/90 backdrop-blur-sm text-heading text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
+                                            <Calendar size={12} className="text-primary" />
+                                            {post.created_at ? new Date(post.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Recent'}
+                                        </span>
+                                    </div>
                                 </div>
-                                <div className="p-8 flex-1 flex flex-col">
-                                    <h2 className="text-2xl font-heading font-bold text-heading mb-3 group-hover:text-primary transition-colors">
+                                <div className="p-6 md:p-8 flex-1 flex flex-col">
+                                    <h2 className="text-xl md:text-2xl font-heading font-bold text-heading mb-4 group-hover:text-primary transition-colors leading-snug">
                                         {post.title}
                                     </h2>
-                                    <p className="text-gray-600 mb-6 line-clamp-3 flex-1">{post.excerpt}</p>
-                                    <span className="text-primary font-bold text-sm uppercase tracking-wider">Read More &rarr;</span>
+                                    <p className="text-para text-sm md:text-base mb-6 line-clamp-3 flex-1 leading-relaxed">{post.excerpt}</p>
+                                    <div className="flex items-center gap-2 text-primary text-xs md:text-sm font-bold uppercase tracking-widest mt-auto">
+                                        Access Insight
+                                        <ChevronRight size={16} className="transition-transform group-hover:translate-x-1" />
+                                    </div>
                                 </div>
                             </Link>
                         ))}

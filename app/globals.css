@@ -2,15 +2,15 @@
 
 @theme {
   --color-heading: rgb(0 10 45);
-  --color-para: #777;
-  --color-para-tint: #e4e4e4;
+  --color-para: #555c66;
+  --color-primary: #2d6a4f;
+  --color-primary-hover: #1b4332;
+  --color-accent: #fdbc00;
+  --color-accent-dark: #b45309;
+  --color-surface: #f9fafb;
   --color-brand-white: #fff;
   --color-brand-black: #212529;
-  --color-helper: #8490ff;
-  --color-overlay: #3e64ff;
-  --color-helper-tint: #f3f4ff;
-  --color-bg-tint: rgb(249 249 255);
-  --color-icons-bg: rgba(144, 172, 209, 0.2);
+  --color-overlay: rgba(0, 10, 45, 0.6);
   --color-card-dark: #161922;
 }
 
@@ -45,4 +45,29 @@ html.lenis, html.lenis body {
 
 .lenis.lenis-scrolling iframe {
   pointer-events: none;
+}
+
+/* Modal enter — scale from 0.95, never from 0 */
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Scrollbar hide */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { Calendar, TrendingUp, FileText, Activity, User, ArrowRight, Flame, Target } from 'lucide-react';
+import { Calendar, TrendingUp, FileText, Activity, User, ArrowRight, Flame, Target, LogOut, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
 export default function DashboardPage() {
@@ -47,10 +47,10 @@ export default function DashboardPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="min-h-screen flex items-center justify-center bg-surface">
                 <div className="text-center">
-                    <div className="w-14 h-14 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                    <p className="text-gray-500 font-medium">Loading your dashboard…</p>
+                    <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-para text-sm font-medium animate-pulse">Syncing your health data...</p>
                 </div>
             </div>
         );
@@ -58,19 +58,19 @@ export default function DashboardPage() {
 
     if (!clientData) {
         return (
-            <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
-                <div className="text-center w-full max-w-sm bg-white p-8 sm:p-12 rounded-3xl shadow-xl border border-gray-100">
-                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-5">
-                        <User size={30} className="text-gray-400" />
+            <div className="min-h-screen flex items-center justify-center p-6 bg-surface">
+                <div className="text-center w-full max-w-sm bg-white p-10 rounded-[2.5rem] shadow-2xl shadow-heading/5 border border-gray-100">
+                    <div className="w-20 h-20 bg-surface rounded-full flex items-center justify-center mx-auto mb-6">
+                        <User size={36} className="text-para/30" />
                     </div>
-                    <h2 className="text-xl font-bold text-heading mb-2">Profile Not Found</h2>
-                    <p className="text-gray-500 text-sm mb-6">Your client profile hasn't been set up yet. Please contact your coach.</p>
+                    <h2 className="text-xl font-bold text-heading mb-3">Profile Pending</h2>
+                    <p className="text-para text-sm mb-8 leading-relaxed">Your profile hasn't been initialized yet. Your coach will update this shortly.</p>
                     <a
                         href="https://wa.me/+919004491160"
                         target="_blank" rel="noopener noreferrer"
-                        className="px-6 py-3 bg-primary text-black font-bold rounded-xl hover:bg-primary-dark transition inline-block text-sm"
+                        className="w-full py-4 bg-primary text-white font-bold rounded-2xl transition-transform duration-150 active:scale-[0.97] inline-block text-sm"
                     >
-                        Contact Support
+                        Inquire Status
                     </a>
                 </div>
             </div>
@@ -94,125 +94,132 @@ export default function DashboardPage() {
     const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
     const STATUS_STYLES = {
-        active: { bg: 'bg-green-100', text: 'text-green-700' },
+        active: { bg: 'bg-primary/10', text: 'text-primary' },
         completed: { bg: 'bg-blue-100', text: 'text-blue-700' },
-        paused: { bg: 'bg-yellow-100', text: 'text-yellow-700' },
+        paused: { bg: 'bg-accent/10', text: 'text-accent-dark' },
     };
-    const statusStyle = STATUS_STYLES[clientData.status] || { bg: 'bg-gray-100', text: 'text-gray-600' };
+    const statusStyle = STATUS_STYLES[clientData.status] || { bg: 'bg-surface', text: 'text-para' };
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+        <div className="min-h-screen bg-surface">
+            <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
 
-                {/* ── Header ── */}
-                <header className="mb-6 sm:mb-8">
-                    <p className="text-sm text-gray-400 font-medium">{greeting},</p>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-heading">{firstName} 👋</h1>
+                {/* Header */}
+                <header className="flex items-center justify-between mb-10">
+                    <div>
+                        <p className="text-[10px] md:text-xs text-para font-bold uppercase tracking-[0.2em] mb-1">{greeting}</p>
+                        <h1 className="text-3xl md:text-4xl font-heading font-bold text-heading">{firstName} 👋</h1>
+                    </div>
+                    <div className={statusStyle.bg + " " + statusStyle.text + " px-4 py-1.5 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-wider hidden sm:block shadow-sm"}>
+                        {clientData.status || 'Active'}
+                    </div>
                 </header>
 
-                {/* ── Stats Grid ── */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
+                {/* Stats Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                     {[
-                        { icon: Target, iconBg: 'bg-blue-50', iconText: 'text-blue-600', label: 'Plan Type', value: clientData.assigned_plan_type || 'None' },
-                        { icon: TrendingUp, iconBg: 'bg-green-50', iconText: 'text-green-600', label: 'Latest Weight', value: latestProgress?.weight_kg ? `${latestProgress.weight_kg} kg` : '—' },
-                        { icon: Activity, iconBg: 'bg-purple-50', iconText: 'text-purple-600', label: 'Progress Logs', value: progressCount },
-                        { icon: Flame, iconBg: 'bg-orange-50', iconText: 'text-orange-600', label: 'Days Active', value: daysElapsed !== null ? Math.max(0, daysElapsed) : '—' },
-                    ].map(({ icon: Icon, iconBg, iconText, label, value }) => (
-                        <div key={label} className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-gray-100">
-                            <div className={`w-9 h-9 ${iconBg} ${iconText} rounded-xl flex items-center justify-center mb-3`}>
+                        { icon: Target, bg: 'bg-primary/5', color: 'text-primary', label: 'Program', value: clientData.assigned_plan_type || 'General' },
+                        { icon: TrendingUp, bg: 'bg-accent/5', color: 'text-accent-dark', label: 'Weight', value: latestProgress?.weight_kg ? `${latestProgress.weight_kg} kg` : '—' },
+                        { icon: Activity, bg: 'bg-blue-50', color: 'text-blue-600', label: 'Entries', value: progressCount },
+                        { icon: Flame, bg: 'bg-orange-50', color: 'text-orange-600', label: 'Streak', value: daysElapsed !== null ? `${Math.max(0, daysElapsed)} days` : '—' },
+                    ].map(({ icon: Icon, bg, color, label, value }) => (
+                        <div key={label} className="bg-white p-5 rounded-2xl shadow-2xl shadow-heading/5 border border-gray-50 transition-transform duration-200 hover:-translate-y-1">
+                            <div className={`w-9 h-9 ${bg} ${color} rounded-xl flex items-center justify-center mb-4`}>
                                 <Icon size={18} />
                             </div>
-                            <p className="text-xs text-gray-400 font-medium mb-0.5">{label}</p>
-                            <p className="text-base sm:text-lg font-bold text-heading truncate">{value}</p>
+                            <p className="text-[10px] text-para font-bold uppercase tracking-wider mb-1">{label}</p>
+                            <p className="text-sm md:text-base font-bold text-heading truncate">{value}</p>
                         </div>
                     ))}
                 </div>
 
-                {/* ── Quick Actions ── */}
-                <div className="grid sm:grid-cols-2 gap-3 sm:gap-4 mb-6 sm:mb-8">
+                {/* Quick Actions */}
+                <div className="grid sm:grid-cols-2 gap-4 mb-8">
                     <Link
                         href="/portal/plans"
-                        className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-primary/20 transition flex items-center justify-between group"
+                        className="bg-white p-6 rounded-[2rem] shadow-2xl shadow-heading/5 border border-gray-50 transition-all duration-250 active:scale-[0.98] flex items-center justify-between group cursor-pointer"
                     >
-                        <div className="flex items-center gap-3 sm:gap-4">
-                            <div className="p-3 bg-primary/10 text-primary rounded-xl group-hover:bg-heading group-hover:text-white transition-colors shrink-0">
-                                <FileText size={20} />
+                        <div className="flex items-center gap-5">
+                            <div className="p-4 bg-primary/10 text-primary rounded-2xl group-hover:bg-primary group-hover:text-white transition-colors">
+                                <FileText size={22} />
                             </div>
                             <div>
-                                <h3 className="font-bold text-heading text-sm sm:text-base">View Diet Plans</h3>
-                                <p className="text-xs sm:text-sm text-gray-400">Access your personalized plans</p>
+                                <h3 className="font-bold text-heading text-lg">My Plans</h3>
+                                <p className="text-xs text-para">Interactive diet & workout guides</p>
                             </div>
                         </div>
-                        <ArrowRight size={18} className="text-gray-300 group-hover:text-heading transition-colors shrink-0" />
+                        <ChevronRight size={20} className="text-para/30 group-hover:text-primary transition-colors group-hover:translate-x-1" />
                     </Link>
 
                     <Link
                         href="/portal/progress"
-                        className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-green-200 transition flex items-center justify-between group"
+                        className="bg-white p-6 rounded-[2rem] shadow-2xl shadow-heading/5 border border-gray-50 transition-all duration-250 active:scale-[0.98] flex items-center justify-between group cursor-pointer"
                     >
-                        <div className="flex items-center gap-3 sm:gap-4">
-                            <div className="p-3 bg-green-50 text-green-600 rounded-xl group-hover:bg-green-600 group-hover:text-white transition-colors shrink-0">
-                                <TrendingUp size={20} />
+                        <div className="flex items-center gap-5">
+                            <div className="p-4 bg-accent/10 text-accent-dark rounded-2xl group-hover:bg-accent group-hover:text-white transition-colors">
+                                <TrendingUp size={22} />
                             </div>
                             <div>
-                                <h3 className="font-bold text-heading text-sm sm:text-base">Log Progress</h3>
-                                <p className="text-xs sm:text-sm text-gray-400">Update your measurements</p>
+                                <h3 className="font-bold text-heading text-lg">Log Update</h3>
+                                <p className="text-xs text-para">Track measurements & weight</p>
                             </div>
                         </div>
-                        <ArrowRight size={18} className="text-gray-300 group-hover:text-green-600 transition-colors shrink-0" />
+                        <ChevronRight size={20} className="text-para/30 group-hover:text-accent-dark transition-colors group-hover:translate-x-1" />
                     </Link>
                 </div>
 
-                {/* ── Current Plan ── */}
+                {/* Progress Card */}
                 {clientData.plan_start_date && (
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-8">
-                        <div className="flex items-center justify-between mb-5">
-                            <h2 className="text-base sm:text-lg font-bold text-heading">Current Plan</h2>
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${statusStyle.bg} ${statusStyle.text}`}>
-                                {clientData.status?.toUpperCase()}
-                            </span>
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl shadow-heading/5 border border-gray-50 p-6 md:p-10 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-48 h-48 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+                        
+                        <div className="flex items-center justify-between mb-8">
+                            <h2 className="text-lg md:text-xl font-heading font-bold text-heading">Plan Tracking</h2>
+                            <span className="text-[10px] font-bold text-para uppercase tracking-[0.2em]">Live Status</span>
                         </div>
 
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
-                            <div className="bg-gray-50 rounded-xl p-3 sm:p-4">
-                                <p className="text-xs text-gray-400 mb-1 flex items-center gap-1">
-                                    <Calendar size={10} /> Start
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-10">
+                            <div className="bg-surface rounded-2xl p-4 md:p-5 border border-gray-50">
+                                <p className="text-[10px] text-para font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                    <Calendar size={12} className="text-primary" /> Start Date
                                 </p>
-                                <p className="font-bold text-heading text-sm">
+                                <p className="font-bold text-heading text-sm md:text-base">
                                     {new Date(clientData.plan_start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                 </p>
                             </div>
-                            <div className="bg-gray-50 rounded-xl p-3 sm:p-4">
-                                <p className="text-xs text-gray-400 mb-1 flex items-center gap-1">
-                                    <Calendar size={10} /> End
+                            <div className="bg-surface rounded-2xl p-4 md:p-5 border border-gray-50">
+                                <p className="text-[10px] text-para font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                    <Calendar size={12} className="text-primary" /> End Date
                                 </p>
-                                <p className="font-bold text-heading text-sm">
+                                <p className="font-bold text-heading text-sm md:text-base">
                                     {clientData.plan_end_date
                                         ? new Date(clientData.plan_end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                                        : '—'}
+                                        : 'Flexible'}
                                 </p>
                             </div>
-                            <div className="bg-gray-50 rounded-xl p-3 sm:p-4 col-span-2 sm:col-span-1">
-                                <p className="text-xs text-gray-400 mb-1">Goal</p>
-                                <p className="font-bold text-heading text-sm truncate">{clientData.initial_goals || '—'}</p>
+                            <div className="bg-surface rounded-2xl p-4 md:p-5 border border-gray-50 col-span-2 md:col-span-1">
+                                <p className="text-[10px] text-para font-bold uppercase tracking-wider mb-2">Main Goal</p>
+                                <p className="font-bold text-heading text-sm md:text-base truncate">{clientData.initial_goals || 'Sustainable Growth'}</p>
                             </div>
                         </div>
 
                         {totalDays && (
-                            <div>
-                                <div className="flex justify-between text-xs sm:text-sm mb-2">
-                                    <span className="font-medium text-gray-500">Journey Progress</span>
-                                    <span className="font-bold text-primary">{progressPercent}%</span>
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-end">
+                                    <div>
+                                        <p className="text-[10px] text-para font-bold uppercase tracking-widest mb-1">Overall Progress</p>
+                                        <p className="text-3xl font-heading font-bold text-heading leading-none">{progressPercent}%</p>
+                                    </div>
+                                    <p className="text-[10px] font-bold text-primary uppercase tracking-widest bg-primary/10 px-3 py-1 rounded-lg">
+                                        {daysRemaining > 0 ? `${daysRemaining} days left` : 'Goal Reach!'}
+                                    </p>
                                 </div>
-                                <div className="h-2.5 sm:h-3 bg-gray-100 rounded-full overflow-hidden">
+                                <div className="h-4 bg-surface rounded-full overflow-hidden border border-gray-100 p-0.5">
                                     <div
-                                        className="h-full bg-heading rounded-full transition-all duration-700"
+                                        className="h-full bg-heading rounded-full transition-all duration-1000 ease-out"
                                         style={{ width: `${progressPercent}%` }}
                                     />
                                 </div>
-                                <p className="text-right text-xs text-gray-400 mt-2">
-                                    {daysRemaining > 0 ? `${daysRemaining} days remaining` : 'Plan completed'}
-                                </p>
                             </div>
                         )}
                     </div>

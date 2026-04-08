@@ -1,19 +1,15 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Quote, X } from 'lucide-react';
-import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
 import data from '@/data/content.json';
 import Section from '@/components/ui/Section';
 
 export default function Testimonials({ initialReviews }) {
     const scrollRef = useRef(null);
-    const [reviews, setReviews] = useState(initialReviews && initialReviews.length > 0 ? initialReviews : data.testimonials);
+    const [reviews] = useState(initialReviews && initialReviews.length > 0 ? initialReviews : data.testimonials);
     const [selectedReview, setSelectedReview] = useState(null);
-
-    // Initial state is already set from prop or fallback, no need for client-side useEffect fetch
-    // unless we wanted real-time updates, which contradicts the 6-day cache requirement.
 
     const scroll = (direction) => {
         if (scrollRef.current) {
@@ -34,13 +30,13 @@ export default function Testimonials({ initialReviews }) {
                 <div className="flex w-full md:w-auto items-center justify-between md:justify-end gap-4">
                     <Link
                         href="/share-story"
-                        className="px-6 py-3 bg-black text-white text-sm font-bold rounded-full hover:bg-gray-800 transition mr-0 md:mr-4 shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2"
+                        className="px-6 py-3 bg-black text-white text-sm font-bold rounded-full transition-transform duration-150 active:scale-[0.97] shadow-lg flex items-center gap-2 cursor-pointer"
                     >
                         Share Your Story
                     </Link>
                     <div className="flex gap-2">
-                        <button onClick={() => scroll('left')} className="p-2 border rounded-full hover:bg-black hover:text-white transition"><ChevronLeft /></button>
-                        <button onClick={() => scroll('right')} className="p-2 border rounded-full hover:bg-black hover:text-white transition"><ChevronRight /></button>
+                        <button onClick={() => scroll('left')} className="p-2 border rounded-full transition-colors duration-200 hover:bg-black hover:text-white active:scale-[0.95] cursor-pointer"><ChevronLeft /></button>
+                        <button onClick={() => scroll('right')} className="p-2 border rounded-full transition-colors duration-200 hover:bg-black hover:text-white active:scale-[0.95] cursor-pointer"><ChevronRight /></button>
                     </div>
                 </div>
             </div>
@@ -60,10 +56,10 @@ export default function Testimonials({ initialReviews }) {
                             className="cursor-pointer group flex-1 mb-6"
                             onClick={() => setSelectedReview(t)}
                         >
-                            <p className="text-gray-600 italic leading-relaxed line-clamp-6 group-hover:text-gray-900 transition-colors">
-                                "{t.content || t.text}"
+                            <p className="text-gray-600 italic leading-relaxed line-clamp-6 group-hover:text-gray-900 transition-colors duration-200">
+                                &ldquo;{t.content || t.text}&rdquo;
                             </p>
-                            <span className="text-xs font-bold uppercase tracking-wider text-gray-400 mt-3 inline-block group-hover:text-black transition-colors border-b border-transparent group-hover:border-black">
+                            <span className="text-xs font-bold uppercase tracking-wider text-gray-400 mt-3 inline-block group-hover:text-black transition-colors duration-200 border-b border-transparent group-hover:border-black">
                                 Read Full Review
                             </span>
                         </div>
@@ -77,28 +73,31 @@ export default function Testimonials({ initialReviews }) {
                 ))}
             </div>
 
-            {/* Review Modal */}
+            {/* Review Modal — enter from scale(0.95), CSS transition for interruptibility */}
             {selectedReview && (
                 <div
-                    className="fixed inset-0 z-1000000 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-all"
+                    className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
                     onClick={() => setSelectedReview(null)}
                 >
                     <div
-                        className="bg-white rounded-3xl p-8 max-w-2xl w-full shadow-2xl relative animate-in fade-in zoom-in duration-200"
+                        className="bg-white rounded-3xl p-8 max-w-2xl w-full shadow-2xl relative"
+                        style={{
+                            animation: 'modalIn 200ms cubic-bezier(0.23, 1, 0.32, 1) both',
+                        }}
                         onClick={e => e.stopPropagation()}
                     >
                         <button
                             onClick={() => setSelectedReview(null)}
-                            className="absolute top-6 right-6 p-2 bg-gray-100 hover:bg-black hover:text-white rounded-full transition-colors z-101"
+                            className="absolute top-6 right-6 p-2 bg-gray-100 rounded-full transition-colors duration-150 hover:bg-black hover:text-white active:scale-[0.95] cursor-pointer"
                         >
                             <X size={20} />
                         </button>
 
                         <Quote className="text-black/10 mb-6" size={60} />
 
-                        <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                        <div className="max-h-[60vh] overflow-y-auto pr-2">
                             <p className="text-xl text-gray-800 italic leading-relaxed mb-8 font-medium">
-                                "{selectedReview.content || selectedReview.text}"
+                                &ldquo;{selectedReview.content || selectedReview.text}&rdquo;
                             </p>
                         </div>
 

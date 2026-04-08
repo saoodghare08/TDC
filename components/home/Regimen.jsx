@@ -1,130 +1,140 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { ChevronDown, ArrowRight } from 'lucide-react';
 import data from '@/data/content.json';
 import Image from 'next/image';
 import clsx from 'clsx';
 
 export default function Regimen() {
     const router = useRouter();
-    const scrollRef = useRef(null);
-    const [activeIndex, setActiveIndex] = useState(0);
-
-    const handleScroll = () => {
-        if (scrollRef.current) {
-            const { scrollLeft, offsetWidth } = scrollRef.current;
-            // Calculate index based on scroll position and card width
-            const index = Math.round(scrollLeft / (offsetWidth * 0.85)); // 0.82-0.85 roughly the mobile width
-            setActiveIndex(index);
-        }
-    };
-
-    const scrollTo = (index) => {
-        if (scrollRef.current) {
-            const { offsetWidth } = scrollRef.current;
-            const cardWidth = window.innerWidth < 768 ? offsetWidth * 0.82 : offsetWidth;
-            scrollRef.current.scrollTo({
-                left: index * cardWidth,
-                behavior: 'smooth'
-            });
-        }
-    };
-
-    const scroll = (direction) => {
-        if (scrollRef.current) {
-            const { current } = scrollRef;
-            const scrollAmount = direction === 'left' ? -current.offsetWidth : current.offsetWidth;
-            current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
-        }
-    };
+    const [openIndex, setOpenIndex] = useState(0);
 
     return (
-        <div id="regimen" className="py-16 md:py-24 bg-white relative overflow-hidden">
-            <div className="container mx-auto px-6 mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
-                <div className='sm:text-left text-center'>
-                    <h2 className="text-3xl md:text-5xl font-heading font-bold text-heading">What We Offer</h2>
-                    <p className="text-gray-500 mt-2 max-w-lg">Comprehensive health and wellness regimens tailored for you.</p>
+        <section id="regimen" className="py-16 md:py-28 bg-white">
+            <div className="container mx-auto px-6 md:px-12 max-w-5xl">
+                {/* Header */}
+                <div className="mb-10 md:mb-14 text-center md:text-left">
+                    <span className="text-primary font-semibold tracking-[0.2em] uppercase text-[11px] md:text-xs block mb-3">
+                        Our Regimens
+                    </span>
+                    <h2 className="text-3xl md:text-5xl font-heading font-bold text-heading">
+                        What We Offer
+                    </h2>
+                    <p className="text-para mt-3 max-w-lg md:mx-0 mx-auto text-sm md:text-base">
+                        Comprehensive health and wellness regimens tailored for you.
+                    </p>
                 </div>
-                <div className="hidden md:flex gap-4">
-                    <button
-                        onClick={() => scroll('left')}
-                        className="p-3 rounded-full border border-gray-200 hover:bg-primary hover:text-white transition-colors"
-                        aria-label="Previous Slide"
-                    >
-                        <ChevronLeft size={24} />
-                    </button>
-                    <button
-                        onClick={() => scroll('right')}
-                        className="p-3 rounded-full border border-gray-200 hover:bg-primary hover:text-white transition-colors"
-                        aria-label="Next Slide"
-                    >
-                        <ChevronRight size={24} />
-                    </button>
-                </div>
-            </div>
 
-            <div
-                ref={scrollRef}
-                onScroll={handleScroll}
-                className="flex overflow-x-auto snap-x snap-mandatory gap-4 md:gap-6 px-6 md:px-12 pb-8 md:pb-12 scrollbar-hide"
-                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-            >
-                {data.regimens.map((item, index) => (
-                    <div
-                        key={index}
-                        className="min-w-[82vw] md:min-w-[600px] lg:min-w-[800px] snap-center bg-gray-50 rounded-3xl overflow-hidden shadow-lg border border-gray-100 flex flex-col md:flex-row group hover:shadow-2xl transition-all duration-300"
-                    >
-                        {/* Image */}
-                        <div className="relative w-full md:w-2/5 h-[180px] md:h-auto overflow-hidden">
-                            <div className="absolute inset-0 bg-primary/10 group-hover:bg-transparent transition-colors z-10" />
-                            <Image
-                                src={item.image}
-                                alt={item.title}
-                                fill
-                                className="object-cover transition-transform duration-700 group-hover:scale-110"
-                            />
-                        </div>
-
-                        {/* Content */}
-                        <div className="p-5 md:p-10 flex-1 flex flex-col justify-center">
-                            <h3 className="text-xl md:text-3xl font-bold font-heading mb-4 md:mb-6 text-primary group-hover:text-heading transition-colors sm:text-center italic">
-                                {item.title}
-                            </h3>
-                            <ul className="space-y-2 md:space-y-4">
-                                {item.description.map((point, i) => (
-                                    <li key={i} className="flex gap-3 text-gray-600 text-sm md:text-base">
-                                        <CheckCircle2 className="text-primary shrink-0 mt-0.5 md:mt-1" size={16} />
-                                        <span>{point.replace(/^\d+\.\s*/, '')}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                            <button
-                                className="mt-8 px-8 py-4 md:py-3 bg-heading text-white rounded-xl w-full md:w-auto hover:bg-primary transition-colors hover:shadow-lg transform active:scale-95 cursor-pointer text-center font-bold"
-                                onClick={() => router.push(`/checkout?regimen=${encodeURIComponent(item.title)}`)}
+                {/* Accordion */}
+                <div className="space-y-3">
+                    {data.regimens.map((item, index) => {
+                        const isOpen = openIndex === index;
+                        return (
+                            <div
+                                key={index}
+                                className={clsx(
+                                    'rounded-2xl border overflow-hidden transition-colors duration-200',
+                                    isOpen
+                                        ? 'border-primary/20 bg-primary-50'
+                                        : 'border-gray-100 bg-white'
+                                )}
                             >
-                                Enroll Now
-                            </button>
-                        </div>
-                    </div>
-                ))}
-            </div>
+                                {/* Panel header */}
+                                <button
+                                    onClick={() => setOpenIndex(isOpen ? -1 : index)}
+                                    className="w-full flex items-center justify-between gap-4 p-4 md:p-6 text-left cursor-pointer transition-transform duration-150 active:scale-[0.995]"
+                                >
+                                    <div className="flex items-center gap-3 md:gap-4 min-w-0">
+                                        <div
+                                            className={clsx(
+                                                'relative w-11 h-11 md:w-14 md:h-14 rounded-xl overflow-hidden shrink-0 transition-all duration-300',
+                                                isOpen && 'w-0 h-0 opacity-0'
+                                            )}
+                                        >
+                                            <Image src={item.image} alt={item.title} fill className="object-cover" />
+                                        </div>
+                                        <h3
+                                            className={clsx(
+                                                'font-heading font-bold text-sm md:text-lg transition-colors duration-200 truncate',
+                                                isOpen ? 'text-primary' : 'text-heading'
+                                            )}
+                                        >
+                                            {item.title}
+                                        </h3>
+                                    </div>
+                                    <ChevronDown
+                                        className={clsx(
+                                            'shrink-0 text-para transition-transform duration-300',
+                                            isOpen && 'rotate-180 text-primary'
+                                        )}
+                                        style={{ transitionTimingFunction: 'var(--ease-out)' }}
+                                        size={20}
+                                    />
+                                </button>
 
-            {/* Mobile Indicators */}
-            <div className="flex md:hidden justify-center items-center gap-2 mt-2">
-                {data.regimens.map((_, i) => (
-                    <button
-                        key={i}
-                        onClick={() => scrollTo(i)}
-                        className={clsx(
-                            "h-1.5 transition-all duration-300 rounded-full",
-                            activeIndex === i ? "w-8 bg-black" : "w-1.5 bg-gray-300"
-                        )}
-                        aria-label={`Go to slide ${i + 1}`}
-                    />
-                ))}
+                                {/* Expandable content — grid-row trick for smooth height */}
+                                <div
+                                    className="grid transition-[grid-template-rows] duration-500"
+                                    style={{
+                                        gridTemplateRows: isOpen ? '1fr' : '0fr',
+                                        transitionTimingFunction: 'var(--ease-out)',
+                                    }}
+                                >
+                                    <div className="overflow-hidden">
+                                        <div className="px-4 pb-5 md:px-6 md:pb-8">
+                                            <div className="flex flex-col md:flex-row gap-5 md:gap-8">
+                                                {/* Image */}
+                                                <div className="relative w-full md:w-60 lg:w-72 h-44 md:h-48 rounded-xl overflow-hidden shrink-0">
+                                                    <Image
+                                                        src={item.image}
+                                                        alt={item.title}
+                                                        fill
+                                                        className="object-cover"
+                                                    />
+                                                </div>
+
+                                                {/* Description */}
+                                                <div className="flex-1 space-y-3">
+                                                    <ul className="space-y-2.5">
+                                                        {item.description.map((point, i) => (
+                                                            <li
+                                                                key={i}
+                                                                className="flex gap-2.5 text-para text-sm leading-relaxed"
+                                                                style={{
+                                                                    opacity: isOpen ? 1 : 0,
+                                                                    transform: isOpen ? 'translateY(0)' : 'translateY(8px)',
+                                                                    transition: `opacity 400ms var(--ease-out) ${i * 50}ms, transform 400ms var(--ease-out) ${i * 50}ms`,
+                                                                }}
+                                                            >
+                                                                <span className="w-1.5 h-1.5 rounded-full bg-primary mt-[7px] shrink-0" />
+                                                                <span>{point.replace(/^\d+\.\s*/, '')}</span>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+
+                                                    <button
+                                                        className="inline-flex items-center gap-2 mt-4 px-6 py-3 bg-heading text-white text-sm rounded-xl font-semibold cursor-pointer transition-all duration-150 active:scale-[0.97]"
+                                                        style={{ transitionTimingFunction: 'var(--ease-out)' }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            router.push(`/checkout?regimen=${encodeURIComponent(item.title)}`);
+                                                        }}
+                                                    >
+                                                        Enroll Now
+                                                        <ArrowRight size={16} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
-        </div>
+        </section>
     );
 }

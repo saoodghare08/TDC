@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
-import { Lock, Mail, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { Lock, Mail, ArrowRight, Eye, EyeOff, ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 
 export default function ClientLoginPage() {
@@ -15,7 +15,6 @@ export default function ClientLoginPage() {
     const supabase = createClient();
 
     useEffect(() => {
-        // Check if already logged in
         const checkUser = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
@@ -27,7 +26,7 @@ export default function ClientLoginPage() {
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
-        setError(''); // Clear error on input change
+        setError('');
     };
 
     const handleLogin = async (e) => {
@@ -52,41 +51,49 @@ export default function ClientLoginPage() {
                 router.refresh();
             }
         } catch (err) {
-            setError('An unexpected error occurred. Please try again.');
+            setError('Something went wrong. Please check your connection.');
             setLoading(false);
         }
     };
 
     return (
-        <main className="min-h-screen bg-linear-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
-            <div className="max-w-md w-full">
-                {/* Logo/Branding */}
-                <div className="text-center mb-8">
-                    <h1 className="text-4xl font-heading font-bold text-heading mb-2">
-                        The Diet Cascade
+        <main className="min-h-screen bg-surface flex flex-col items-center justify-center p-6 relative overflow-hidden">
+            {/* Background Decorations */}
+            <div className="absolute top-0 right-0 w-[50vw] h-[50vw] bg-primary/5 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/2" />
+            <div className="absolute bottom-0 left-0 w-[40vw] h-[40vw] bg-accent/5 rounded-full blur-[100px] translate-y-1/2 -translate-x-1/2" />
+            
+            <div className="max-w-md w-full relative z-10">
+                {/* Branding */}
+                <div className="text-center mb-10">
+                    <Link href="/" className="inline-block group mb-6">
+                        <div className="flex items-center gap-2 text-para text-xs font-bold uppercase tracking-widest group-hover:text-primary transition-colors">
+                            <ChevronLeft size={14} className="transition-transform group-hover:-translate-x-1" />
+                            Homepage
+                        </div>
+                    </Link>
+                    <h1 className="text-3xl md:text-5xl font-heading font-bold text-heading mb-2 leading-tight">
+                        Client <span className="text-primary italic">Portal</span>
                     </h1>
-                    <p className="text-gray-500">Client Portal</p>
+                    <p className="text-para text-sm font-medium">Monitoring your health journey, together.</p>
                 </div>
 
                 {/* Login Card */}
-                <div className="bg-white p-8 rounded-3xl shadow-2xl border border-gray-100">
+                <div className="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-2xl shadow-heading/5 border border-gray-100 relative">
                     <div className="mb-8">
-                        <h2 className="text-2xl font-bold text-heading mb-1">Welcome Back</h2>
-                        <p className="text-gray-500">Sign in to access your dashboard</p>
+                        <h2 className="text-xl md:text-2xl font-bold text-heading mb-1">Welcome back</h2>
+                        <p className="text-para text-xs md:text-sm">Please enter your credentials to continue</p>
                     </div>
 
                     {error && (
-                        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+                        <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-xs font-medium animate-in fade-in slide-in-from-top-2 duration-300">
                             {error}
                         </div>
                     )}
 
-                    <form onSubmit={handleLogin} className="space-y-5">
-                        {/* Email Field */}
+                    <form onSubmit={handleLogin} className="space-y-6">
                         <div className="space-y-2">
-                            <label className="text-sm font-bold text-heading flex items-center gap-2">
-                                <Mail size={16} className="text-primary" />
-                                Email Address
+                            <label className="text-xs font-bold text-heading uppercase tracking-wider ml-1 flex items-center gap-2">
+                                <Mail size={14} className="text-primary" /> Email
                             </label>
                             <input
                                 type="email"
@@ -95,16 +102,14 @@ export default function ClientLoginPage() {
                                 onChange={handleChange}
                                 required
                                 placeholder="your@email.com"
-                                className="w-full px-5 py-4 rounded-2xl border border-gray-200 bg-gray-50 transition-all focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary"
+                                className="w-full px-5 py-4 rounded-xl border border-gray-100 bg-surface focus:outline-none focus:ring-4 focus:ring-primary/10 focus:bg-white focus:border-primary transition-all text-sm"
                                 disabled={loading}
                             />
                         </div>
 
-                        {/* Password Field */}
                         <div className="space-y-2">
-                            <label className="text-sm font-bold text-heading flex items-center gap-2">
-                                <Lock size={16} className="text-primary" />
-                                Password
+                            <label className="text-xs font-bold text-heading uppercase tracking-wider ml-1 flex items-center gap-2">
+                                <Lock size={14} className="text-primary" /> Password
                             </label>
                             <div className="relative">
                                 <input
@@ -114,52 +119,55 @@ export default function ClientLoginPage() {
                                     onChange={handleChange}
                                     required
                                     placeholder="••••••••"
-                                    className="w-full px-5 py-4 rounded-2xl border border-gray-200 bg-gray-50 transition-all focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary pr-12"
+                                    className="w-full px-5 py-4 rounded-xl border border-gray-100 bg-surface focus:outline-none focus:ring-4 focus:ring-primary/10 focus:bg-white focus:border-primary transition-all text-sm pr-12"
                                     disabled={loading}
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-para/40 hover:text-primary transition-colors cursor-pointer"
                                 >
-                                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
                             </div>
                         </div>
 
-                        {/* Submit Button */}
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full py-4 bg-linear-to-r from-primary to-blue-600 text-white font-bold rounded-2xl shadow-xl shadow-primary/30 hover:shadow-primary/40 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 text-base group disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {loading ? 'Signing in...' : 'Sign In'}
-                            <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-                        </button>
+                        <div className="pt-2">
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full py-4.5 bg-heading text-white font-bold rounded-2xl transition-all duration-150 active:scale-[0.97] shadow-xl shadow-heading/10 flex items-center justify-center gap-3 text-sm md:text-base group disabled:opacity-50 cursor-pointer"
+                            >
+                                {loading ? (
+                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                    <>
+                                        Access Dashboard
+                                        <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
+                                    </>
+                                )}
+                            </button>
+                        </div>
                     </form>
 
-                    {/* Footer */}
-                    <div className="mt-6 text-center text-sm text-gray-500">
-                        <p>
-                            Need help?{' '}
+                    <div className="mt-8 text-center">
+                        <p className="text-xs text-para">
+                            Issues with logging in?{' '}
                             <a
                                 href="https://wa.me/+918452095252"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-primary font-bold hover:underline"
+                                className="text-primary font-bold transition-colors hover:text-primary-hover underline underline-offset-4"
                             >
-                                Contact Support
+                                Contact Clinic Admin
                             </a>
                         </p>
                     </div>
                 </div>
 
-                {/* Back to Home */}
-                <div className="mt-6 text-center">
-                    <Link href="/" className="text-gray-500 hover:text-gray-700 transition text-sm">
-                        ← Back to Homepage
-                    </Link>
-                </div>
+                <p className="mt-10 text-center text-[10px] text-para/50 uppercase tracking-[0.3em]">
+                    The Diet Cascade
+                </p>
             </div>
         </main>
     );

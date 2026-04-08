@@ -2,15 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { Calendar, Camera, FileText, TrendingUp, Save, ArrowLeft, Scale, Ruler } from 'lucide-react';
+import { Calendar, Camera, FileText, TrendingUp, Save, ChevronLeft, Scale, Ruler, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Swal from 'sweetalert2';
 
 const MEASUREMENT_FIELDS = [
-    { key: 'chest_cm', label: 'Chest', unit: 'cm', placeholder: '95', min: 50, max: 200, icon: Ruler, bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-600', ring: 'focus:ring-blue-200' },
-    { key: 'waist_cm', label: 'Waist', unit: 'cm', placeholder: '85', min: 40, max: 200, icon: Ruler, bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-500', ring: 'focus:ring-red-200' },
-    { key: 'hips_cm', label: 'Hips', unit: 'cm', placeholder: '100', min: 50, max: 200, icon: Ruler, bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-600', ring: 'focus:ring-purple-200' },
+    { key: 'chest_cm', label: 'Chest', unit: 'cm', placeholder: '95', min: 50, max: 200, icon: Ruler, bg: 'bg-primary/5', border: 'border-primary/10', text: 'text-primary', ring: 'focus:ring-primary/20' },
+    { key: 'waist_cm', label: 'Waist', unit: 'cm', placeholder: '85', min: 40, max: 200, icon: Ruler, bg: 'bg-accent/5', border: 'border-accent/10', text: 'text-accent-dark', ring: 'focus:ring-accent/20' },
+    { key: 'hips_cm', label: 'Hips', unit: 'cm', placeholder: '100', min: 50, max: 200, icon: Ruler, bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-600', ring: 'focus:ring-blue-200' },
 ];
 
 export default function ProgressPage() {
@@ -93,155 +93,166 @@ export default function ProgressPage() {
             }]);
 
             if (error) {
-                Swal.fire({ icon: 'error', title: 'Error Saving Progress', text: error.message, confirmButtonColor: '#fdbc00' });
+                Swal.fire({ icon: 'error', title: 'Error Saving Progress', text: error.message, confirmButtonColor: '#2d6a4f' });
             } else {
-                await Swal.fire({ icon: 'success', title: 'Progress Logged!', text: 'Your progress has been saved.', confirmButtonColor: '#fdbc00', timer: 2000 });
+                await Swal.fire({ icon: 'success', title: 'Progress Logged!', text: 'Your physical metrics have been updated.', confirmButtonColor: '#2d6a4f', timer: 2000 });
                 router.push('/portal/progress/history');
             }
         } catch (err) {
-            Swal.fire({ icon: 'error', title: 'Unexpected Error', text: 'Please try again.', confirmButtonColor: '#fdbc00' });
+            Swal.fire({ icon: 'error', title: 'Unexpected Error', text: 'Please try again.', confirmButtonColor: '#2d6a4f' });
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-12">
+        <div className="min-h-screen bg-surface">
+            <div className="max-w-2xl mx-auto px-5 sm:px-8 py-8 sm:py-12 pb-32">
 
-                {/* ── Header ── */}
-                <div className="flex items-start justify-between gap-3 mb-6 sm:mb-10">
-                    <div className="flex items-center gap-3">
-                        <Link href="/portal/dashboard" className="p-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm sm:hidden shrink-0">
-                            <ArrowLeft size={18} className="text-gray-600" />
+                {/* Header */}
+                <div className="flex items-center justify-between gap-4 mb-10">
+                    <div className="flex items-center gap-4">
+                        <Link href="/portal/dashboard" className="p-2.5 bg-white rounded-xl hover:text-primary transition-colors shadow-sm shadow-heading/5 sm:hidden">
+                            <ChevronLeft size={20} />
                         </Link>
                         <div>
-                            <h1 className="text-2xl sm:text-4xl font-heading font-bold text-heading leading-tight">
-                                Log Your Progress
-                            </h1>
-                            <p className="text-gray-400 text-sm mt-0.5">Track your measurements and journey</p>
+                            <h1 className="text-2xl sm:text-4xl font-heading font-bold text-heading">Update <span className="text-primary italic">Stats</span></h1>
+                            <p className="text-para text-xs md:text-sm mt-0.5">Track your evolution day by day</p>
                         </div>
                     </div>
-                    <button
-                        type="button"
-                        onClick={() => router.push('/portal/progress/history')}
-                        className="shrink-0 flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 sm:py-3 border-2 border-gray-200 text-gray-600 font-bold rounded-xl hover:bg-gray-100 transition cursor-pointer text-sm"
+                    <Link
+                        href="/portal/progress/history"
+                        className="shrink-0 flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-100 text-heading font-bold rounded-xl transition-all duration-150 active:scale-95 shadow-sm shadow-heading/5 text-[10px] md:text-xs uppercase tracking-widest"
                     >
-                        <TrendingUp size={16} />
-                        <span className="hidden sm:inline">View </span>History
-                    </button>
+                        <TrendingUp size={14} className="text-primary" />
+                        History
+                    </Link>
                 </div>
 
                 {errors.general && (
-                    <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-600 text-sm font-medium">
+                    <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-xs font-medium animate-in fade-in duration-300">
                         {errors.general}
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="bg-white p-5 sm:p-8 rounded-2xl sm:rounded-3xl shadow-sm border border-gray-100 space-y-5 sm:space-y-6">
+                <form onSubmit={handleSubmit} className="bg-white p-6 md:p-10 rounded-[2.5rem] shadow-2xl shadow-heading/5 border border-gray-50 space-y-8">
 
-                    {/* Date */}
+                    {/* Date Selector */}
                     <div className="space-y-2">
-                        <label className="text-sm font-bold text-heading flex items-center gap-2">
-                            <Calendar size={15} className="text-primary" /> Date
+                        <label className="text-[10px] md:text-xs font-bold text-heading uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
+                            <Calendar size={14} className="text-primary" /> Entry Date
                         </label>
                         <input
                             type="date" name="date" value={formData.date} onChange={handleChange}
                             max={new Date().toISOString().split('T')[0]}
-                            className="w-full px-4 py-3 sm:py-4 rounded-xl sm:rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition text-sm"
+                            className="w-full px-5 py-4 rounded-xl border border-gray-100 bg-surface focus:outline-none focus:ring-4 focus:ring-primary/10 focus:bg-white focus:border-primary transition-all text-sm font-medium"
                             required
                         />
                     </div>
 
-                    {/* Weight — full width, prominent */}
+                    {/* Weight Entry */}
                     <div className="space-y-2">
-                        <label className="text-sm font-bold text-heading flex items-center gap-2">
-                            <Scale size={15} className="text-amber-500" /> Weight (kg)
+                        <label className="text-[10px] md:text-xs font-bold text-heading uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
+                            <Scale size={14} className="text-primary" /> Body Weight (kg)
                         </label>
                         <div className="relative">
                             <input
                                 type="number" step="0.1" min="20" max="300"
                                 name="weight_kg" value={formData.weight_kg} onChange={handleChange}
-                                placeholder="70.5"
-                                className={`w-full px-4 py-3 sm:py-4 rounded-xl sm:rounded-2xl border transition-all focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm ${errors.weight_kg ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50 focus:bg-white focus:border-primary'}`}
+                                placeholder="00.0"
+                                className={`w-full px-5 py-4 rounded-xl border transition-all focus:outline-none focus:ring-4 focus:ring-primary/10 text-sm font-bold ${errors.weight_kg ? 'border-red-200 bg-red-50' : 'border-gray-100 bg-surface focus:bg-white focus:border-primary'}`}
                             />
-                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-semibold">kg</span>
+                            <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] text-para/40 font-black uppercase tracking-widest">Kilograms</span>
                         </div>
-                        {errors.weight_kg && <p className="text-xs text-red-500">{errors.weight_kg}</p>}
+                        {errors.weight_kg && <p className="text-[10px] text-red-500 font-bold ml-1">{errors.weight_kg}</p>}
                     </div>
 
-                    {/* Body Measurements — 2-col grid on all sizes */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-bold text-heading">Body Measurements</label>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {/* Body Measurements */}
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between ml-1">
+                            <label className="text-[10px] md:text-xs font-bold text-heading uppercase tracking-[0.2em]">Body Metrics</label>
+                            <span className="text-[8px] font-black text-para/30 uppercase tracking-widest">Optional but helpful</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             {MEASUREMENT_FIELDS.map(f => (
-                                <div key={f.key} className={`rounded-xl border ${f.border} ${f.bg} p-3`}>
-                                    <label className={`block text-xs font-bold ${f.text} mb-1.5`}>{f.label} ({f.unit})</label>
+                                <div key={f.key} className={`rounded-[1.5rem] border ${f.border} ${f.bg} p-4 md:p-5 transition-transform duration-200 hover:-translate-y-1`}>
+                                    <label className={`block text-[10px] font-black ${f.text} uppercase tracking-[0.2em] mb-3`}>{f.label}</label>
                                     <div className="relative">
                                         <input
                                             type="number" step="0.1" min={f.min} max={f.max}
                                             name={f.key} value={formData[f.key]} onChange={handleChange}
                                             placeholder={f.placeholder}
-                                            className={`w-full px-3 py-2 sm:py-2.5 rounded-lg border border-white bg-white focus:outline-none focus:ring-2 ${f.ring} text-sm font-semibold ${errors[f.key] ? 'border-red-300' : ''}`}
+                                            className={`w-full px-4 py-2.5 rounded-xl border border-white/50 bg-white/80 focus:bg-white focus:outline-none focus:ring-4 ${f.ring} text-sm font-bold shadow-sm ${errors[f.key] ? 'border-red-200' : ''}`}
                                         />
+                                        <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold ${f.text} opacity-30`}>cm</span>
                                     </div>
-                                    {errors[f.key] && <p className="text-xs text-red-500 mt-1">{errors[f.key]}</p>}
+                                    {errors[f.key] && <p className="text-[10px] text-red-500 font-bold mt-2 ml-1">{errors[f.key]}</p>}
                                 </div>
                             ))}
                         </div>
                     </div>
 
                     {/* Photo Upload */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-bold text-heading flex items-center gap-2">
-                            <Camera size={15} className="text-primary" /> Progress Photo <span className="text-gray-400 font-normal">(optional)</span>
+                    <div className="space-y-4 pt-2">
+                        <label className="text-[10px] md:text-xs font-bold text-heading uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
+                            <Camera size={14} className="text-primary" /> Progress Photo
                         </label>
 
-                        {photoPreview && (
-                            <div className="relative rounded-xl overflow-hidden border border-gray-200 mb-2">
-                                <img src={photoPreview} alt="Preview" className="w-full max-h-48 object-cover" />
-                                <button
-                                    type="button"
-                                    onClick={() => { setPhotoFile(null); setPhotoPreview(null); }}
-                                    className="absolute top-2 right-2 p-1.5 bg-white/90 hover:bg-white rounded-lg text-red-500 shadow transition cursor-pointer"
-                                >
-                                    ✕
-                                </button>
+                        {photoPreview ? (
+                            <div className="relative rounded-[2rem] overflow-hidden border-2 border-primary/20 shadow-xl group">
+                                <img src={photoPreview} alt="Preview" className="w-full max-h-64 object-cover" />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setPhotoFile(null); setPhotoPreview(null); }}
+                                        className="p-4 bg-white text-red-500 rounded-2xl shadow-2xl transition-transform active:scale-90 cursor-pointer"
+                                    >
+                                        <Trash2 size={24} />
+                                    </button>
+                                </div>
                             </div>
+                        ) : (
+                            <label className={`flex flex-col items-center justify-center gap-3 px-6 py-10 rounded-[2rem] border-2 border-dashed transition-all cursor-pointer ${errors.photo ? 'border-red-200 bg-red-50' : 'border-gray-100 bg-surface hover:bg-white hover:border-primary hover:shadow-xl hover:shadow-primary/5'}`}>
+                                <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+                                    <Camera size={24} />
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-xs font-bold text-heading">Capture or Select Photo</p>
+                                    <p className="text-[10px] text-para/50 mt-1 uppercase tracking-widest font-black">Visual Tracking is Key</p>
+                                </div>
+                                <input type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
+                            </label>
                         )}
-
-                        <label className={`flex items-center gap-3 px-4 py-3.5 rounded-xl border border-dashed cursor-pointer transition text-sm ${errors.photo ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-gray-50 hover:bg-gray-100 hover:border-gray-400'}`}>
-                            <Camera size={18} className="text-gray-400 shrink-0" />
-                            <span className="text-gray-500 font-medium truncate">
-                                {photoFile ? photoFile.name : 'Tap to choose a photo…'}
-                            </span>
-                            <input type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
-                        </label>
-                        {errors.photo && <p className="text-xs text-red-500">{errors.photo}</p>}
-                        <p className="text-xs text-gray-400">Max 5MB · JPG, PNG, WEBP</p>
+                        {errors.photo && <p className="text-[10px] text-red-500 font-bold ml-1">{errors.photo}</p>}
                     </div>
 
-                    {/* Notes */}
+                    {/* Notes Area */}
                     <div className="space-y-2">
-                        <label className="text-sm font-bold text-heading flex items-center gap-2">
-                            <FileText size={15} className="text-primary" /> Notes <span className="text-gray-400 font-normal">(optional)</span>
+                        <label className="text-[10px] md:text-xs font-bold text-heading uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
+                            <FileText size={14} className="text-primary" /> Daily Observations
                         </label>
                         <textarea
                             name="notes" value={formData.notes} onChange={handleChange}
-                            rows={3}
-                            placeholder="How are you feeling? Any observations?"
-                            className="w-full px-4 py-3 sm:py-4 rounded-xl sm:rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition text-sm resize-none"
+                            rows={4}
+                            placeholder="Describe how you feel today, energy levels, cravings, etc."
+                            className="w-full px-5 py-4 rounded-xl border border-gray-100 bg-surface focus:outline-none focus:ring-4 focus:ring-primary/10 focus:bg-white focus:border-primary transition-all text-sm leading-relaxed resize-none"
                         />
                     </div>
 
-                    {/* Submit */}
-                    <div className="pt-2">
+                    {/* Save Button */}
+                    <div className="pt-4">
                         <button
                             type="submit" disabled={loading}
-                            className="cursor-pointer w-full py-4 bg-linear-to-r from-primary to-blue-600 text-white font-bold rounded-2xl shadow-lg shadow-primary/20 hover:shadow-primary/30 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+                            className="w-full py-5 bg-heading text-white font-bold rounded-2xl shadow-2xl shadow-heading/20 transition-all duration-150 active:scale-[0.97] hover:bg-primary flex items-center justify-center gap-3 disabled:opacity-50 text-sm md:text-base cursor-pointer group"
                         >
-                            <Save size={18} />
-                            {loading ? 'Saving…' : 'Save Progress'}
+                            {loading ? (
+                                <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                            ) : (
+                                <>
+                                    <Save size={20} className="transition-transform group-hover:scale-110" />
+                                    Commit Progress
+                                </>
+                            )}
                         </button>
                     </div>
                 </form>

@@ -13,10 +13,10 @@ export default function Footer() {
                         {data.footer.about}
                     </p>
                     <div className="flex gap-4">
-                        <Link href={data.contact.instagram} target="_blank" className="bg-white/10 p-3 rounded-full hover:bg-primary transition text-white">
+                        <Link href={data.contact.instagram} target="_blank" className="bg-white/10 p-3 rounded-full transition-colors duration-200 text-white hover:bg-primary">
                             <Instagram size={20} />
                         </Link>
-                        <Link href={data.contact.linkedin} target="_blank" className="bg-white/10 p-3 rounded-full hover:bg-primary transition text-white">
+                        <Link href={data.contact.linkedin} target="_blank" className="bg-white/10 p-3 rounded-full transition-colors duration-200 text-white hover:bg-primary">
                             <Linkedin size={20} />
                         </Link>
                     </div>
@@ -27,16 +27,16 @@ export default function Footer() {
                     <h3 className="text-xl font-bold mb-6">Contact Us</h3>
                     <ul className="space-y-4 text-gray-400">
                         <li className="flex items-center gap-3">
-                            <MapPin size={20} className="text-primary" />
+                            <MapPin size={20} className="text-primary shrink-0" />
                             <span>{data.footer.address}</span>
                         </li>
                         <li className="flex items-center gap-3">
-                            <Phone size={20} className="text-primary" />
-                            <a href={`tel:${data.footer.phone}`} className="hover:text-white transition">{data.footer.phone}</a>
+                            <Phone size={20} className="text-primary shrink-0" />
+                            <a href={`tel:${data.footer.phone}`} className="transition-colors duration-200 hover:text-white">{data.footer.phone}</a>
                         </li>
                         <li className="flex items-center gap-3">
-                            <Mail size={20} className="text-primary" />
-                            <a href={`mailto:${data.footer.email}`} className="hover:text-white transition">{data.footer.email}</a>
+                            <Mail size={20} className="text-primary shrink-0" />
+                            <a href={`mailto:${data.footer.email}`} className="transition-colors duration-200 hover:text-white">{data.footer.email}</a>
                         </li>
                     </ul>
                 </div>
@@ -45,18 +45,18 @@ export default function Footer() {
                 <div>
                     <h3 className="text-xl font-bold mb-6">Quick Links</h3>
                     <ul className="space-y-3 text-gray-400">
-                        <li><Link href="/#home" className="hover:text-primary transition">Home</Link></li>
-                        <li><Link href="/#about" className="hover:text-primary transition">About</Link></li>
-                        <li><Link href="/#regimen" className="hover:text-primary transition">Regimens</Link></li>
-                        <li><Link href="/#reviews" className="hover:text-primary transition">Testimonials</Link></li>
-                        <li><Link href="/blog" className="hover:text-primary transition">Blog</Link></li>
+                        <li><Link href="/#home" className="transition-colors duration-200 hover:text-primary">Home</Link></li>
+                        <li><Link href="/#about" className="transition-colors duration-200 hover:text-primary">About</Link></li>
+                        <li><Link href="/#regimen" className="transition-colors duration-200 hover:text-primary">Regimens</Link></li>
+                        <li><Link href="/#reviews" className="transition-colors duration-200 hover:text-primary">Testimonials</Link></li>
+                        <li><Link href="/blog" className="transition-colors duration-200 hover:text-primary">Blog</Link></li>
                     </ul>
                 </div>
             </div>
 
             <div className="border-t border-white/10 pt-8 text-center text-gray-500 text-sm relative z-10">
                 <p>&copy; {new Date().getFullYear()} The Diet Cascade. All rights reserved.</p>
-                <p className="mt-2">Designed by <a href="https://saoodghare08.github.io/MyPortfolio/" target="_blank" className="hover:text-primary transition underline">Saood</a></p>
+                <p className="mt-2">Designed by <a href="https://saoodghare08.github.io/MyPortfolio/" target="_blank" className="transition-colors duration-200 hover:text-primary underline">Saood</a></p>
             </div>
 
             {/* Decorative Blur */}

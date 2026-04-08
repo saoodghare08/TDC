@@ -6,9 +6,11 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import data from '@/data/content.json';
 import Section from '@/components/ui/Section';
 
+gsap.registerPlugin(ScrollTrigger);
+
 const StatItem = ({ label, value }) => {
     const activeRef = useRef(null);
-    const numericValue = parseInt(value.replace(/,/g, ''), 10); // Handle commas if any
+    const numericValue = parseInt(value.replace(/,/g, ''), 10);
     const suffix = value.replace(/[0-9,]/g, '');
 
     useEffect(() => {
@@ -21,7 +23,7 @@ const StatItem = ({ label, value }) => {
                 scrollTrigger: {
                     trigger: activeRef.current,
                     start: 'top 100%',
-                    toggleActions: 'play none none reverse' // Play on enter, reverse on leave up
+                    toggleActions: 'play none none reverse'
                 },
                 onUpdate: () => {
                     if (activeRef.current) {
@@ -34,7 +36,7 @@ const StatItem = ({ label, value }) => {
     }, [numericValue, suffix]);
 
     return (
-        <div className="flex flex-col items-center justify-center p-4 md:p-8 bg-white rounded-xl md:rounded-2xl shadow-lg md:shadow-xl border border-gray-100 hover:-translate-y-2 transition-transform duration-300">
+        <div className="flex flex-col items-center justify-center p-4 md:p-8 bg-white rounded-xl md:rounded-2xl shadow-lg md:shadow-xl border border-gray-100 transition-transform duration-200 hover:-translate-y-1">
             <h3 ref={activeRef} className="text-3xl md:text-6xl font-bold text-transparent bg-clip-text bg-linear-to-r from-primary to-blue-600 mb-1 md:mb-2 font-heading">
                 0
             </h3>

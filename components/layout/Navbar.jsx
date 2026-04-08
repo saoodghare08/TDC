@@ -21,46 +21,46 @@ export default function Navbar() {
 
     useEffect(() => {
         const buttonCenter = 'calc(100% - 45px) 45px';
-        
+
         if (isOpen) {
             document.body.style.overflow = 'hidden';
-            
+
             const tl = gsap.timeline();
-            
-            // Expand menu circle
+
+            // Expand menu — slightly faster, better easing
             tl.to(menuRef.current, {
                 clipPath: `circle(300% at ${buttonCenter})`,
-                duration: 0.8,
-                ease: 'power4.inOut'
+                duration: 0.6,
+                ease: 'power3.inOut'
             });
 
-            // Stagger reveal links
-            tl.fromTo(linksRef.current.filter(Boolean), 
-                { y: 60, opacity: 0, rotateX: -45 },
-                { 
-                    y: 0, 
-                    opacity: 1, 
-                    rotateX: 0,
-                    duration: 0.8, 
-                    stagger: 0.08, 
-                    ease: 'power3.out' 
+            // Stagger links — reduced stagger for snappier feel
+            tl.fromTo(linksRef.current.filter(Boolean),
+                { y: 40, opacity: 0 },
+                {
+                    y: 0,
+                    opacity: 1,
+                    duration: 0.6,
+                    stagger: 0.06,
+                    ease: 'power3.out'
                 },
-                '-=0.4'
+                '-=0.3'
             );
         } else {
             document.body.style.overflow = '';
-            
-            // Reset links
+
+            // Fade out links quickly
             gsap.to(linksRef.current.filter(Boolean), {
                 opacity: 0,
-                duration: 0.2,
+                duration: 0.15,
                 ease: 'power2.in'
             });
 
+            // Collapse menu
             gsap.to(menuRef.current, {
                 clipPath: `circle(25px at ${buttonCenter})`,
-                duration: 0.6,
-                ease: 'power4.inOut'
+                duration: 0.5,
+                ease: 'power3.inOut'
             });
         }
     }, [isOpen]);
@@ -70,17 +70,19 @@ export default function Navbar() {
             {/* Toggle Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="fixed top-5 right-5 z-10000 w-[50px] h-[50px] flex items-center justify-center text-black hover:scale-110 active:scale-90 transition-all duration-300 hover:cursor-pointer"
+                className="fixed top-5 right-5 z-10000 w-[50px] h-[50px] flex items-center justify-center text-black transition-transform duration-150 active:scale-[0.92] cursor-pointer"
                 aria-label="Toggle Menu"
             >
                 <div className="relative w-7 h-7 flex items-center justify-center">
-                    <Menu 
-                        size={28} 
-                        className={`absolute transition-all duration-500 ease-in-out ${isOpen ? 'rotate-90 opacity-0 scale-50' : 'rotate-0 opacity-100 scale-100'}`} 
+                    <Menu
+                        size={28}
+                        className={`absolute transition-all duration-300 ${isOpen ? 'rotate-90 opacity-0 scale-75' : 'rotate-0 opacity-100 scale-100'}`}
+                        style={{ transitionTimingFunction: 'cubic-bezier(0.23, 1, 0.32, 1)' }}
                     />
-                    <X 
-                        size={28} 
-                        className={`absolute transition-all duration-500 ease-in-out ${isOpen ? 'rotate-0 opacity-100 scale-100' : '-rotate-90 opacity-0 scale-50'}`} 
+                    <X
+                        size={28}
+                        className={`absolute transition-all duration-300 ${isOpen ? 'rotate-0 opacity-100 scale-100' : '-rotate-90 opacity-0 scale-75'}`}
+                        style={{ transitionTimingFunction: 'cubic-bezier(0.23, 1, 0.32, 1)' }}
                     />
                 </div>
             </button>
@@ -92,20 +94,19 @@ export default function Navbar() {
                 style={{ clipPath: 'circle(25px at calc(100% - 45px) 45px)' }}
             >
                 <div className="w-full max-w-2xl px-6 text-center">
-                    <ul className="flex flex-col gap-4 md:gap-6 perspective-1000">
+                    <ul className="flex flex-col gap-4 md:gap-6">
                         {navLinks.map((link, index) => (
-                            <li 
+                            <li
                                 key={link.label}
                                 ref={el => linksRef.current[index] = el}
-                                className="origin-top"
                             >
                                 <Link
                                     href={link.href}
                                     onClick={() => setIsOpen(false)}
-                                    className="group relative inline-block px-10 py-3 text-3xl md:text-5xl font-heading font-bold text-heading hover:text-primary transition-colors duration-300"
+                                    className="group relative inline-block px-10 py-3 text-3xl md:text-5xl font-heading font-bold text-heading transition-colors duration-200"
                                 >
                                     <span className="relative z-10">{link.label}</span>
-                                    <span className="absolute left-0 bottom-2 w-0 h-2 bg-primary/20 transition-all duration-500 group-hover:w-full" />
+                                    <span className="absolute left-0 bottom-2 w-0 h-2 bg-primary/20 transition-all duration-300 group-hover:w-full" style={{ transitionTimingFunction: 'cubic-bezier(0.23, 1, 0.32, 1)' }} />
                                 </Link>
                             </li>
                         ))}
@@ -115,7 +116,7 @@ export default function Navbar() {
                             <Link
                                 href="/portal/login"
                                 onClick={() => setIsOpen(false)}
-                                className="mt-8 inline-flex items-center gap-3 px-10 py-4 bg-primary text-black text-xl md:text-2xl font-bold rounded-full hover:bg-black hover:text-white transition-all duration-300 hover:scale-105 active:scale-95 shadow-2xl shadow-primary/20"
+                                className="mt-8 inline-flex items-center gap-3 px-10 py-4 bg-primary text-black text-xl md:text-2xl font-bold rounded-full transition-transform duration-150 active:scale-[0.97] shadow-2xl shadow-primary/20 cursor-pointer"
                             >
                                 Client Portal
                             </Link>
@@ -123,7 +124,6 @@ export default function Navbar() {
                     </ul>
                 </div>
 
-                {/* Decorative background number/letter? Or just keep it clean */}
                 <div className="absolute inset-0 pointer-events-none opacity-[0.03] select-none flex items-center justify-center">
                     <span className="text-[40vw] font-black uppercase tracking-tighter">TDC</span>
                 </div>

@@ -21,9 +21,10 @@ export default function Workouts() {
                     <div
                         key={index}
                         className={clsx(
-                            "relative rounded-3xl overflow-hidden cursor-pointer transition-all duration-700 ease-in-out",
-                            activeId === index ? "flex-5" : "flex-1 hover:flex-1.5"
+                            "relative rounded-3xl overflow-hidden cursor-pointer transition-[flex] duration-500",
+                            activeId === index ? "flex-5" : "flex-1"
                         )}
+                        style={{ transitionTimingFunction: 'cubic-bezier(0.23, 1, 0.32, 1)' }}
                         onClick={() => setActiveId(index)}
                         onMouseEnter={() => setActiveId(index)}
                     >
@@ -31,15 +32,20 @@ export default function Workouts() {
                             src={workout.image}
                             alt={workout.title}
                             fill
-                            className="object-cover transition-transform duration-700 hover:scale-110"
+                            className="object-cover"
                         />
-                        <div className={`absolute inset-0 bg-black/40 transition-opacity ${activeId === index ? 'opacity-0 md:opacity-30' : 'opacity-60'}`} />
+                        <div className={clsx(
+                            "absolute inset-0 transition-opacity duration-300",
+                            activeId === index ? 'bg-black/20' : 'bg-black/50'
+                        )} />
 
                         <div className={clsx(
-                            "absolute bottom-8 left-8 transition-all duration-500",
-                            activeId === index ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10 md:opacity-100 md:-rotate-90 md:bottom-20 md:left-1/2 md:-translate-x-1/2 md:origin-left md:whitespace-nowrap"
-                        )}>
-                            <h3 className="text-2xl md:text-3xl font-bold uppercase tracking-wider shadow-black drop-shadow-lg">
+                            "absolute bottom-8 left-8 transition-all duration-400",
+                            activeId === index
+                                ? "opacity-100 translate-y-0"
+                                : "opacity-0 translate-y-6 md:opacity-100 md:-rotate-90 md:bottom-20 md:left-1/2 md:-translate-x-1/2 md:origin-left md:whitespace-nowrap"
+                        )} style={{ transitionTimingFunction: 'cubic-bezier(0.23, 1, 0.32, 1)' }}>
+                            <h3 className="text-2xl md:text-3xl font-bold uppercase tracking-wider drop-shadow-lg">
                                 {workout.title}
                             </h3>
                         </div>

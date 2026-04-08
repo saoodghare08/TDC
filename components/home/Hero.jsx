@@ -6,6 +6,8 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import data from '@/data/content.json';
 import Image from 'next/image';
 
+gsap.registerPlugin(ScrollTrigger);
+
 export default function Hero() {
     const containerRef = useRef(null);
     const contentRef = useRef(null);
@@ -16,28 +18,27 @@ export default function Hero() {
         const ctx = gsap.context(() => {
             const tl = gsap.timeline();
 
-            // 1. Initial Load: Simple fade scale for background
-            // Start slightly scaled up so we have room to parallax
+            // Background reveal — start from scale(1.1), not 1.2 to reduce paint area
             tl.fromTo(imageRef.current,
-                { scale: 1.2, filter: 'blur(10px)' },
-                { scale: 1.1, filter: 'blur(0px)', duration: 1.5, ease: 'power2.out' }
+                { scale: 1.1, opacity: 0.8 },
+                { scale: 1.05, opacity: 1, duration: 1.2, ease: 'power2.out' }
             );
 
-            // 2. Text Reveal
+            // Text stagger — reduced duration, tighter stagger
             tl.fromTo(contentRef.current.children,
-                { y: 30, opacity: 0 },
-                { y: 0, opacity: 1, duration: 1, stagger: 0.15, ease: 'power3.out' },
-                '-=1'
+                { y: 20, opacity: 0 },
+                { y: 0, opacity: 1, duration: 0.7, stagger: 0.1, ease: 'power3.out' },
+                '-=0.8'
             );
 
-            // 3. Button Reveal (Separate to avoid conflict)
+            // Button — start from scale(0.95) not 0.8 (never animate from too small)
             tl.fromTo(buttonRef.current,
-                { scale: 0.8, opacity: 0 },
-                { scale: 1, opacity: 1, duration: 0.6, ease: 'back.out(1.7)', clearProps: 'transform' }, // clearProps ensures CSS hover works
-                '-=0.5'
+                { scale: 0.95, opacity: 0 },
+                { scale: 1, opacity: 1, duration: 0.5, ease: 'power3.out', clearProps: 'transform' },
+                '-=0.3'
             );
 
-            // 4. Parallax Scroll Effect
+            // Parallax — only animate transform (GPU-composited)
             gsap.to(imageRef.current, {
                 scrollTrigger: {
                     trigger: containerRef.current,
@@ -45,7 +46,7 @@ export default function Hero() {
                     end: 'bottom top',
                     scrub: true
                 },
-                yPercent: 30, // Move image down slightly slower than scroll
+                yPercent: 20,
                 ease: 'none'
             });
 
@@ -56,10 +57,10 @@ export default function Hero() {
 
     return (
         <section id="home" ref={containerRef} className="relative h-screen w-full overflow-hidden flex items-center justify-center text-white">
-            {/* Background Image Wrapper */}
+            {/* Background Image */}
             <div className="absolute inset-0 z-0">
-                <div className="absolute inset-0 bg-black/40 z-10" /> {/* Overlay */}
-                <div ref={imageRef} className="relative w-full h-[120%] -mt-[10%]"> {/* Extra height for parallax */}
+                <div className="absolute inset-0 bg-black/40 z-10" />
+                <div ref={imageRef} className="relative w-full h-[115%] -mt-[8%] will-change-transform">
                     <Image
                         src={data.hero.media}
                         alt="Hero Background"
@@ -91,7 +92,7 @@ export default function Hero() {
                 <button
                     ref={buttonRef}
                     onClick={() => document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' })}
-                    className="group relative px-8 py-4 bg-white/10 backdrop-blur-md border border-white/20 text-white rounded-full overflow-hidden transition-all hover:bg-white/20 hover:scale-105 active:scale-95 cursor-pointer"
+                    className="group relative px-8 py-4 bg-white/10 backdrop-blur-md border border-white/20 text-white rounded-full overflow-hidden transition-transform duration-150 active:scale-[0.97] cursor-pointer"
                 >
                     <div className="absolute inset-0 w-full h-full bg-linear-to-r from-primary/0 via-primary/30 to-primary/0 -translate-x-full group-hover:animate-shimmer" />
                     <span className="relative font-bold tracking-wide">EXPLORE MORE</span>

@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import data from '@/data/content.json';
 import Section from '@/components/ui/Section';
-import { Package, Check, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
 
@@ -13,7 +13,6 @@ export default function Pricing() {
     const [activeIndex, setActiveIndex] = useState(2);
 
     useEffect(() => {
-        // Initial scroll to the default active index (2)
         scrollTo(1);
     }, []);
 
@@ -42,7 +41,6 @@ export default function Pricing() {
 
     return (
         <Section id="pricing" className="bg-linear-to-br from-blue-50/50 to-white relative overflow-hidden">
-            {/* Decorative Elements */}
             <div className="absolute top-0 right-0 p-20 bg-blue-100 rounded-full blur-[100px] opacity-30 pointer-events-none -translate-y-1/2 translate-x-1/2"></div>
             <div className="absolute bottom-0 left-0 p-32 bg-purple-100 rounded-full blur-[120px] opacity-30 pointer-events-none translate-y-1/2 -translate-x-1/2"></div>
 
@@ -66,10 +64,10 @@ export default function Pricing() {
                         <div
                             key={index}
                             className={clsx(
-                                "relative p-6 md:p-8 rounded-4xl flex flex-col transition-all duration-300 min-w-[75vw] md:min-w-0 snap-center",
+                                "relative p-6 md:p-8 rounded-4xl flex flex-col min-w-[75vw] md:min-w-0 snap-center",
                                 isPopular
                                     ? "bg-white border-2 border-primary shadow-xl md:scale-105 z-20"
-                                    : "bg-white border border-gray-100 shadow-lg md:hover:shadow-xl md:hover:-translate-y-2"
+                                    : "bg-white border border-gray-100 shadow-lg"
                             )}
                         >
                             {isPopular && (
@@ -104,10 +102,10 @@ export default function Pricing() {
                             <button
                                 onClick={() => handleEnroll(plan.title)}
                                 className={clsx(
-                                    "w-full py-4 rounded-xl font-bold transition-all transform active:scale-95 duration-200",
+                                    "w-full py-4 rounded-xl font-bold transition-transform duration-150 active:scale-[0.97] cursor-pointer",
                                     isPopular
-                                        ? "bg-linear-to-r from-primary to-blue-600 text-white shadow-lg hover:shadow-primary/30 hover:brightness-110 hover:cursor-pointer"
-                                        : "bg-gray-50 border-2 border-gray-200 text-heading hover:border-primary hover:text-primary z-10 hover:cursor-pointer shadow-sm"
+                                        ? "bg-linear-to-r from-primary to-blue-600 text-white shadow-lg"
+                                        : "bg-gray-50 border-2 border-gray-200 text-heading shadow-sm"
                                 )}
                             >
                                 Choose Plan
@@ -117,14 +115,13 @@ export default function Pricing() {
                 })}
             </div>
 
-            {/* Decoration & Indicators */}
             <div className="flex md:hidden justify-center items-center gap-3 mt-4 relative z-10">
                 {data.pricing.map((_, i) => (
                     <button
                         key={i}
                         onClick={() => scrollTo(i)}
                         className={clsx(
-                            "transition-all duration-300 rounded-full",
+                            "transition-all duration-200 rounded-full",
                             activeIndex === i
                                 ? "w-8 h-2.5 bg-black"
                                 : "w-2.5 h-2.5 bg-gray-300"
