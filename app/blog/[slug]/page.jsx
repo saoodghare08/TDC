@@ -7,6 +7,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ChevronLeft, Calendar, Share2 } from 'lucide-react';
 import { notFound } from 'next/navigation';
+import ShareButton from '@/components/blog/ShareButton';
 
 export async function generateMetadata({ params }) {
     const supabase = await createClient();
@@ -53,7 +54,7 @@ export default async function BlogPostPage({ params }) {
             <Navbar />
 
             {/* Premium Blog Header */}
-            <div className="relative h-[55vh] md:h-[70vh] w-full bg-heading overflow-hidden rounded-b-[2.5rem] md:rounded-b-[5rem]">
+            <div className="relative h-[55vh] md:h-[50vh] w-full bg-heading overflow-hidden rounded-b-[2.5rem] md:rounded-b-[5rem]">
                 {post.cover_image ? (
                     <Image 
                         src={post.cover_image} 
@@ -71,7 +72,7 @@ export default async function BlogPostPage({ params }) {
 
                 <div className="absolute inset-0 flex items-end">
                     <div className="max-w-4xl mx-auto px-6 w-full pb-16 md:pb-24">
-                        <Link href="/blog" className="inline-flex items-center gap-2 text-primary-200 text-xs md:text-sm font-bold uppercase tracking-[0.2em] mb-8 hover:text-white transition-colors group">
+                        <Link href="/blog" className="inline-flex items-center gap-2 text-primary-200 text-xs md:text-sm font-bold uppercase tracking-[0.2em] mb-8 text-white transition-colors group">
                             <ChevronLeft size={16} className="transition-transform group-hover:-translate-x-1" />
                             Insights Library
                         </Link>
@@ -95,8 +96,8 @@ export default async function BlogPostPage({ params }) {
             </div>
 
             {/* Content Section */}
-            <Section className="bg-surface relative z-10 -mt-10 md:-mt-16 pt-0">
-                <div className="max-w-3xl mx-auto bg-white p-8 md:p-16 rounded-[2rem] md:rounded-[3rem] shadow-2xl shadow-heading/5 border border-gray-100">
+            <Section className="relative z-10 -mt-10 md:-mt-16 pt-0">
+                <div className="max-w-3xl mx-auto bg-white p-3 md:p-16 rounded-4xl md:rounded-[3rem] shadow-2xl shadow-heading/5 border border-gray-100">
                     <article className="prose prose-sm md:prose-base lg:prose-lg max-w-none 
                         prose-headings:font-heading prose-headings:font-bold prose-headings:text-heading
                         prose-p:text-para prose-p:leading-relaxed
@@ -120,10 +121,7 @@ export default async function BlogPostPage({ params }) {
                             </div>
                         </div>
                         
-                        <button className="flex items-center gap-2.5 px-6 py-3 bg-heading text-white rounded-full text-xs font-bold uppercase tracking-widest transition-all duration-150 active:scale-[0.97] hover:bg-primary cursor-pointer group">
-                            Share Insight
-                            <Share2 size={16} className="transition-transform group-hover:scale-110" />
-                        </button>
+                        <ShareButton />
                     </div>
                 </div>
             </Section>
