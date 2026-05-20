@@ -45,11 +45,18 @@ export default function Footer() {
                 <div>
                     <h3 className="text-xl font-bold mb-6">Quick Links</h3>
                     <ul className="space-y-3 text-gray-400">
-                        <li><Link href="/#home" className="transition-colors duration-200 hover:text-primary">Home</Link></li>
-                        <li><Link href="/#about" className="transition-colors duration-200 hover:text-primary">About</Link></li>
-                        <li><Link href="/#regimen" className="transition-colors duration-200 hover:text-primary">Regimens</Link></li>
-                        <li><Link href="/#reviews" className="transition-colors duration-200 hover:text-primary">Testimonials</Link></li>
+                        <li><Link href="/" className="transition-colors duration-200 hover:text-primary">Home</Link></li>
+                        <li><Link href="/about" className="transition-colors duration-200 hover:text-primary">About</Link></li>
+                        <li><Link href="/regimen" className="transition-colors duration-200 hover:text-primary">Regimens</Link></li>
+                        <li><Link href="/program" className="transition-colors duration-200 hover:text-primary">Our Programme</Link></li>
                         <li><Link href="/blog" className="transition-colors duration-200 hover:text-primary">Blog</Link></li>
+                        <li><Link href="/faq" className="transition-colors duration-200 hover:text-primary">FAQs</Link></li>
+                        <li><Link href="/contact" className="transition-colors duration-200 hover:text-primary">Contact</Link></li>
+                    </ul>
+                    <h3 className="text-xl font-bold mt-8 mb-4">Legal</h3>
+                    <ul className="space-y-3 text-gray-400">
+                        <li><Link href="/privacy" className="transition-colors duration-200 hover:text-primary">Privacy &amp; Refund Policy</Link></li>
+                        <li><Link href="/terms" className="transition-colors duration-200 hover:text-primary">Terms &amp; Conditions</Link></li>
                     </ul>
                 </div>
             </div>

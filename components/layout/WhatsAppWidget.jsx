@@ -161,6 +161,17 @@ export default function WhatsAppWidget() {
     return () => window.removeEventListener('resize', handleResize);
   }, [isOpen]);
 
+  // Handle custom window event to trigger opening the widget from other pages
+  useEffect(() => {
+    function handleOpenWidget() {
+      setIsOpen(true);
+    }
+    window.addEventListener('open-whatsapp-widget', handleOpenWidget);
+    return () => {
+      window.removeEventListener('open-whatsapp-widget', handleOpenWidget);
+    };
+  }, []);
+
   // Handle click outside to close the widget
   useEffect(() => {
     function handleClickOutside(event) {

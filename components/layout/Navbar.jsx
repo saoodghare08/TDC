@@ -6,12 +6,12 @@ import gsap from 'gsap';
 import { Menu, X } from 'lucide-react';
 
 const navLinks = [
-    { href: '/#home', label: 'Home' },
-    { href: '/#about', label: 'About' },
-    { href: '/#regimen', label: 'Regimen' },
-    { href: '/#program', label: 'Our Program' },
-    { href: '/#reviews', label: 'Reviews' },
-    { href: '/#contact', label: 'Contact' },
+    { href: '/', label: 'Home' },
+    { href: '/about', label: 'About' },
+    { href: '/regimen', label: 'Regimen' },
+    { href: '/program', label: 'Our Program' },
+    { href: '/blog', label: 'Blog' },
+    { href: '/contact', label: 'Contact' },
 ];
 
 export default function Navbar() {

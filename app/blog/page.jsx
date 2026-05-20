@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server';
+import { getSeoMetadata } from '@/utils/getSeoMetadata';
 export const revalidate = 518400; // 6 days
 import Link from 'next/link';
 import Image from 'next/image';
@@ -8,18 +9,11 @@ import Section from '@/components/ui/Section';
 import { Calendar, ChevronRight } from 'lucide-react';
 
 export async function generateMetadata() {
-    const supabase = await createClient();
-    const { data: seo } = await supabase
-        .from('seo_metadata')
-        .select('*')
-        .eq('route', '/blog')
-        .single();
-
-    return {
-        title: seo?.title || 'Blog | The Diet Cascade',
-        description: seo?.description || 'Latest health tips, recipes, and insights from Dt. Sabah Ghare.',
-        keywords: seo?.keywords || 'blog, health tips, recipes, diet advice',
-    };
+    return getSeoMetadata('/blog', {
+        title: 'Blog | The Diet Cascade',
+        description: 'Latest health tips, recipes, and insights from Dt. Sabah Ghare.',
+        keywords: 'blog, health tips, recipes, diet advice',
+    });
 }
 
 export default async function BlogIndexPage() {

@@ -9,8 +9,6 @@ import Workouts from '@/components/home/Workouts';
 import Testimonials from '@/components/home/Testimonials';
 import Footer from '@/components/layout/Footer';
 import data from '@/data/content.json';
-import { Analytics } from "@vercel/analytics/next"
-import { SpeedInsights } from "@vercel/speed-insights/next"
 
 import { createClient } from '@/utils/supabase/server';
 
@@ -45,8 +43,6 @@ export default async function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <Analytics />
-      <SpeedInsights />
       <Navbar />
       <Hero />
       <About />
