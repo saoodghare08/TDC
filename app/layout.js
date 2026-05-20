@@ -2,6 +2,7 @@ import { Work_Sans, Poppins } from "next/font/google"; // Import standard fonts
 import "./globals.css";
 import Providers from "@/components/Providers";
 import Script from "next/script";
+import WhatsAppWidget from "@/components/layout/WhatsAppWidget";
 
 const workSans = Work_Sans({
   subsets: ["latin"],
@@ -193,6 +194,7 @@ export default function RootLayout({ children }) {
         {/* End Google Tag Manager (noscript) */}
         <Providers>
           {children}
+          <WhatsAppWidget />
         </Providers>
         <StructuredData />
       </body>

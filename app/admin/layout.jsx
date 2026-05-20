@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { LayoutDashboard, MessageSquareQuote, FileText, Settings, LogOut, Menu, X, Users, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, MessageSquareQuote, FileText, Settings, LogOut, Menu, X, Users, ChevronRight, MessageCircle } from 'lucide-react';
 import clsx from 'clsx';
 import Image from 'next/image';
 
@@ -15,6 +15,7 @@ const navItems = [
     { href: '/admin/reviews', label: 'Reviews', icon: MessageSquareQuote },
     { href: '/admin/blog', label: 'Blog', icon: FileText },
     { href: '/admin/seo', label: 'SEO', icon: Settings },
+    { href: '/admin/chatbot', label: 'Chatbot FAQs', icon: MessageCircle },
 ];
 
 export default function AdminLayout({ children }) {
@@ -35,7 +36,7 @@ export default function AdminLayout({ children }) {
     }
 
     return (
-        <div className="flex h-screen bg-gray-50">
+        <div className="flex h-screen bg-gray-50" data-lenis-prevent>
 
             {/* ── Mobile top bar ───────────────────────────────────── */}
             <div className="md:hidden fixed top-0 inset-x-0 h-14 bg-white border-b border-gray-100 z-40 flex items-center justify-between px-4 shadow-sm">
