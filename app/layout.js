@@ -135,6 +135,7 @@ function StructuredData() {
       closes: '21:00',
     },
     sameAs: [
+      'https://share.google/QH5gLxx7F2Nbu4HzE',
       'https://www.instagram.com/thedietcascade',
       'https://twitter.com/thedietcascade',
       'https://www.linkedin.com/in/sabah-aslam-ghare-9125a3213/'

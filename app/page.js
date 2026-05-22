@@ -24,10 +24,6 @@ export default async function Home() {
 
   return (
     <main className="bg-white min-h-screen selection:bg-primary selection:text-white">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
       <Navbar />
       <Hero />
       <About />
