@@ -153,9 +153,18 @@ export default function RootLayout({ children }) {
 
   return (
     <html lang="en" className="lenis">
-      <body
-        className={`${workSans.variable} ${poppins.variable} font-sans antialiased bg-gray-50`}
-      >
+      <body className={`${workSans.variable} ${poppins.variable} font-sans antialiased bg-gray-50`}>
+        {/* Google Tag Manager (noscript) */}
+        <noscript>
+          <iframe
+            src="https://www.googletagmanager.com/ns.html?id=GTM-5MDWV8L5"
+            height="0"
+            width="0"
+            style={{ display: 'none', visibility: 'hidden' }}
+          />
+        </noscript>
+        {/* End Google Tag Manager (noscript) */}
+
         {/* Google Analytics */}
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-1D06V6TYFC"
@@ -184,16 +193,6 @@ export default function RootLayout({ children }) {
         </Script>
         {/* End Google Tag Manager */}
 
-        {/* Google Tag Manager (noscript) */}
-        <noscript>
-          <iframe
-            src="https://www.googletagmanager.com/ns.html?id=GTM-5MDWV8L5"
-            height="0"
-            width="0"
-            style={{ display: 'none', visibility: 'hidden' }}
-          />
-        </noscript>
-        {/* End Google Tag Manager (noscript) */}
         <Providers>
           <Analytics />
           <SpeedInsights />

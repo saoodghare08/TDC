@@ -7,6 +7,7 @@ import data from '@/data/content.json';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import Regimen from '@/components/home/Regimen';
+import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema';
 
 export async function generateMetadata() {
     return getSeoMetadata('/regimen', {
@@ -19,6 +20,10 @@ export async function generateMetadata() {
 export default async function RegimenPage() {
     return (
         <main className="bg-surface min-h-screen selection:bg-primary selection:text-white">
+            <BreadcrumbSchema items={[
+                { name: 'Home', url: '/' },
+                { name: 'Diet Regimens', url: '/regimen' },
+            ]} />
             <Navbar />
 
             {/* Hero Banner */}

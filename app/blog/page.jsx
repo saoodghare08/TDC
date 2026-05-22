@@ -7,6 +7,7 @@ import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import Section from '@/components/ui/Section';
 import { Calendar, ChevronRight } from 'lucide-react';
+import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema';
 
 export async function generateMetadata() {
     return getSeoMetadata('/blog', {
@@ -26,6 +27,10 @@ export default async function BlogIndexPage() {
 
     return (
         <main className="bg-surface min-h-screen">
+            <BreadcrumbSchema items={[
+                { name: 'Home', url: '/' },
+                { name: 'Blog', url: '/blog' },
+            ]} />
             <Navbar />
 
             {/* Header */}

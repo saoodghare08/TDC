@@ -10,6 +10,7 @@ import {
     MessageCircle, Layers, Dumbbell, TrendingUp,
     Map, ShieldCheck, BookOpen, ArrowRight, CheckCircle2, Search
 } from 'lucide-react';
+import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema';
 
 export async function generateMetadata() {
     return getSeoMetadata('/program', {
@@ -43,6 +44,10 @@ function getIcon(text) {
 export default async function ProgramPage() {
     return (
         <main className="bg-surface min-h-screen selection:bg-primary selection:text-white">
+            <BreadcrumbSchema items={[
+                { name: 'Home', url: '/' },
+                { name: 'Our Programme', url: '/program' },
+            ]} />
             <Navbar />
 
             {/* Hero Banner */}

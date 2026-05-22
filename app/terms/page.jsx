@@ -5,6 +5,7 @@ import Footer from '@/components/layout/Footer';
 import Section from '@/components/ui/Section';
 import Link from 'next/link';
 import { FileText, AlertCircle, ArrowRight, Shield, Clock, ExternalLink } from 'lucide-react';
+import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema';
 
 export async function generateMetadata() {
     return getSeoMetadata('/terms', {
@@ -68,6 +69,10 @@ const terms = [
 export default async function TermsPage() {
     return (
         <main className="bg-surface min-h-screen selection:bg-primary selection:text-white">
+            <BreadcrumbSchema items={[
+                { name: 'Home', url: '/' },
+                { name: 'Terms & Conditions', url: '/terms' },
+            ]} />
             <Navbar />
 
             {/* Hero Banner */}

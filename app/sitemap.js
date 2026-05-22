@@ -26,12 +26,13 @@ export default async function sitemap() {
     })) || [];
 
     // Only public-facing pages — keep /admin, /login, /portal out of index
-    const routes = ['', '/blog', '/share-story'].map((route) => ({
-        url: `${baseUrl}${route}`,
-        lastModified: new Date().toISOString(),
-        changeFrequency: 'monthly',
-        priority: route === '' ? 1 : 0.8,
-    }));
+    const routes = ['', '/about', '/blog', '/contact', '/faq', '/program',
+        '/regimen', '/regimens', '/share-story', '/testimonials', '/privacy', '/terms'].map((route) => ({
+            url: `${baseUrl}${route}`,
+            lastModified: new Date().toISOString(),
+            changeFrequency: 'monthly',
+            priority: route === '' ? 1 : 0.8,
+        }));
 
     return [...routes, ...blogRoutes];
 }

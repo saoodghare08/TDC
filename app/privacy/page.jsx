@@ -5,6 +5,7 @@ import Footer from '@/components/layout/Footer';
 import Section from '@/components/ui/Section';
 import Link from 'next/link';
 import { Shield, AlertCircle, ArrowRight, RefreshCw, ClipboardList, Clock } from 'lucide-react';
+import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema';
 
 export async function generateMetadata() {
     return getSeoMetadata('/privacy', {
@@ -70,6 +71,10 @@ const policySections = [
 export default async function PrivacyPolicyPage() {
     return (
         <main className="bg-surface min-h-screen selection:bg-primary selection:text-white">
+            <BreadcrumbSchema items={[
+                { name: 'Home', url: '/' },
+                { name: 'Privacy & Refund Policy', url: '/privacy' },
+            ]} />
             <Navbar />
 
             {/* Hero Banner */}

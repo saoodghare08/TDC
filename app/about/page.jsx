@@ -7,6 +7,7 @@ import data from '@/data/content.json';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, Award, Globe, Users, Heart, Star, BookOpen } from 'lucide-react';
+import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema';
 
 export async function generateMetadata() {
     return getSeoMetadata('/about', {
@@ -44,6 +45,10 @@ const values = [
 export default function AboutPage() {
     return (
         <main className="bg-surface min-h-screen selection:bg-primary selection:text-white">
+            <BreadcrumbSchema items={[
+                { name: 'Home', url: '/' },
+                { name: 'About Us', url: '/about' },
+            ]} />
             <Navbar />
 
             {/* Hero Banner */}

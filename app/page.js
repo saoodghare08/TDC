@@ -22,21 +22,6 @@ export default async function Home() {
     .eq('is_approved', true)
     .order('created_at', { ascending: false });
 
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'HealthAndBeautyBusiness',
-    'name': 'The Diet Cascade',
-    'image': 'https://thedietcascade.com/images/logo.png',
-    'description': data.about.paragraphs[0],
-    'address': {
-      '@type': 'PostalAddress',
-      'addressLocality': data.footer.address,
-      'addressCountry': 'IN'
-    },
-    'telephone': data.footer.phone,
-    'priceRange': '$$'
-  };
-
   return (
     <main className="bg-white min-h-screen selection:bg-primary selection:text-white">
       <script

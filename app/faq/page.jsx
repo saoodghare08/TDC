@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import FAQClient from './FAQClient';
+import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema';
 
 export const revalidate = 259200; // 3 days in seconds
 
@@ -53,6 +54,10 @@ export default async function FAQPage() {
 
     return (
         <main className="bg-surface min-h-screen selection:bg-primary selection:text-white">
+            <BreadcrumbSchema items={[
+                { name: 'Home', url: '/' },
+                { name: 'FAQ', url: '/faq' },
+            ]} />
             <Navbar />
             <FAQClient initialFAQs={initialFAQs} />
             <Footer />

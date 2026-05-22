@@ -6,6 +6,7 @@ import Section from '@/components/ui/Section';
 import data from '@/data/content.json';
 import Link from 'next/link';
 import { Phone, Mail, Instagram, Linkedin, MapPin, MessageCircle, Clock, ArrowRight } from 'lucide-react';
+import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema';
 
 export async function generateMetadata() {
     return getSeoMetadata('/contact', {
@@ -61,6 +62,10 @@ const contactMethods = [
 export default async function ContactPage() {
     return (
         <main className="bg-surface min-h-screen selection:bg-primary selection:text-white">
+            <BreadcrumbSchema items={[
+                { name: 'Home', url: '/' },
+                { name: 'Contact', url: '/contact' },
+            ]} />
             <Navbar />
 
             {/* Hero Banner */}

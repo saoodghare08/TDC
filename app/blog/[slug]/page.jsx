@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { ChevronLeft, Calendar, Share2 } from 'lucide-react';
 import { notFound } from 'next/navigation';
 import ShareButton from '@/components/blog/ShareButton';
+import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema';
 
 export async function generateMetadata({ params }) {
     const supabase = await createClient();
@@ -49,8 +50,47 @@ export default async function BlogPostPage({ params }) {
         notFound();
     }
 
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://thedietcascade.com';
+
+    const jsonLd = {
+        '@context': 'https://schema.org',
+        '@type': 'Article',
+        headline: post.title,
+        description: post.excerpt || '',
+        image: post.cover_image || `${baseUrl}/images/logo.png`,
+        datePublished: post.created_at,
+        dateModified: post.updated_at || post.created_at,
+        url: `${baseUrl}/blog/${slug}`,
+        author: {
+            '@type': 'Person',
+            name: 'Dt. Sabah Ghare',
+            url: `${baseUrl}/about`,
+        },
+        publisher: {
+            '@type': 'Organization',
+            name: 'The Diet Cascade',
+            logo: {
+                '@type': 'ImageObject',
+                url: `${baseUrl}/images/logo.png`,
+            },
+        },
+        mainEntityOfPage: {
+            '@type': 'WebPage',
+            '@id': `${baseUrl}/blog/${slug}`,
+        },
+    };
+
     return (
         <main className="bg-surface min-h-screen">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+            />
+            <BreadcrumbSchema items={[
+                { name: 'Home', url: '/' },
+                { name: 'Blog', url: '/blog' },
+                { name: post.title, url: `/blog/${slug}` },
+            ]} />
             <Navbar />
 
             {/* Premium Blog Header */}
