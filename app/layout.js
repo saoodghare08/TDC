@@ -62,6 +62,7 @@ export async function generateMetadata() {
         },
       ],
       locale: 'en_US',
+      alternateLocale: ['en_IN', 'en_AE', 'en_GB', 'ar_AE'],
       type: 'website',
     },
     twitter: {
@@ -72,6 +73,15 @@ export async function generateMetadata() {
     },
     alternates: {
       canonical: url,
+      languages: {
+        'en-IN': url,
+        'en-AE': url,
+        'en-US': url,
+        'en-GB': url,
+        'en-CA': url,
+        'en-AU': url,
+        'x-default': url,
+      },
     },
     verification: {
       google: 'guS34CTX4qg6zjDiGQFWarDgoqN90f41xhAIm5Ubn9Y',
@@ -99,17 +109,17 @@ function StructuredData() {
       {
         "@type": "PostalAddress",
         "addressLocality": "Ajman",
-        "addressCountry": "UAE"
+        "addressCountry": "AE"
       },
       {
         "@type": "PostalAddress",
         "addressLocality": "Dubai",
-        "addressCountry": "UAE"
+        "addressCountry": "AE"
       },
       {
         "@type": "PostalAddress",
         "addressLocality": "Sharjah",
-        "addressCountry": "UAE"
+        "addressCountry": "AE"
       }
     ],
     geo: {
@@ -117,10 +127,19 @@ function StructuredData() {
       latitude: 19.0330,
       longitude: 73.0297,
     },
-    areaServed: {
-      '@type': 'Place',
-      name: 'Worldwide'
-    },
+    areaServed: [
+      { '@type': 'Country', name: 'India' },
+      { '@type': 'Country', name: 'United Arab Emirates' },
+      { '@type': 'Country', name: 'United States' },
+      { '@type': 'Country', name: 'United Kingdom' },
+      { '@type': 'Country', name: 'Canada' },
+      { '@type': 'Country', name: 'Australia' },
+    ],
+    availableLanguage: [
+      { '@type': 'Language', name: 'English' },
+      { '@type': 'Language', name: 'Arabic' },
+    ],
+    priceRange: '$$',
     openingHoursSpecification: {
       '@type': 'OpeningHoursSpecification',
       dayOfWeek: [
