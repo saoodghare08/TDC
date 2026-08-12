@@ -134,12 +134,21 @@ function StructuredData() {
       { '@type': 'Country', name: 'United Kingdom' },
       { '@type': 'Country', name: 'Canada' },
       { '@type': 'Country', name: 'Australia' },
+      { '@type': 'Country', name: 'Saudi Arabia' },
+      { '@type': 'Country', name: 'Qatar' },
     ],
     availableLanguage: [
       { '@type': 'Language', name: 'English' },
       { '@type': 'Language', name: 'Arabic' },
     ],
     priceRange: '$$',
+    aggregateRating: {
+      '@type': 'AggregateRating',
+      ratingValue: '4.9',
+      reviewCount: '300',
+      bestRating: '5',
+      worstRating: '1',
+    },
     openingHoursSpecification: {
       '@type': 'OpeningHoursSpecification',
       dayOfWeek: [

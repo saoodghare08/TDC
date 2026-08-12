@@ -44,7 +44,7 @@ export default async function sitemap() {
 
     // Only public-facing pages — keep /admin, /login, /portal out of index
     const routes = ['', '/about', '/blog', '/contact', '/faq', '/program',
-        '/regimen', '/regimens', '/share-story', '/testimonials', '/privacy', '/terms'].map((route) => {
+        '/regimen', '/regimens', '/share-story', '/privacy', '/terms'].map((route) => {
             const url = `${baseUrl}${route}`;
             return {
                 url,

@@ -1,12 +1,9 @@
 'use client';
 
 import { useRef, useEffect } from 'react';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { gsap, ScrollTrigger } from '@/utils/gsap';
 import data from '@/data/content.json';
 import Section from '@/components/ui/Section';
-
-gsap.registerPlugin(ScrollTrigger);
 
 const StatItem = ({ label, value }) => {
     const activeRef = useRef(null);

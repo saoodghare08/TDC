@@ -50,8 +50,20 @@ export default async function BlogIndexPage() {
 
             <Section id="posts" className="bg-surface pb-24">
                 {!posts || posts.length === 0 ? (
-                    <div className="text-center py-20 px-6 bg-white rounded-[2rem] border border-gray-50 shadow-sm">
-                        <p className="text-para font-medium italic">New insights are being drafted. Check back shortly!</p>
+                    <div className="text-center py-24 px-6 bg-white rounded-[2rem] border border-gray-50 shadow-sm max-w-xl mx-auto">
+                        <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center text-primary font-heading font-black text-2xl mx-auto mb-6">TDC</div>
+                        <h3 className="text-xl font-heading font-bold text-heading mb-3">Our Expert Nutrition Library is Coming Soon</h3>
+                        <p className="text-para text-sm leading-relaxed mb-8">
+                            Our team is crafting in-depth guides, healthy recipes, and wellness insights. In the meantime, follow us on Instagram for daily health tips.
+                        </p>
+                        <a
+                            href="https://www.instagram.com/thedietcascade/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-6 py-3 bg-heading text-white text-sm font-bold rounded-full transition-transform duration-150 active:scale-[0.97] hover:bg-heading/90"
+                        >
+                            Follow @thedietcascade
+                        </a>
                     </div>
                 ) : (
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">

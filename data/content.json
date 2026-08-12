@@ -1,14 +1,15 @@
 {
     "hero": {
-        "title": "The Diet Cascade",
+        "title": "Transform Your Health",
         "subtitle": "Dt. Sabah Ghare",
         "role": "Clinical Dietitian & Lifestyle Coach",
+        "tagline": "Personalized nutrition plans that fit your lifestyle — crafted by a certified clinical dietitian serving clients across 8+ countries.",
         "media": "/images/hero1.jpg"
     },
     "about": {
         "title": "About The Diet Cascade",
         "paragraphs": [
-            "Welcome to The Diet Cascade (TDC), your holistic health clinic specializing in lifestyle and weight management through customized diet programs. With a global clientele spanning six countries, we have a proven track record of helping individuals achieve their health targets successfully.",
+            "Welcome to The Diet Cascade (TDC), your holistic health clinic specializing in lifestyle and weight management through customized diet programs. With a global clientele spanning 8+ countries, we have a proven track record of helping individuals achieve their health targets successfully.",
             "At TDC, we go beyond simply addressing medical conditions – we're committed to fostering healthy lifestyles and promoting physical activity. Our approach involves formulating diet plans tailored to your preferences and routines, offering modern solutions that empower you to take charge of your fitness and nutrition. We prioritize education about nutrition, ensuring you understand your body and make informed choices. When it comes to physical fitness, we emphasize all components of fitness, not just the number on the scale.",
             "With a personal touch, our team crafts simple and manageable diet plans that are easy to follow. Our founder, Dt. Sabah Ghare, leads by example, advocating for a balanced approach to diet and exercise that integrates seamlessly into your daily routine. Her vision is to empower clients to sustain a healthy lifestyle for the long-term.",
             "Adapting to a healthy lifestyle may not be easy, but at TDC, we believe that growth happens when you embrace challenges with consistency and patience. Remember, true transformation starts from within – with our guidance and your commitment, achieving your goals is not just possible, but inevitable."
@@ -32,7 +33,6 @@
             }
         ]
     },
-    "tagline": "Elevate Your Health Journey at The Diet Cascade– Your Holistic Health Clinic for Lifestyle, Weight Management, and Comprehensive Care Spanning Feminine, Masculine, Athletes, Kids, and Geriatric Well-being.",
     "dietPerspective": {
         "title": "Dt. Sabah Ghare's Diet Perspective",
         "text": "Diet is a form of respect and discipline one offers to their body and soul. There is no specific food group that will assist you in reaching your fitness goal; rather it is a holistic approach that includes a protein-rich balanced diet, physical activity, and adequate sleep. It takes one to be focused, have patience and most importantly, be consistent to adapt to a balanced lifestyle.",
@@ -118,6 +118,19 @@
         }
     ],
     "services": [
+        "1-on-1 Diet Consultation with Dt. Sabah Ghare",
+        "Full Health & Body Composition Assessment",
+        "Customized Diet Plans with Recipes",
+        "Regular Follow-Up Calls",
+        "WhatsApp Meal Monitoring",
+        "Exercise-Aligned Meal Planning",
+        "Workout Guidance & Plan",
+        "Progress Tracking (Weight, Photos & Measurements)",
+        "Nutritional Education & Guidance",
+        "Travel Diet Guide (if required)",
+        "Maintenance Check-In & Long-Term Support"
+    ],
+    "_services_original": [
         "Diet counseling and diet recall with Dt.Sabah Ghare",
         "Clinical and anthropometric record acquisition",
         "Customized diet plans with recipes",
@@ -126,7 +139,6 @@
         "Plan periodisation (aligning dietary habits with exercise goals)",
         "Workout guidance/Plan",
         "Progress tracking(weight, photos & measurements)",
-        "Follow up calls",
         "Nutritional guidance and personalized diet solutions",
         "Travel guide (only if required)",
         "Maintenance diet counseling (closing call)"
@@ -134,6 +146,10 @@
     "pricing": [
         {
             "title": "1 Month Plan",
+            "name": "Starter",
+            "duration": "1 Month",
+            "lucideIcon": "Leaf",
+            "subtitle": "A strong start to build healthy habits",
             "icon": "1",
             "features": [
                 "2 Number of Meal Plans",
@@ -145,6 +161,10 @@
         },
         {
             "title": "3 Month Plan",
+            "name": "Momentum",
+            "duration": "3 Months",
+            "lucideIcon": "TrendingUp",
+            "subtitle": "The most popular choice for real, lasting results",
             "icon": "3",
             "features": [
                 "6 Number of Meal Plans",
@@ -157,6 +177,10 @@
         },
         {
             "title": "6 Month Plan",
+            "name": "Transformation",
+            "duration": "6 Months",
+            "lucideIcon": "Trophy",
+            "subtitle": "Full transformation with long-term lifestyle change",
             "icon": "6",
             "features": [
                 "12 Number of Meal Plans",
@@ -172,7 +196,7 @@
         "If you are seeking personalized, sustainable diet plans tailored to your tastes and preferences? Look no further – we're the perfect match.",
         "If you need budget-friendly diet solutions that prioritize results and elevate your lifestyle? You've found your ideal fit.",
         "If you want to say goodbye to unnecessary supplements with our supplement-free diet plans, customized to your needs.",
-        "If you're health is a top priority and you're in search of expert guidance to address health concerns, we're the perfect match for you."
+        "If your health is a top priority and you're in search of expert guidance to address health concerns, we're the perfect match for you."
     ],
     "workouts": [
         {
@@ -228,7 +252,7 @@
     },
     "footer": {
         "about": "Welcome to The Diet Cascade (TDC), where personalized diet programs redefine health, led by Dt. Sabah Ghare, prioritizing education, crafting manageable plans, and ensuring true transformation.",
-        "address": "Navi-Mumbai",
+        "address": "Nerul, Navi Mumbai, Maharashtra, India",
         "phone": "+919004491160",
         "email": "sabahghare24@gmail.com",
         "instagram": "https://www.instagram.com/thedietcascade/",

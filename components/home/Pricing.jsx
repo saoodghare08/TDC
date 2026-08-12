@@ -3,9 +3,11 @@
 import { useState, useRef, useEffect } from 'react';
 import data from '@/data/content.json';
 import Section from '@/components/ui/Section';
-import { Check } from 'lucide-react';
+import { Check, Leaf, TrendingUp, Trophy } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
+
+const PLAN_ICONS = { Leaf, TrendingUp, Trophy };
 
 export default function Pricing() {
     const router = useRouter();
@@ -45,8 +47,8 @@ export default function Pricing() {
             <div className="absolute bottom-0 left-0 p-32 bg-purple-100 rounded-full blur-[120px] opacity-30 pointer-events-none translate-y-1/2 -translate-x-1/2"></div>
 
             <div className="text-center mb-10 md:mb-16 relative z-10">
-                <span className="text-primary font-bold tracking-wider uppercase text-sm mb-2 block">Our Packages</span>
-                <h2 className="text-3xl md:text-5xl font-heading font-bold text-heading mb-4">Plan Benefits</h2>
+                <span className="text-primary font-bold tracking-wider uppercase text-sm mb-2 block">Choose Your Plan</span>
+                <h2 className="text-3xl md:text-5xl font-heading font-bold text-heading mb-4">Our Programs</h2>
                 <p className="text-gray-600 text-base md:text-lg max-w-2xl mx-auto px-4 md:px-0">
                     Invest in your health with our structured, expert-led nutrition plans designed for sustainable results.
                 </p>
@@ -55,7 +57,7 @@ export default function Pricing() {
             <div
                 ref={scrollRef}
                 onScroll={handleScroll}
-                className="flex md:grid md:grid-cols-3 gap-4 md:gap-8 max-w-6xl mx-auto relative z-10 px-8 md:px-0 overflow-x-auto md:overflow-visible snap-x snap-mandatory pb-8 scrollbar-hide items-stretch"
+                className="flex md:grid md:grid-cols-3 gap-4 md:gap-8 max-w-6xl mx-auto relative z-10 px-8 md:px-0 overflow-x-auto md:overflow-visible snap-x snap-mandatory pt-6 md:pt-0 pb-8 scrollbar-hide items-stretch"
                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
                 {data.pricing.map((plan, index) => {
@@ -71,20 +73,29 @@ export default function Pricing() {
                             )}
                         >
                             {isPopular && (
-                                <div className="absolute sm:-top-4 -top-1 left-1/2 -translate-x-1/2 bg-linear-to-r from-primary to-blue-600 text-white text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-widest shadow-md">
+                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-linear-to-r from-primary to-blue-600 text-white text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-widest shadow-md whitespace-nowrap">
                                     Most Popular
                                 </div>
                             )}
 
-                            <div className={clsx(
-                                "w-16 h-16 rounded-2xl flex items-center justify-center mb-6 text-2xl font-heading font-bold",
-                                isPopular ? "bg-primary/10 text-primary" : "bg-blue-50 text-blue-900"
-                            )}>
-                                {plan.icon}M
+                            {/* Icon + duration pill on one row — eliminates stacked spacing */}
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className={clsx(
+                                    "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
+                                    isPopular ? "bg-primary/10 text-primary" : "bg-blue-50 text-blue-700"
+                                )}>
+                                    {(() => { const Icon = PLAN_ICONS[plan.lucideIcon]; return Icon ? <Icon size={20} strokeWidth={1.75} /> : null; })()}
+                                </div>
+                                <span className={clsx(
+                                    "text-[10px] font-bold uppercase tracking-[0.15em] px-3 py-1 rounded-full",
+                                    isPopular ? "bg-primary/10 text-primary" : "bg-gray-100 text-gray-500"
+                                )}>
+                                    {plan.duration}
+                                </span>
                             </div>
 
-                            <h3 className="text-2xl font-bold text-heading mb-2">{plan.title}</h3>
-                            <p className="text-gray-600 text-sm mb-6">Comprehensive care for {plan.title}</p>
+                            <h3 className="text-2xl font-bold text-heading mb-1.5">{plan.name}</h3>
+                            <p className="text-gray-500 text-sm mb-5">{plan.subtitle}</p>
 
                             <div className="h-px w-full bg-linear-to-r from-transparent via-gray-200 to-transparent mb-6"></div>
 
@@ -108,7 +119,7 @@ export default function Pricing() {
                                         : "bg-gray-50 border-2 border-gray-200 text-heading shadow-sm"
                                 )}
                             >
-                                Choose Plan
+                                Inquire Now
                             </button>
                         </div>
                     );

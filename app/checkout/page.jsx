@@ -127,7 +127,7 @@ function CheckoutContent() {
                     <div className="lg:w-7/12 order-1 lg:order-2">
                         <div className="bg-white p-6 md:p-12 rounded-[2rem] md:rounded-[3rem] shadow-2xl shadow-heading/5 border border-gray-100 relative">
                             <div className="mb-10">
-                                <h1 className="text-3xl md:text-5xl font-heading font-bold text-heading mb-3">Initiate Journey</h1>
+                                <h1 className="text-3xl md:text-5xl font-heading font-bold text-heading mb-3">Book Your Consultation</h1>
                                 <p className="text-para text-sm md:text-base max-w-sm">Provide your details to connect directly with our clinic experts.</p>
                             </div>
 

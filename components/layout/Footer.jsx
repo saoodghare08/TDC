@@ -13,10 +13,10 @@ export default function Footer() {
                         {data.footer.about}
                     </p>
                     <div className="flex gap-4">
-                        <Link href={data.contact.instagram} target="_blank" className="bg-white/10 p-3 rounded-full transition-colors duration-200 text-white hover:bg-primary">
+                        <Link href={data.contact.instagram} aria-label="Follow us on Instagram" target="_blank" className="bg-white/10 p-3 rounded-full transition-colors duration-200 text-white hover:bg-primary">
                             <Instagram size={20} />
                         </Link>
-                        <Link href={data.contact.linkedin} target="_blank" className="bg-white/10 p-3 rounded-full transition-colors duration-200 text-white hover:bg-primary">
+                        <Link href={data.contact.linkedin} aria-label="Follow us on LinkedIn" target="_blank" className="bg-white/10 p-3 rounded-full transition-colors duration-200 text-white hover:bg-primary">
                             <Linkedin size={20} />
                         </Link>
                     </div>

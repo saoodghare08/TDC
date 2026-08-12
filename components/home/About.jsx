@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { gsap, ScrollTrigger } from '@/utils/gsap';
 import data from '@/data/content.json';
 import Section from '@/components/ui/Section';
 import Image from 'next/image';
@@ -13,7 +12,6 @@ export default function About() {
     const imageRef = useRef(null);
 
     useEffect(() => {
-        gsap.registerPlugin(ScrollTrigger);
         const ctx = gsap.context(() => {
             gsap.from(textRef.current.children, {
                 scrollTrigger: {
