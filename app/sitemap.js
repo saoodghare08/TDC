@@ -44,7 +44,7 @@ export default async function sitemap() {
 
     // Only public-facing pages — keep /admin, /login, /portal out of index
     const routes = ['', '/about', '/blog', '/contact', '/faq', '/program',
-        '/regimen', '/regimens', '/share-story', '/privacy', '/terms'].map((route) => {
+        '/regimen', '/share-story', '/privacy', '/terms'].map((route) => {
             const url = `${baseUrl}${route}`;
             return {
                 url,
@@ -55,5 +55,23 @@ export default async function sitemap() {
             };
         });
 
-    return [...routes, ...blogRoutes];
+    // SEO landing pages — location and service targeting pages
+    const landingPageRoutes = [
+        '/dietitian-navi-mumbai/',
+        '/india/',
+        '/uae/',
+        '/dietitian-dubai/',
+        '/online-dietitian/',
+    ].map((route) => {
+        const url = `${baseUrl}${route}`;
+        return {
+            url,
+            lastModified: new Date().toISOString(),
+            changeFrequency: 'weekly',
+            priority: 0.85,
+            alternates: buildAlternates(url),
+        };
+    });
+
+    return [...routes, ...landingPageRoutes, ...blogRoutes];
 }
