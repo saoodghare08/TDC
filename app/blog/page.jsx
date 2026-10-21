@@ -37,7 +37,7 @@ export default async function BlogIndexPage() {
             <div className="relative pt-32 pb-24 md:pt-48 md:pb-32 overflow-hidden bg-heading rounded-b-[2.5rem] md:rounded-b-[4rem]">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2" />
                 <div className="absolute bottom-0 left-0 w-80 h-80 bg-primary/5 rounded-full blur-[120px] translate-y-1/2 -translate-x-1/3" />
-                
+
                 <div className="relative z-10 px-6 max-w-3xl mx-auto text-center">
                     <h1 className="text-4xl md:text-6xl font-heading font-bold text-white mb-6 leading-tight">
                         Our <span className="text-primary-200">Insights</span>
@@ -50,7 +50,7 @@ export default async function BlogIndexPage() {
 
             <Section id="posts" className="bg-surface pb-24">
                 {!posts || posts.length === 0 ? (
-                    <div className="text-center py-24 px-6 bg-white rounded-[2rem] border border-gray-50 shadow-sm max-w-xl mx-auto">
+                    <div className="text-center py-24 px-6 bg-white rounded-4xl border border-gray-50 shadow-sm max-w-xl mx-auto">
                         <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center text-primary font-heading font-black text-2xl mx-auto mb-6">TDC</div>
                         <h3 className="text-xl font-heading font-bold text-heading mb-3">Our Expert Nutrition Library is Coming Soon</h3>
                         <p className="text-para text-sm leading-relaxed mb-8">
@@ -68,7 +68,7 @@ export default async function BlogIndexPage() {
                 ) : (
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
                         {posts.map((post) => (
-                            <Link href={`/blog/${post.slug}`} key={post.id} className="group flex flex-col bg-white border border-gray-100 rounded-[2rem] overflow-hidden hover:shadow-2xl hover:shadow-heading/5 transition-shadow duration-300 active:scale-[0.98]">
+                            <Link href={`/blog/${post.slug}`} key={post.id} className="group flex flex-col bg-white border border-gray-100 rounded-4xl overflow-hidden hover:shadow-2xl hover:shadow-heading/5 transition-shadow duration-300 active:scale-[0.98]">
                                 <div className="relative h-60 md:h-72 w-full overflow-hidden">
                                     {post.cover_image ? (
                                         <Image

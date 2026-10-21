@@ -144,14 +144,14 @@ export default function LocationPageShell({
                                 Book a Consultation <ArrowRight size={16} />
                             </Link>
                         </div>
-                        <div className="relative rounded-[2.5rem] overflow-hidden aspect-[4/3] shadow-2xl">
+                        <div className="relative rounded-[2.5rem] overflow-hidden aspect-4/3 shadow-2xl">
                             <Image
                                 src="/images/diet-p.jpg"
                                 alt="Online nutrition consultation with Dt. Sabah Ghare"
                                 fill
                                 className="object-cover"
                             />
-                            <div className="absolute inset-0 bg-gradient-to-br from-heading/30 to-transparent" />
+                            <div className="absolute inset-0 bg-linear-to-br from-heading/30 to-transparent" />
                         </div>
                     </div>
                 </Section>
@@ -208,7 +208,7 @@ export default function LocationPageShell({
                         <span className="text-primary font-bold tracking-widest uppercase text-xs block mb-3">Common Questions</span>
                         <h2 className="text-3xl md:text-4xl font-heading font-bold text-heading">Frequently Asked Questions</h2>
                     </div>
-                    <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm divide-y divide-gray-100 px-6 md:px-10">
+                    <div className="bg-white rounded-4xl border border-gray-100 shadow-sm divide-y divide-gray-100 px-6 md:px-10">
                         {faqs.map((faq, i) => <FAQItem key={i} {...faq} />)}
                     </div>
                 </div>
