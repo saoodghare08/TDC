@@ -1,13 +1,15 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import {
     FileText, Download, Send, Sparkles, Plus, Trash2,
     Calendar, User, Target, Scale, Droplet, Flame, Eye,
     CheckCircle, AlertCircle, RefreshCw, ArrowLeft, Clock,
     Share2, Printer, RotateCcw, BookmarkPlus, Database,
-    Info, Copy, ChefHat, Utensils, Search, X, Palette
+    Info, Copy, ChefHat, Utensils, Search, X, Palette,
+    ShieldAlert, ChevronDown, ChevronUp, Edit3, Undo2,
+    Maximize2, Minimize2, Check, ExternalLink, Sliders
 } from 'lucide-react';
 import Link from 'next/link';
 import Swal from 'sweetalert2';
@@ -24,6 +26,8 @@ const PDFViewer = dynamic(() => import('@react-pdf/renderer').then(mod => mod.PD
         </div>
     )
 });
+
+
 
 const EMPTY_FORM_STATE = {
     client_name: '',
@@ -55,7 +59,15 @@ const EMPTY_FORM_STATE = {
     guidelines: [],
     donts: [],
     recipes: [],
-    pdf_theme: 'clinical'
+    pdf_theme: 'clinical',
+    show_special_instructions: false,
+    special_instructions_title: 'Special Clinical Instructions & Edge-Case Directives',
+    special_instructions_badge: 'EDGE CASE ADVISORY',
+    special_instructions_theme: 'emerald',
+    special_instructions_style: 'callout',
+    special_instructions: '',
+    special_instructions_warning: '',
+    special_instructions_verified: true
 };
 
 export default function AdminPdfGeneratorPage() {
@@ -64,14 +76,59 @@ export default function AdminPdfGeneratorPage() {
     // Form State (Starts Empty On Load)
     const [formData, setFormData] = useState(EMPTY_FORM_STATE);
 
+    // Collapsible Sections State
+    const [collapsed, setCollapsed] = useState({
+        presets: false,       // Presets (open by default, collapsible)
+        profile: false,       // 1. Client Profile (open by default)
+        targets: false,       // 2. Targets (open by default)
+        meals: false,         // 3. Meals (open by default)
+        supplements: true,    // 4. Supplements (collapsed by default)
+        special: true,        // 5. Special Directives (collapsed by default)
+        rules: true,          // 6. Rules (collapsed by default)
+        recipes: false        // 7. Recipes (open by default)
+    });
+
+    const toggleSection = (key) => {
+        setCollapsed(prev => ({ ...prev, [key]: !prev[key] }));
+    };
+
+    const expandAll = () => {
+        setCollapsed({
+            presets: false,
+            profile: false,
+            targets: false,
+            meals: false,
+            supplements: false,
+            special: false,
+            rules: false,
+            recipes: false
+        });
+    };
+
+    const collapseAll = () => {
+        setCollapsed({
+            presets: true,
+            profile: true,
+            targets: true,
+            meals: true,
+            supplements: true,
+            special: true,
+            rules: true,
+            recipes: true
+        });
+    };
+
+    // Soft-Editing State for Attached Recipes
+    const [editingRecipeId, setEditingRecipeId] = useState(null);
+
     // Dynamic Database Templates State
     const [templates, setTemplates] = useState([]);
     const [loadingTemplates, setLoadingTemplates] = useState(true);
     const [dbAvailable, setDbAvailable] = useState(true);
 
-    // Dynamic Recipes State
+    // Dynamic Recipes State (On-demand Search)
     const [availableRecipes, setAvailableRecipes] = useState([]);
-    const [loadingRecipes, setLoadingRecipes] = useState(true);
+    const [loadingRecipes, setLoadingRecipes] = useState(false);
     const [recipeSearch, setRecipeSearch] = useState('');
     const [recipeCategoryFilter, setRecipeCategoryFilter] = useState('All');
 
@@ -106,29 +163,61 @@ export default function AdminPdfGeneratorPage() {
         }
     }, [supabase]);
 
-    // ─── Fetch Recipes from Supabase ───
-    const fetchAvailableRecipes = useCallback(async () => {
-        setLoadingRecipes(true);
-        try {
-            const { data, error } = await supabase
-                .from('recipes')
-                .select('*')
-                .order('name', { ascending: true });
-
-            if (!error && data) {
-                setAvailableRecipes(data);
-            }
-        } catch (err) {
-            console.warn('Error fetching available recipes:', err);
-        } finally {
-            setLoadingRecipes(false);
-        }
-    }, [supabase]);
-
     useEffect(() => {
         fetchTemplates();
-        fetchAvailableRecipes();
-    }, [fetchTemplates, fetchAvailableRecipes]);
+    }, [fetchTemplates]);
+
+    // ─── Pure Search-Based Recipe Fetching (Supabase On-Demand) ───
+    useEffect(() => {
+        const queryText = recipeSearch.trim();
+        const hasCategory = recipeCategoryFilter && recipeCategoryFilter !== 'All';
+
+        // Only query when search keyword or category filter is active
+        if (!queryText && !hasCategory) {
+            setAvailableRecipes([]);
+            setLoadingRecipes(false);
+            return;
+        }
+
+        let isMounted = true;
+        setLoadingRecipes(true);
+
+        const timer = setTimeout(async () => {
+            try {
+                let query = supabase.from('recipes').select('*');
+
+                if (hasCategory) {
+                    query = query.ilike('category', `%${recipeCategoryFilter}%`);
+                }
+
+                if (queryText) {
+                    query = query.ilike('name', `%${queryText}%`);
+                }
+
+                const { data, error } = await query
+                    .order('name', { ascending: true })
+                    .limit(30);
+
+                if (isMounted) {
+                    if (!error && data) {
+                        setAvailableRecipes(data);
+                    } else {
+                        setAvailableRecipes([]);
+                    }
+                }
+            } catch (err) {
+                console.warn('Error searching recipes:', err);
+                if (isMounted) setAvailableRecipes([]);
+            } finally {
+                if (isMounted) setLoadingRecipes(false);
+            }
+        }, 250);
+
+        return () => {
+            isMounted = false;
+            clearTimeout(timer);
+        };
+    }, [recipeSearch, recipeCategoryFilter, supabase]);
 
     // ─── Clear Form ───
     const handleClearForm = () => {
@@ -142,6 +231,7 @@ export default function AdminPdfGeneratorPage() {
         }).then((res) => {
             if (res.isConfirmed) {
                 setFormData(EMPTY_FORM_STATE);
+                setEditingRecipeId(null);
                 setPreviewKey(k => k + 1);
             }
         });
@@ -176,7 +266,15 @@ export default function AdminPdfGeneratorPage() {
                     supplements: Array.isArray(template.supplements) ? JSON.parse(JSON.stringify(template.supplements)) : [],
                     guidelines: Array.isArray(template.guidelines) ? JSON.parse(JSON.stringify(template.guidelines)) : [],
                     donts: Array.isArray(template.donts) ? JSON.parse(JSON.stringify(template.donts)) : [],
-                    recipes: Array.isArray(template.recipes) ? JSON.parse(JSON.stringify(template.recipes)) : (prev.recipes || [])
+                    recipes: Array.isArray(template.recipes) ? JSON.parse(JSON.stringify(template.recipes)) : (prev.recipes || []),
+                    show_special_instructions: Boolean(template.show_special_instructions),
+                    special_instructions_title: template.special_instructions_title || 'Special Clinical Instructions & Edge-Case Directives',
+                    special_instructions_badge: template.special_instructions_badge || 'EDGE CASE ADVISORY',
+                    special_instructions_theme: template.special_instructions_theme || 'emerald',
+                    special_instructions_style: template.special_instructions_style || 'callout',
+                    special_instructions: template.special_instructions || '',
+                    special_instructions_warning: template.special_instructions_warning || '',
+                    special_instructions_verified: template.special_instructions_verified !== false
                 }));
                 setPreviewKey(k => k + 1);
                 Swal.fire({
@@ -249,6 +347,7 @@ export default function AdminPdfGeneratorPage() {
                     supplements: formData.supplements,
                     guidelines: formData.guidelines,
                     donts: formData.donts,
+                    recipes: formData.recipes,
                     is_preset: false
                 }]);
 
@@ -268,10 +367,7 @@ export default function AdminPdfGeneratorPage() {
             Swal.fire({
                 icon: 'error',
                 title: 'Database Save Failed',
-                html: `
-                    <p style="font-size: 13px; margin-bottom: 8px;">${err.message}</p>
-                    <p style="font-size: 11px; color: #64748b;">If the table has not been created yet in Supabase, make sure to execute the migration file <code>supabase/migrations/20261019000000_create_diet_plan_templates_table.sql</code> in the Supabase SQL editor.</p>
-                `,
+                text: err.message,
                 confirmButtonColor: '#2d6a4f'
             });
         }
@@ -457,9 +553,12 @@ export default function AdminPdfGeneratorPage() {
         const exists = currentRecipes.some(r => r.id === recipe.id);
         const updated = exists
             ? currentRecipes.filter(r => r.id !== recipe.id)
-            : [...currentRecipes, recipe];
+            : [...currentRecipes, JSON.parse(JSON.stringify(recipe))];
 
         setFormData(prev => ({ ...prev, recipes: updated }));
+        if (exists && editingRecipeId === recipe.id) {
+            setEditingRecipeId(null);
+        }
     };
 
     const handleRemoveSelectedRecipe = (recipeId) => {
@@ -467,43 +566,73 @@ export default function AdminPdfGeneratorPage() {
             ...prev,
             recipes: (prev.recipes || []).filter(r => r.id !== recipeId)
         }));
+        if (editingRecipeId === recipeId) {
+            setEditingRecipeId(null);
+        }
     };
 
     const handleClearAllRecipes = () => {
         setFormData(prev => ({ ...prev, recipes: [] }));
+        setEditingRecipeId(null);
     };
 
-    const handleAutoMatchRecipes = () => {
-        const mealTexts = (formData.meals || [])
-            .flatMap(m => getMealOptions(m))
-            .join(' ')
-            .toLowerCase();
+    // ─── Soft-Edit Recipe Functions (Specific to this Diet Plan) ───
+    const handleSoftEditRecipe = (recipeId, field, value) => {
+        setFormData(prev => ({
+            ...prev,
+            recipes: (prev.recipes || []).map(r => {
+                if (r.id !== recipeId) return r;
+                return {
+                    ...r,
+                    [field]: value,
+                    is_soft_edited: true
+                };
+            })
+        }));
+    };
 
-        const matched = availableRecipes.filter(r => {
-            const words = r.name.toLowerCase().split(/[\s,&+]+/);
-            return words.some(w => w.length > 3 && mealTexts.includes(w));
-        });
+    const handleSoftEditIngredientsText = (recipeId, text) => {
+        const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+        handleSoftEditRecipe(recipeId, 'ingredients', lines);
+    };
 
-        if (matched.length === 0) {
+    const handleSoftEditInstructionsText = (recipeId, text) => {
+        const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+        handleSoftEditRecipe(recipeId, 'instructions', lines);
+    };
+
+    const handleResetRecipeToMaster = async (recipeId) => {
+        let master = availableRecipes.find(r => r.id === recipeId);
+        if (!master) {
+            try {
+                const { data } = await supabase.from('recipes').select('*').eq('id', recipeId).single();
+                if (data) master = data;
+            } catch (err) {
+                console.warn('Error fetching master recipe:', err);
+            }
+        }
+        if (!master) {
             Swal.fire({
-                icon: 'info',
-                title: 'No Matches Found',
-                text: 'No dishes from your recipe bank matched the current meal options in your blueprint.',
-                confirmButtonColor: '#2d6a4f'
+                icon: 'warning',
+                title: 'Master Recipe Not Found',
+                text: 'Could not load original master recipe from clinic database.',
+                timer: 2000,
+                showConfirmButton: false
             });
             return;
         }
-
-        const currentIds = new Set((formData.recipes || []).map(r => r.id));
-        const newMatches = matched.filter(r => !currentIds.has(r.id));
-        const combined = [...(formData.recipes || []), ...newMatches];
-        setFormData(prev => ({ ...prev, recipes: combined }));
-
+        setFormData(prev => ({
+            ...prev,
+            recipes: (prev.recipes || []).map(r => {
+                if (r.id !== recipeId) return r;
+                return JSON.parse(JSON.stringify(master));
+            })
+        }));
         Swal.fire({
-            icon: 'success',
-            title: `${newMatches.length} Recipe(s) Attached`,
-            text: `Matched: ${matched.map(r => r.name).join(', ')}`,
-            timer: 2000,
+            icon: 'info',
+            title: 'Reset to Master',
+            text: 'Recipe has been restored to the original clinic master version.',
+            timer: 1500,
             showConfirmButton: false
         });
     };
@@ -554,665 +683,705 @@ export default function AdminPdfGeneratorPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50/60 pb-20">
-            {/* ── Top Header Bar ────────────────────────────────────────── */}
-            <div className="bg-white border-b border-gray-100 sticky top-0 z-30 shadow-xs">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <Link
-                            href="/admin"
-                            className="p-2 text-gray-500 hover:text-heading hover:bg-gray-100 rounded-xl transition"
-                        >
-                            <ArrowLeft size={18} />
-                        </Link>
-                        <div>
-                            <div className="flex items-center gap-2">
-                                <span className="p-1.5 bg-primary/10 text-primary rounded-lg">
-                                    <FileText size={18} />
-                                </span>
-                                <h1 className="text-xl sm:text-2xl font-heading font-bold text-heading">
-                                    Diet Plan <span className="text-primary">PDF Generator</span>
-                                </h1>
+        <div className="min-h-screen bg-gray-50 pb-20 font-sans text-heading">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+
+                {/* ── Header (Styled like Clients page) ── */}
+                <div className="flex items-start sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h1 className="text-2xl sm:text-3xl font-bold text-heading flex items-center gap-3">
+                            <div className="p-2 bg-primary/10 rounded-xl">
+                                <FileText size={22} className="text-primary" />
                             </div>
-                            <p className="text-xs text-para mt-0.5">
-                                Design, preview, and export fully formatted clinical nutrition plan PDFs
-                            </p>
-                        </div>
+                            Diet Plan Generator
+                        </h1>
+                        <p className="text-gray-400 text-sm mt-1 ml-1">Create clinical diet plans with live vector PDF export</p>
+                    </div>
+                    <Link
+                        href="/admin"
+                        className="flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 bg-white border border-gray-200 text-heading font-bold rounded-xl hover:bg-gray-100 transition shadow-xs text-xs sm:text-sm shrink-0"
+                    >
+                        <ArrowLeft size={16} />
+                        <span className="hidden sm:inline">Back to Dashboard</span>
+                        <span className="sm:hidden">Dashboard</span>
+                    </Link>
+                </div>
+
+                {/* ════════════════ TOP ACTION TOOLBAR ════════════════ */}
+                <div className="bg-white rounded-2xl p-2.5 sm:p-3 mb-4 border border-gray-200/80 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                    {/* Mode switcher tabs */}
+                    <div className="bg-gray-100 p-1 rounded-xl flex items-center w-full sm:w-auto">
+                        <button
+                            type="button"
+                            onClick={() => setActiveView('editor')}
+                            className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${activeView === 'editor' ? 'bg-white text-heading shadow-xs font-bold' : 'text-gray-500 hover:text-heading'
+                                }`}
+                        >
+                            <FileText size={13} />
+                            <span>Edit Form</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => { setActiveView('preview'); setPreviewKey(k => k + 1); }}
+                            className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${activeView === 'preview' ? 'bg-white text-heading shadow-xs font-bold' : 'text-gray-500 hover:text-heading'
+                                }`}
+                        >
+                            <Eye size={13} className="text-primary" />
+                            <span>Preview</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => { setActiveView('split'); setPreviewKey(k => k + 1); }}
+                            className={`hidden lg:flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${activeView === 'split' ? 'bg-white text-heading shadow-xs font-bold' : 'text-gray-500 hover:text-heading'
+                                }`}
+                        >
+                            <Sliders size={13} />
+                            <span>Split View</span>
+                        </button>
                     </div>
 
-                    {/* View switcher & action buttons */}
-                    <div className="flex items-center flex-wrap gap-2.5">
-                        {/* View mode toggle */}
-                        <div className="bg-gray-100 p-1 rounded-xl flex items-center text-xs font-semibold text-gray-600">
-                            <button
-                                onClick={() => setActiveView('editor')}
-                                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${activeView === 'editor' ? 'bg-white text-heading shadow-xs' : 'hover:text-heading'}`}
-                            >
-                                Edit Form
-                            </button>
-                            <button
-                                onClick={() => { setActiveView('preview'); setPreviewKey(k => k + 1); }}
-                                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${activeView === 'preview' ? 'bg-white text-heading shadow-xs' : 'hover:text-heading'}`}
-                            >
-                                Live Preview
-                            </button>
-                            <button
-                                onClick={() => { setActiveView('split'); setPreviewKey(k => k + 1); }}
-                                className={`hidden lg:block px-3 py-1.5 rounded-lg transition cursor-pointer ${activeView === 'split' ? 'bg-white text-heading shadow-xs' : 'hover:text-heading'}`}
-                            >
-                                Split View
-                            </button>
-                        </div>
-
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2">
                         {/* Reset Form */}
                         <button
+                            type="button"
                             onClick={handleClearForm}
-                            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 hover:border-red-300 hover:bg-red-50 text-gray-600 hover:text-red-600 font-semibold text-xs rounded-xl shadow-xs transition active:scale-95 cursor-pointer"
-                            title="Reset all fields to empty state"
+                            className="flex items-center justify-center gap-1 px-3 py-2 bg-white border border-gray-200 hover:border-red-300 hover:bg-red-50 text-gray-600 hover:text-red-600 font-semibold text-xs rounded-xl shadow-2xs transition active:scale-95 cursor-pointer shrink-0"
+                            title="Reset all fields"
                         >
-                            <RotateCcw size={13} />
-                            Reset
-                        </button>
-
-                        {/* Download PDF */}
-                        <button
-                            onClick={handleDownloadPdf}
-                            disabled={generating}
-                            className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white font-semibold text-xs rounded-xl shadow-sm shadow-primary/20 transition active:scale-95 disabled:opacity-50 cursor-pointer"
-                        >
-                            {generating ? <RefreshCw size={14} className="animate-spin text-white" /> : <Download size={14} className="text-white" />}
-                            Download PDF
+                            <RotateCcw size={12} />
+                            <span>Reset</span>
                         </button>
 
                         {/* WhatsApp Quick Share */}
                         <button
+                            type="button"
                             onClick={handleOpenWhatsApp}
-                            className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 font-semibold text-xs rounded-xl transition cursor-pointer"
-                            title="Share message on WhatsApp"
+                            className="flex items-center justify-center gap-1 px-3 py-2 bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 font-semibold text-xs rounded-xl transition active:scale-95 cursor-pointer shrink-0"
+                            title="Share on WhatsApp"
                         >
-                            <Send size={13} />
-                            WhatsApp
+                            <Send size={12} />
+                            <span>WhatsApp</span>
+                        </button>
+
+                        {/* Download PDF */}
+                        <button
+                            type="button"
+                            onClick={handleDownloadPdf}
+                            disabled={generating}
+                            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 sm:px-5 py-2 bg-primary hover:bg-primary-hover text-white font-bold text-xs rounded-xl shadow-xs shadow-primary/20 transition active:scale-95 disabled:opacity-50 cursor-pointer min-w-0"
+                        >
+                            {generating ? <RefreshCw size={13} className="animate-spin text-white shrink-0" /> : <Download size={13} className="text-white shrink-0" />}
+                            <span className="truncate">Download PDF</span>
                         </button>
                     </div>
                 </div>
-            </div>
 
-            {/* ── Main Content Container ─────────────────────────────────── */}
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6">
-                {/* Dynamic DB Preset Banner */}
-                <div className="bg-linear-to-r from-emerald-900 to-slate-900 text-white rounded-2xl p-4 sm:p-5 mb-6 shadow-md relative overflow-hidden">
-                    <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                            <span className="p-2.5 bg-white/10 rounded-xl text-accent">
-                                <Sparkles size={20} />
-                            </span>
-                            <div>
+                {/* ════════════════ THEME & PRESETS ════════════════ */}
+                <div className="bg-white rounded-2xl p-4 sm:p-4.5 mb-5 border border-gray-200/80 shadow-xs">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5 sm:gap-4 items-start">
+
+                        {/* Theme Picker */}
+                        <div className="md:col-span-4 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <label className="text-xs font-bold text-heading uppercase tracking-wider flex items-center gap-1.5">
+                                    <Palette size={13} className="text-primary" />
+                                    <span>Theme</span>
+                                </label>
+                                <span className="text-[10px] text-gray-400 font-medium">
+                                    {formData.pdf_theme === 'senior' ? 'Senior Large-Print' : 'Clinical Precision'}
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setFormData(prev => ({ ...prev, pdf_theme: 'clinical' }));
+                                        setPreviewKey(k => k + 1);
+                                    }}
+                                    className={`py-2 px-3 rounded-xl border text-xs font-bold text-center transition cursor-pointer flex items-center justify-center gap-1.5 ${formData.pdf_theme !== 'senior'
+                                        ? 'border-emerald-600 bg-emerald-50 text-emerald-900 ring-1 ring-emerald-600/30 shadow-2xs'
+                                        : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50 bg-white'
+                                        }`}
+                                >
+                                    <span className={`w-2 h-2 rounded-full ${formData.pdf_theme !== 'senior' ? 'bg-emerald-600' : 'bg-gray-300'}`} />
+                                    <span>Clinical</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setFormData(prev => ({ ...prev, pdf_theme: 'senior' }));
+                                        setPreviewKey(k => k + 1);
+                                    }}
+                                    className={`py-2 px-3 rounded-xl border text-xs font-bold text-center transition cursor-pointer flex items-center justify-center gap-1.5 ${formData.pdf_theme === 'senior'
+                                        ? 'border-amber-500 bg-amber-50 text-amber-900 ring-1 ring-amber-400 shadow-2xs'
+                                        : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50 bg-white'
+                                        }`}
+                                >
+                                    <span className={`w-2 h-2 rounded-full ${formData.pdf_theme === 'senior' ? 'bg-amber-500' : 'bg-gray-300'}`} />
+                                    <span>Senior</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Presets: Vertical scroll & Collapsible */}
+                        <div className="md:col-span-8 space-y-2">
+                            <div
+                                onClick={() => toggleSection('presets')}
+                                className="flex items-center justify-between cursor-pointer select-none"
+                            >
+                                <div className="flex items-center gap-1.5">
+                                    <Sparkles size={14} className="text-accent" />
+                                    <span className="text-xs font-bold text-heading uppercase tracking-wider">Presets</span>
+                                    <span className="text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold px-2 py-0.2 rounded-full">
+                                        {templates.length}
+                                    </span>
+                                </div>
                                 <div className="flex items-center gap-2">
-                                    <h2 className="text-sm sm:text-base font-bold text-white">
-                                        Clinical Plan Presets
-                                    </h2>
-                                    <span className="text-[10px] bg-white/10 text-emerald-300 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
-                                        <Database size={10} />
-                                        {dbAvailable ? 'Database Presets' : 'Database Offline'}
-                                    </span>
-                                </div>
-                                <p className="text-xs text-white/70 mt-0.5">
-                                    Load, customize, or save new clinical presets directly to your database.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center flex-wrap gap-2">
-                            {loadingTemplates ? (
-                                <div className="flex items-center gap-2 text-xs text-white/70 px-3 py-1.5">
-                                    <RefreshCw size={13} className="animate-spin text-accent" />
-                                    Loading presets...
-                                </div>
-                            ) : (
-                                <>
-                                    {templates.length === 0 ? (
-                                        <span className="text-xs text-white/60 italic py-1">
-                                            No presets in database. Build a plan below and click &quot;Save As Preset&quot;.
-                                        </span>
-                                    ) : (
-                                        templates.map((preset) => (
-                                            <div
-                                                key={preset.id || preset.label}
-                                                className="inline-flex items-center bg-white/10 hover:bg-white/20 border border-white/15 rounded-lg transition overflow-hidden shadow-xs"
-                                            >
-                                                <button
-                                                    onClick={() => handleApplyTemplate(preset)}
-                                                    className="px-3 py-1.5 text-white text-xs font-medium flex items-center gap-2 cursor-pointer"
-                                                    title={`Load preset: ${preset.label}`}
-                                                >
-                                                    <span>{preset.label}</span>
-                                                    <span className="bg-accent text-heading text-[10px] font-bold px-1.5 py-0.5 rounded">
-                                                        {preset.badge || (preset.calories ? `${preset.calories} kcal` : 'Preset')}
-                                                    </span>
-                                                </button>
-                                                {preset.id && (
-                                                    <button
-                                                        onClick={(e) => handleDeleteTemplate(preset.id, preset.label, e)}
-                                                        className="px-2 py-1.5 text-white/40 hover:text-red-300 hover:bg-white/10 border-l border-white/10 transition cursor-pointer"
-                                                        title="Delete this preset from database"
-                                                    >
-                                                        <Trash2 size={12} />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        ))
-                                    )}
-
-                                    {/* Save Current Plan as Preset */}
-                                    <button
-                                        onClick={handleSaveCurrentAsTemplate}
-                                        className="px-3 py-1.5 bg-accent hover:bg-accent/90 text-heading font-bold rounded-lg text-xs transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
-                                        title="Save current form values as a new database preset"
-                                    >
-                                        <BookmarkPlus size={14} />
-                                        <span>Save As Preset</span>
-                                    </button>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* ── PDF Template & Visual Theme Selector ─────────────────── */}
-                <div className="bg-white rounded-2xl p-4 sm:p-5 mb-6 border border-gray-100 shadow-xs">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3.5">
-                        <div>
-                            <span className="text-[10px] font-bold text-primary uppercase tracking-wider">Document Presentation</span>
-                            <h3 className="font-heading font-bold text-heading text-sm sm:text-base flex items-center gap-2">
-                                <Palette size={16} className="text-primary" />
-                                Select PDF Template & Theme
-                            </h3>
-                        </div>
-                        <div className="text-xs text-para">
-                            Current Style: <strong className="text-heading font-bold">{formData.pdf_theme === 'senior' ? 'Vibrant Senior Friendly (Large Print)' : 'Clinical Standard (Executive)'}</strong>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                        {/* Theme 1: Clinical Standard */}
-                        <div
-                            onClick={() => {
-                                setFormData(prev => ({ ...prev, pdf_theme: 'clinical' }));
-                                setPreviewKey(k => k + 1);
-                            }}
-                            className={`p-4 rounded-2xl border-2 transition cursor-pointer flex flex-col justify-between ${
-                                formData.pdf_theme !== 'senior'
-                                    ? 'border-emerald-600 bg-emerald-50/40 shadow-xs ring-1 ring-emerald-600/30'
-                                    : 'border-gray-200 hover:border-gray-300 bg-white'
-                            }`}
-                        >
-                            <div>
-                                <div className="flex items-center justify-between gap-2 mb-1.5">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-lg">🌿</span>
-                                        <h4 className="font-bold text-xs sm:text-sm text-heading">
-                                            Clinical Standard (2-Page Executive)
-                                        </h4>
-                                    </div>
-                                    {formData.pdf_theme !== 'senior' && (
-                                        <span className="text-[10px] bg-emerald-600 text-white font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                                            <CheckCircle size={10} /> Active Theme
-                                        </span>
-                                    )}
-                                </div>
-                                <p className="text-[11px] text-para leading-relaxed">
-                                    Clean, concise, and medical executive layout. Optimized for standard 2-page print with dense typography, subtle borders, and forest emerald tones.
-                                </p>
-                            </div>
-                            <div className="mt-3 flex items-center gap-2 text-[10px] font-semibold text-gray-500 pt-2.5 border-t border-gray-100">
-                                <span className="bg-gray-100 px-2 py-0.5 rounded">Standard 8pt-9pt</span>
-                                <span className="bg-gray-100 px-2 py-0.5 rounded">2-3 Pages</span>
-                                <span className="bg-gray-100 px-2 py-0.5 rounded">Executive Medical</span>
-                            </div>
-                        </div>
-
-                        {/* Theme 2: Vibrant & Senior Friendly */}
-                        <div
-                            onClick={() => {
-                                setFormData(prev => ({ ...prev, pdf_theme: 'senior' }));
-                                setPreviewKey(k => k + 1);
-                            }}
-                            className={`p-4 rounded-2xl border-2 transition cursor-pointer flex flex-col justify-between ${
-                                formData.pdf_theme === 'senior'
-                                    ? 'border-amber-500 bg-amber-50/40 shadow-xs ring-1 ring-amber-400'
-                                    : 'border-gray-200 hover:border-gray-300 bg-white'
-                            }`}
-                        >
-                            <div>
-                                <div className="flex items-center justify-between gap-2 mb-1.5">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-lg">🎨</span>
-                                        <h4 className="font-bold text-xs sm:text-sm text-heading">
-                                            Vibrant & Senior Friendly (Large Print)
-                                        </h4>
-                                    </div>
-                                    {formData.pdf_theme === 'senior' && (
-                                        <span className="text-[10px] bg-amber-500 text-white font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                                            <CheckCircle size={10} /> Active Theme
-                                        </span>
-                                    )}
-                                </div>
-                                <p className="text-[11px] text-para leading-relaxed">
-                                    Tailored for older adults & clients needing extra visual clarity. Features large 10pt-12pt fonts, high contrast text, and colorful color-coded meal cards.
-                                </p>
-                            </div>
-                            <div className="mt-3 flex items-center gap-2 text-[10px] font-semibold text-amber-800 pt-2.5 border-t border-amber-100/60">
-                                <span className="bg-amber-100/80 px-2 py-0.5 rounded font-bold">Large Print 10pt-12pt</span>
-                                <span className="bg-amber-100/80 px-2 py-0.5 rounded">Color-Coded Meals</span>
-                                <span className="bg-amber-100/80 px-2 py-0.5 rounded font-bold">Senior Friendly</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Split / Single View Layout */}
-                <div className={`grid gap-6 ${activeView === 'split' ? 'lg:grid-cols-2' : 'grid-cols-1'}`}>
-
-                    {/* ════════════════ FORM EDITOR ════════════════ */}
-                    {(activeView === 'editor' || activeView === 'split') && (
-                        <div className="space-y-6">
-
-                            {/* Section 1: Client Information & Plan Timeline */}
-                            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-xs">
-                                <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
-                                    <h3 className="font-heading font-bold text-heading text-sm flex items-center gap-2">
-                                        <User size={16} className="text-primary" />
-                                        1. Client Information & Plan Timeline
-                                    </h3>
-                                    <span className="text-[11px] bg-primary/10 text-primary font-semibold px-2 py-0.5 rounded-full">
-                                        Client Profile & Goals
-                                    </span>
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {/* Client Name */}
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1">Client Full Name *</label>
-                                        <input
-                                            type="text"
-                                            value={formData.client_name}
-                                            onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
-                                            placeholder="e.g., Fatima Al-Zahra"
-                                            className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                            required
-                                        />
-                                    </div>
-
-                                    {/* Age */}
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1">Age</label>
-                                        <input
-                                            type="text"
-                                            value={formData.client_age}
-                                            onChange={(e) => setFormData({ ...formData, client_age: e.target.value })}
-                                            placeholder="e.g., 29 yrs"
-                                            className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                        />
-                                    </div>
-
-                                    {/* Phone */}
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1">Phone / WhatsApp</label>
-                                        <input
-                                            type="text"
-                                            value={formData.client_phone}
-                                            onChange={(e) => setFormData({ ...formData, client_phone: e.target.value })}
-                                            placeholder="+971 50 123 4567 or +91 9876543210"
-                                            className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                        />
-                                    </div>
-
-                                    {/* Current Weight */}
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1">Current Weight (kg)</label>
-                                        <input
-                                            type="text"
-                                            value={formData.start_weight}
-                                            onChange={(e) => setFormData({ ...formData, start_weight: e.target.value })}
-                                            placeholder="e.g., 68.5 kg"
-                                            className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                        />
-                                    </div>
-
-                                    {/* Height */}
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1">Height</label>
-                                        <input
-                                            type="text"
-                                            value={formData.client_height}
-                                            onChange={(e) => setFormData({ ...formData, client_height: e.target.value })}
-                                            placeholder="e.g., 165 cm or 5'5&quot;"
-                                            className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                        />
-                                    </div>
-
-                                    {/* Target Weight */}
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1">Target Weight (kg)</label>
-                                        <input
-                                            type="text"
-                                            value={formData.target_weight}
-                                            onChange={(e) => setFormData({ ...formData, target_weight: e.target.value })}
-                                            placeholder="e.g., 62.0 kg"
-                                            className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                        />
-                                    </div>
-
-                                    {/* Food Habits */}
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1">Food Habits</label>
-                                        <input
-                                            type="text"
-                                            list="food-habits-list"
-                                            value={formData.food_habits}
-                                            onChange={(e) => setFormData({ ...formData, food_habits: e.target.value })}
-                                            placeholder="e.g., Vegetarian, Non-Vegetarian, Vegan"
-                                            className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                        />
-                                        <datalist id="food-habits-list">
-                                            <option value="Vegetarian" />
-                                            <option value="Non-Vegetarian" />
-                                            <option value="Eggetarian" />
-                                            <option value="Vegan" />
-                                            <option value="Jain Vegetarian" />
-                                            <option value="Pescatarian" />
-                                        </datalist>
-                                    </div>
-
-                                    {/* Lifestyle */}
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1">Lifestyle</label>
-                                        <input
-                                            type="text"
-                                            list="lifestyle-list"
-                                            value={formData.lifestyle}
-                                            onChange={(e) => setFormData({ ...formData, lifestyle: e.target.value })}
-                                            placeholder="e.g., Sedentary Desk Job, Active"
-                                            className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                        />
-                                        <datalist id="lifestyle-list">
-                                            <option value="Sedentary (Desk Job)" />
-                                            <option value="Lightly Active" />
-                                            <option value="Moderately Active" />
-                                            <option value="Very Active (Athlete)" />
-                                            <option value="Irregular / Night Shifts" />
-                                        </datalist>
-                                    </div>
-
-                                    {/* Plan Title */}
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1">Plan Title / Phase *</label>
-                                        <input
-                                            type="text"
-                                            value={formData.plan_title}
-                                            onChange={(e) => setFormData({ ...formData, plan_title: e.target.value })}
-                                            placeholder="e.g., Phase 1: Metabolic Reset & Gut Detox"
-                                            className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                        />
-                                    </div>
-
-                                    {/* Target Goal */}
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1">Target Goal</label>
-                                        <input
-                                            type="text"
-                                            value={formData.goal}
-                                            onChange={(e) => setFormData({ ...formData, goal: e.target.value })}
-                                            placeholder="e.g., Fat Loss, Thyroid Support, Muscle Tone"
-                                            className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                        />
-                                    </div>
-
-                                    {/* Start Date */}
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1">Plan Start Date</label>
-                                        <input
-                                            type="date"
-                                            value={formData.start_date}
-                                            onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                                            className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                        />
-                                    </div>
-
-                                    {/* End / Review Date */}
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1">Plan End / Review Date</label>
-                                        <input
-                                            type="date"
-                                            value={formData.end_date}
-                                            onChange={(e) => setFormData({ ...formData, end_date: e.target.value, next_review_date: e.target.value })}
-                                            className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Clinical History Row */}
-                                <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1">Medical Conditions</label>
-                                        <input
-                                            type="text"
-                                            value={formData.medical_conditions}
-                                            onChange={(e) => setFormData({ ...formData, medical_conditions: e.target.value })}
-                                            placeholder="e.g., PCOS, Hypothyroidism, Hypertension"
-                                            className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1">Medication</label>
-                                        <input
-                                            type="text"
-                                            value={formData.medication}
-                                            onChange={(e) => setFormData({ ...formData, medication: e.target.value })}
-                                            placeholder="e.g., Thyronorm 50mcg, Metformin 500mg"
-                                            className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1">Health Abuses / Habits</label>
-                                        <input
-                                            type="text"
-                                            value={formData.health_abuses}
-                                            onChange={(e) => setFormData({ ...formData, health_abuses: e.target.value })}
-                                            placeholder="e.g., Late Night Eating, Excess Caffeine, Smoking"
-                                            className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Section 2: Macro & Daily Targets */}
-                            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-xs">
-                                <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
-                                    <h3 className="font-heading font-bold text-heading text-sm flex items-center gap-2">
-                                        <Target size={16} className="text-primary" />
-                                        2. Nutritional Targets & Daily Quotas
-                                    </h3>
-                                    <span className="text-[11px] bg-accent/20 text-accent-dark font-semibold px-2 py-0.5 rounded-full">
-                                        Macro Bar
-                                    </span>
-                                </div>
-
-                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                                    <div>
-                                        <label className="block text-[11px] font-semibold text-gray-600 mb-1">Calories (kcal)</label>
-                                        <input
-                                            type="text"
-                                            value={formData.calories}
-                                            onChange={(e) => setFormData({ ...formData, calories: e.target.value })}
-                                            placeholder="e.g., 1500 or 1400-1500"
-                                            className="w-full text-xs font-bold text-emerald-800 px-2.5 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[11px] font-semibold text-gray-600 mb-1">Protein (g)</label>
-                                        <input
-                                            type="text"
-                                            value={formData.protein}
-                                            onChange={(e) => setFormData({ ...formData, protein: e.target.value })}
-                                            placeholder="e.g., 85 or 80-90g"
-                                            className="w-full text-xs font-semibold px-2.5 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[11px] font-semibold text-gray-600 mb-1">Carbs (g)</label>
-                                        <input
-                                            type="text"
-                                            value={formData.carbs}
-                                            onChange={(e) => setFormData({ ...formData, carbs: e.target.value })}
-                                            placeholder="e.g., 145 or Low-Carb"
-                                            className="w-full text-xs font-semibold px-2.5 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[11px] font-semibold text-gray-600 mb-1">Fats (g)</label>
-                                        <input
-                                            type="text"
-                                            value={formData.fats}
-                                            onChange={(e) => setFormData({ ...formData, fats: e.target.value })}
-                                            placeholder="e.g., 42 or 40-50g"
-                                            className="w-full text-xs font-semibold px-2.5 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[11px] font-semibold text-gray-600 mb-1">Water (Litres)</label>
-                                        <input
-                                            type="text"
-                                            value={formData.water}
-                                            onChange={(e) => setFormData({ ...formData, water: e.target.value })}
-                                            placeholder="e.g., 3.5 or 3-4 L"
-                                            className="w-full text-xs font-semibold px-2.5 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[11px] font-semibold text-gray-600 mb-1">Steps Target</label>
-                                        <input
-                                            type="text"
-                                            value={formData.steps}
-                                            onChange={(e) => setFormData({ ...formData, steps: e.target.value })}
-                                            placeholder="e.g., 10,000 or 8k-10k"
-                                            className="w-full text-xs font-semibold px-2.5 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Section 3: Daily Meal Schedule */}
-                            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-xs">
-                                <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
-                                    <div>
-                                        <h3 className="font-heading font-bold text-heading text-sm flex items-center gap-2">
-                                            <Clock size={16} className="text-primary" />
-                                            3. Daily Meal Blueprint ({formData.meals.length} Slots)
-                                        </h3>
-                                        <p className="text-[11px] text-para mt-0.5">
-                                            First 4 meals render on Page 1; remaining meals render on Page 2
-                                        </p>
-                                    </div>
                                     <button
                                         type="button"
-                                        onClick={handleAddMeal}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary text-xs font-semibold rounded-xl transition cursor-pointer"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleSaveCurrentAsTemplate();
+                                        }}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary text-white font-bold text-[11px] rounded-lg hover:bg-primary-hover shadow-2xs transition cursor-pointer active:scale-95"
+                                        title="Save current form values as a new preset"
                                     >
-                                        <Plus size={14} />
-                                        Add Meal
+                                        <BookmarkPlus size={11} />
+                                        <span>Save As Preset</span>
                                     </button>
+                                    <span className="text-gray-400">
+                                        {collapsed.presets ? <ChevronDown size={17} /> : <ChevronUp size={17} />}
+                                    </span>
                                 </div>
+                            </div>
 
-                                <div className="space-y-4">
-                                    {formData.meals.length === 0 ? (
-                                        <div className="text-center py-10 px-4 border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50/50">
-                                            <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-2.5">
-                                                <Clock size={20} />
-                                            </div>
-                                            <p className="text-xs font-bold text-heading">No meals added yet</p>
-                                            <p className="text-[11px] text-para mb-3.5 max-w-xs mx-auto">
-                                                Click below to add your first meal slot, or pick one of the clinical presets above.
-                                            </p>
-                                            <button
-                                                type="button"
-                                                onClick={handleAddMeal}
-                                                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-primary text-white text-xs font-semibold rounded-xl hover:bg-primary-hover transition cursor-pointer shadow-xs"
-                                            >
-                                                <Plus size={14} />
-                                                Add First Meal Slot
-                                            </button>
+                            {!collapsed.presets && (
+                                <div className="p-2 rounded-xl bg-gray-50/80 border border-gray-200/80">
+                                    {loadingTemplates ? (
+                                        <div className="flex items-center justify-center gap-2 text-xs text-gray-500 py-3">
+                                            <RefreshCw size={12} className="animate-spin text-primary" />
+                                            <span>Loading presets...</span>
                                         </div>
+                                    ) : templates.length === 0 ? (
+                                        <p className="text-xs text-gray-400 italic text-center py-2.5">
+                                            No presets saved yet. Build a plan below and click Save As Preset.
+                                        </p>
                                     ) : (
-                                        formData.meals.map((meal, index) => (
-                                            <div
-                                                key={index}
-                                                className="bg-gray-50/70 border border-gray-200/80 rounded-xl p-4 relative group hover:border-primary/30 transition"
-                                            >
-                                                <div className="flex items-center justify-between gap-3 mb-3">
-                                                    <div className="flex items-center gap-2 flex-1">
-                                                        <span className="w-5 h-5 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
-                                                            {index + 1}
+                                        <div className="overflow-y-auto max-h-48 space-y-1.5 pr-1">
+                                            {templates.map((preset) => (
+                                                <div
+                                                    key={preset.id || preset.label}
+                                                    className="flex items-center justify-between p-2 rounded-lg bg-white border border-gray-200 hover:border-primary/40 hover:bg-emerald-50/40 transition shadow-2xs"
+                                                >
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleApplyTemplate(preset)}
+                                                        className="flex items-center gap-2 text-left flex-1 min-w-0 cursor-pointer"
+                                                        title={`Click to load: ${preset.label}`}
+                                                    >
+                                                        <span className="font-semibold text-xs text-heading truncate">{preset.label}</span>
+                                                        <span className="bg-primary/10 text-primary text-[10px] font-bold px-1.5 py-0.2 rounded shrink-0">
+                                                            {preset.badge || (preset.calories ? `${preset.calories} kcal` : 'Preset')}
                                                         </span>
-                                                        <input
-                                                            type="text"
-                                                            value={meal.name}
-                                                            onChange={(e) => handleMealChange(index, 'name', e.target.value)}
-                                                            placeholder="Meal Name (e.g., Breakfast, Lunch)"
-                                                            className="font-bold text-heading text-xs px-2.5 py-1 rounded-lg border border-transparent hover:border-gray-300 focus:border-primary focus:bg-white bg-transparent flex-1"
-                                                        />
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <input
-                                                            type="text"
-                                                            value={meal.time}
-                                                            onChange={(e) => handleMealChange(index, 'time', e.target.value)}
-                                                            placeholder="Time (e.g. 8:30 AM)"
-                                                            className="text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1 w-36 text-center"
-                                                        />
+                                                    </button>
+                                                    {preset.id && (
                                                         <button
                                                             type="button"
-                                                            onClick={() => handleRemoveMeal(index)}
-                                                            className="text-gray-400 hover:text-red-500 p-1 rounded-lg transition cursor-pointer"
-                                                            title="Delete Meal"
+                                                            onClick={(e) => handleDeleteTemplate(preset.id, preset.label, e)}
+                                                            className="p-1 text-gray-400 hover:text-red-500 rounded transition ml-2 cursor-pointer"
+                                                            title="Delete preset"
                                                         >
-                                                            <Trash2 size={15} />
+                                                            <Trash2 size={12} />
                                                         </button>
-                                                    </div>
+                                                    )}
                                                 </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
 
-                                                <div className="space-y-2.5">
-                                                    {getMealOptions(meal).map((opt, optIndex) => {
-                                                        const isPrimary = optIndex === 0;
-                                                        const isSecondary = optIndex === 1;
-                                                        const labelText = isPrimary
-                                                            ? 'Option 1 (Primary Choice)'
-                                                            : isSecondary
-                                                                ? 'Option 2 (Alternative / Swap)'
-                                                                : `Option ${optIndex + 1} (Alternative)`;
-                                                        const labelColor = isPrimary
-                                                            ? 'text-primary'
-                                                            : isSecondary
-                                                                ? 'text-amber-700'
-                                                                : 'text-blue-700';
+                    </div>
+                </div>
 
-                                                        return (
+                {/* ════════════════ GLOBAL COLLAPSE / EXPAND TOGGLE ════════════════ */}
+                <div className="flex items-center justify-between mb-3 text-xs">
+                    <div className="flex items-center gap-2">
+                        <span className="font-bold text-heading text-sm">Form Blueprint Sections</span>
+                        <span className="text-para text-[11px] hidden sm:inline">Tap any section to expand or collapse</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={expandAll}
+                            className="inline-flex items-center gap-1 text-[11px] text-gray-600 hover:text-primary font-semibold px-2 py-1 rounded-md bg-white border border-gray-200 shadow-2xs transition cursor-pointer"
+                        >
+                            <Maximize2 size={11} />
+                            <span>Expand All</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={collapseAll}
+                            className="inline-flex items-center gap-1 text-[11px] text-gray-600 hover:text-primary font-semibold px-2 py-1 rounded-md bg-white border border-gray-200 shadow-2xs transition cursor-pointer"
+                        >
+                            <Minimize2 size={11} />
+                            <span>Collapse All</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* ════════════════ SPLIT / SINGLE VIEW LAYOUT ════════════════ */}
+                <div className={`grid gap-6 ${activeView === 'split' ? 'lg:grid-cols-2' : 'grid-cols-1'}`}>
+
+                    {/* ════════════════ FORM EDITOR COLUMN ════════════════ */}
+                    {(activeView === 'editor' || activeView === 'split') && (
+                        <div className="space-y-4">
+
+                            {/* ── SECTION 1: Client Profile & Timeline ──────────────────── */}
+                            <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden transition">
+                                <div
+                                    onClick={() => toggleSection('profile')}
+                                    className="p-4 sm:p-4.5 flex items-center justify-between cursor-pointer hover:bg-gray-50/60 select-none border-b border-gray-100"
+                                >
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">
+                                            <User size={15} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-xs sm:text-sm text-heading flex items-center gap-2">
+                                                <span>1. Client Information & Timeline</span>
+                                                {formData.client_name && (
+                                                    <span className="text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.2 rounded-full font-bold">
+                                                        {formData.client_name}
+                                                    </span>
+                                                )}
+                                            </h3>
+                                            <p className="text-[11px] text-para line-clamp-1">
+                                                {formData.client_name
+                                                    ? `${formData.client_name} • ${formData.client_age || 'Age —'} • ${formData.start_weight || '—'} → ${formData.target_weight || '—'}`
+                                                    : 'Client demographics, measurements, habits and dates'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-gray-400">
+                                        {collapsed.profile ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+                                    </div>
+                                </div>
+
+                                {!collapsed.profile && (
+                                    <div className="p-4 sm:p-5 space-y-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                            {/* Client Name */}
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Client Full Name *</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.client_name}
+                                                    onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
+                                                    placeholder="e.g., Fatima Al-Zahra"
+                                                    className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                    required
+                                                />
+                                            </div>
+
+                                            {/* Age */}
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Age</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.client_age}
+                                                    onChange={(e) => setFormData({ ...formData, client_age: e.target.value })}
+                                                    placeholder="e.g., 29 yrs"
+                                                    className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                />
+                                            </div>
+
+                                            {/* Phone */}
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Phone / WhatsApp</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.client_phone}
+                                                    onChange={(e) => setFormData({ ...formData, client_phone: e.target.value })}
+                                                    placeholder="+971 50 123 4567 or +91 9876543210"
+                                                    className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                />
+                                            </div>
+
+                                            {/* Current Weight */}
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Current Weight (kg)</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.start_weight}
+                                                    onChange={(e) => setFormData({ ...formData, start_weight: e.target.value })}
+                                                    placeholder="e.g., 68.5 kg"
+                                                    className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                />
+                                            </div>
+
+                                            {/* Height */}
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Height</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.client_height}
+                                                    onChange={(e) => setFormData({ ...formData, client_height: e.target.value })}
+                                                    placeholder="e.g., 165 cm or 5'5&quot;"
+                                                    className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                />
+                                            </div>
+
+                                            {/* Target Weight */}
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Target Weight (kg)</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.target_weight}
+                                                    onChange={(e) => setFormData({ ...formData, target_weight: e.target.value })}
+                                                    placeholder="e.g., 62.0 kg"
+                                                    className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                />
+                                            </div>
+
+                                            {/* Food Habits */}
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Food Habits</label>
+                                                <input
+                                                    type="text"
+                                                    list="food-habits-list"
+                                                    value={formData.food_habits}
+                                                    onChange={(e) => setFormData({ ...formData, food_habits: e.target.value })}
+                                                    placeholder="e.g., Vegetarian, Non-Vegetarian"
+                                                    className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                />
+                                                <datalist id="food-habits-list">
+                                                    <option value="Vegetarian" />
+                                                    <option value="Non-Vegetarian" />
+                                                    <option value="Eggetarian" />
+                                                    <option value="Vegan" />
+                                                    <option value="Jain Vegetarian" />
+                                                    <option value="Pescatarian" />
+                                                </datalist>
+                                            </div>
+
+                                            {/* Lifestyle */}
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Lifestyle</label>
+                                                <input
+                                                    type="text"
+                                                    list="lifestyle-list"
+                                                    value={formData.lifestyle}
+                                                    onChange={(e) => setFormData({ ...formData, lifestyle: e.target.value })}
+                                                    placeholder="e.g., Sedentary Desk Job, Active"
+                                                    className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                />
+                                                <datalist id="lifestyle-list">
+                                                    <option value="Sedentary (Desk Job)" />
+                                                    <option value="Lightly Active" />
+                                                    <option value="Moderately Active" />
+                                                    <option value="Very Active (Athlete)" />
+                                                    <option value="Irregular / Night Shifts" />
+                                                </datalist>
+                                            </div>
+
+                                            {/* Plan Title */}
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Plan Title / Phase *</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.plan_title}
+                                                    onChange={(e) => setFormData({ ...formData, plan_title: e.target.value })}
+                                                    placeholder="e.g., Phase 1: Metabolic Reset"
+                                                    className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                />
+                                            </div>
+
+                                            {/* Target Goal */}
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Target Goal</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.goal}
+                                                    onChange={(e) => setFormData({ ...formData, goal: e.target.value })}
+                                                    placeholder="e.g., Fat Loss, Thyroid Support"
+                                                    className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                />
+                                            </div>
+
+                                            {/* Start Date */}
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Plan Start Date</label>
+                                                <input
+                                                    type="date"
+                                                    value={formData.start_date}
+                                                    onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                                                    className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                />
+                                            </div>
+
+                                            {/* End / Review Date */}
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Plan End / Review Date</label>
+                                                <input
+                                                    type="date"
+                                                    value={formData.end_date}
+                                                    onChange={(e) => setFormData({ ...formData, end_date: e.target.value, next_review_date: e.target.value })}
+                                                    className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Clinical History Row */}
+                                        <div className="pt-3 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Medical Conditions</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.medical_conditions}
+                                                    onChange={(e) => setFormData({ ...formData, medical_conditions: e.target.value })}
+                                                    placeholder="e.g., PCOS, Hypothyroidism"
+                                                    className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Medication</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.medication}
+                                                    onChange={(e) => setFormData({ ...formData, medication: e.target.value })}
+                                                    placeholder="e.g., Thyronorm 50mcg"
+                                                    className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Health Abuses / Habits</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.health_abuses}
+                                                    onChange={(e) => setFormData({ ...formData, health_abuses: e.target.value })}
+                                                    placeholder="e.g., Late Night Eating, Excess Caffeine"
+                                                    className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* ── SECTION 2: Macro & Daily Targets ──────────────────────── */}
+                            <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden transition">
+                                <div
+                                    onClick={() => toggleSection('targets')}
+                                    className="p-4 sm:p-4.5 flex items-center justify-between cursor-pointer hover:bg-gray-50/60 select-none border-b border-gray-100"
+                                >
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xs">
+                                            <Target size={15} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-xs sm:text-sm text-heading flex items-center gap-2">
+                                                <span>2. Nutritional Targets & Daily Quotas</span>
+                                                {formData.calories && (
+                                                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.2 rounded-full">
+                                                        {formData.calories} kcal
+                                                    </span>
+                                                )}
+                                            </h3>
+                                            <p className="text-[11px] text-para line-clamp-1">
+                                                {formData.calories
+                                                    ? `${formData.calories} kcal • P: ${formData.protein || '—'} • C: ${formData.carbs || '—'} • F: ${formData.fats || '—'} • ${formData.water || '—'}L Water`
+                                                    : 'Calories, Protein, Carbs, Fats, Water and Step goals'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-gray-400">
+                                        {collapsed.targets ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+                                    </div>
+                                </div>
+
+                                {!collapsed.targets && (
+                                    <div className="p-4 sm:p-5">
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                                            <div>
+                                                <label className="block text-[11px] font-semibold text-gray-600 mb-1">Calories (kcal)</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.calories}
+                                                    onChange={(e) => setFormData({ ...formData, calories: e.target.value })}
+                                                    placeholder="e.g. 1500"
+                                                    className="w-full text-xs font-bold text-emerald-800 px-2.5 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[11px] font-semibold text-gray-600 mb-1">Protein (g)</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.protein}
+                                                    onChange={(e) => setFormData({ ...formData, protein: e.target.value })}
+                                                    placeholder="e.g. 85g"
+                                                    className="w-full text-xs font-semibold px-2.5 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[11px] font-semibold text-gray-600 mb-1">Carbs (g)</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.carbs}
+                                                    onChange={(e) => setFormData({ ...formData, carbs: e.target.value })}
+                                                    placeholder="e.g. 145g"
+                                                    className="w-full text-xs font-semibold px-2.5 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[11px] font-semibold text-gray-600 mb-1">Fats (g)</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.fats}
+                                                    onChange={(e) => setFormData({ ...formData, fats: e.target.value })}
+                                                    placeholder="e.g. 42g"
+                                                    className="w-full text-xs font-semibold px-2.5 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[11px] font-semibold text-gray-600 mb-1">Water (Litres)</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.water}
+                                                    onChange={(e) => setFormData({ ...formData, water: e.target.value })}
+                                                    placeholder="e.g. 3.5L"
+                                                    className="w-full text-xs font-semibold px-2.5 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[11px] font-semibold text-gray-600 mb-1">Steps Target</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.steps}
+                                                    onChange={(e) => setFormData({ ...formData, steps: e.target.value })}
+                                                    placeholder="e.g. 10,000"
+                                                    className="w-full text-xs font-semibold px-2.5 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* ── SECTION 3: Daily Meal Schedule Blueprint ──────────────── */}
+                            <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden transition">
+                                <div
+                                    onClick={() => toggleSection('meals')}
+                                    className="p-4 sm:p-4.5 flex items-center justify-between cursor-pointer hover:bg-gray-50/60 select-none border-b border-gray-100"
+                                >
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center font-bold text-xs">
+                                            <Clock size={15} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-xs sm:text-sm text-heading flex items-center gap-2">
+                                                <span>3. Daily Meal Blueprint</span>
+                                                <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.2 rounded-full">
+                                                    {formData.meals.length} Slots
+                                                </span>
+                                            </h3>
+                                            <p className="text-[11px] text-para line-clamp-1">
+                                                {formData.meals.length > 0
+                                                    ? formData.meals.map(m => m.name).join(' → ')
+                                                    : 'Meal timings, options, and chef cooking notes'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleAddMeal();
+                                                if (collapsed.meals) toggleSection('meals');
+                                            }}
+                                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary/10 hover:bg-primary/20 text-primary text-xs font-semibold rounded-lg transition cursor-pointer"
+                                        >
+                                            <Plus size={13} />
+                                        </button>
+                                        <span className="text-gray-400">
+                                            {collapsed.meals ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {!collapsed.meals && (
+                                    <div className="p-4 sm:p-5 space-y-3.5">
+                                        {formData.meals.length === 0 ? (
+                                            <div className="text-center py-8 px-4 border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50/50">
+                                                <Clock size={24} className="mx-auto mb-2 text-gray-400" />
+                                                <p className="text-xs font-bold text-heading">No meal slots configured</p>
+                                                <p className="text-[11px] text-para mb-3">Add meal timings and food options or load a preset above.</p>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAddMeal}
+                                                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-primary text-white text-xs font-semibold rounded-xl hover:bg-primary-hover shadow-xs"
+                                                >
+                                                    <Plus size={14} />
+                                                    Add First Meal
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            formData.meals.map((meal, index) => (
+                                                <div
+                                                    key={index}
+                                                    className="bg-gray-50/80 border border-gray-200/90 rounded-xl p-3 sm:p-4 hover:border-primary/40 transition"
+                                                >
+                                                    <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 mb-2.5">
+                                                        <div className="flex items-center gap-2 flex-1 min-w-[140px]">
+                                                            <span className="w-5 h-5 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+                                                                {index + 1}
+                                                            </span>
+                                                            <input
+                                                                type="text"
+                                                                value={meal.name}
+                                                                onChange={(e) => handleMealChange(index, 'name', e.target.value)}
+                                                                placeholder="Meal Name (e.g. Breakfast)"
+                                                                className="font-bold text-heading text-xs px-2 py-1 rounded-lg border border-transparent hover:border-gray-300 focus:border-primary focus:bg-white bg-transparent flex-1 min-w-0"
+                                                            />
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+                                                            <input
+                                                                type="text"
+                                                                value={meal.time}
+                                                                onChange={(e) => handleMealChange(index, 'time', e.target.value)}
+                                                                placeholder="8:30 AM"
+                                                                className="text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1 w-20 sm:w-28 text-center"
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRemoveMeal(index)}
+                                                                className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition cursor-pointer shrink-0"
+                                                                title="Delete Meal"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="space-y-2">
+                                                        {getMealOptions(meal).map((opt, optIndex) => (
                                                             <div key={optIndex} className="relative">
                                                                 <div className="flex items-center justify-between mb-0.5">
-                                                                    <label className={`text-[10px] font-bold ${labelColor} uppercase`}>
-                                                                        {labelText}
+                                                                    <label className={`text-[10px] font-bold uppercase ${optIndex === 0 ? 'text-primary' : 'text-amber-700'}`}>
+                                                                        Option {optIndex + 1} {optIndex === 0 ? '(Primary Choice)' : '(Alternative / Swap)'}
                                                                     </label>
                                                                     {getMealOptions(meal).length > 1 && (
                                                                         <button
                                                                             type="button"
                                                                             onClick={() => handleRemoveMealOption(index, optIndex)}
-                                                                            className="inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-red-500 transition cursor-pointer px-1 py-0.5 rounded hover:bg-red-50"
-                                                                            title={`Remove Option ${optIndex + 1}`}
+                                                                            className="text-[10px] text-gray-400 hover:text-red-500 px-1"
                                                                         >
-                                                                            <Trash2 size={11} />
-                                                                            <span>Remove</span>
+                                                                            Remove Option
                                                                         </button>
                                                                     )}
                                                                 </div>
@@ -1220,382 +1389,839 @@ export default function AdminPdfGeneratorPage() {
                                                                     rows={2}
                                                                     value={opt}
                                                                     onChange={(e) => handleMealOptionChange(index, optIndex, e.target.value)}
-                                                                    placeholder={
-                                                                        isPrimary
-                                                                            ? "e.g., 2 Moong Dal Chillas + 2 tbsp Mint Chutney"
-                                                                            : isSecondary
-                                                                                ? "e.g., 1 Bowl Vegetable Oats with 40g Paneer"
-                                                                                : `e.g., Alternative meal choice ${optIndex + 1}`
-                                                                    }
+                                                                    placeholder={optIndex === 0 ? "e.g. 2 Moong Dal Chillas + 2 tbsp Mint Chutney" : "e.g. 1 Bowl Vegetable Oats with 40g Paneer"}
                                                                     className="w-full text-xs px-3 py-1.5 rounded-lg border border-gray-200 focus:ring-1 focus:ring-primary/20 bg-white"
                                                                 />
                                                             </div>
-                                                        );
-                                                    })}
+                                                        ))}
 
-                                                    {/* Add More Options Button */}
-                                                    <div className="pt-0.5">
+                                                        <div className="flex items-center justify-between pt-1">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleAddMealOption(index)}
+                                                                className="text-[11px] font-semibold text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
+                                                            >
+                                                                <Plus size={12} />
+                                                                <span>Add Option {getMealOptions(meal).length + 1}</span>
+                                                            </button>
+                                                        </div>
+
+                                                        <div>
+                                                            <input
+                                                                type="text"
+                                                                value={meal.notes || ''}
+                                                                onChange={(e) => handleMealChange(index, 'notes', e.target.value)}
+                                                                placeholder="Chef Note (e.g. Cook with 1/2 tsp ghee; chew thoroughly)"
+                                                                className="w-full text-xs px-2.5 py-1 rounded-lg border border-gray-200/80 bg-white/70 focus:bg-white text-para"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* ── SECTION 4: Prescribed Supplements ─────────────────────── */}
+                            <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden transition">
+                                <div
+                                    onClick={() => toggleSection('supplements')}
+                                    className="p-3.5 sm:p-4.5 flex items-center justify-between cursor-pointer hover:bg-gray-50/60 select-none border-b border-gray-100 gap-2"
+                                >
+                                    <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                                        <div className="w-7 h-7 rounded-lg bg-teal-50 text-teal-700 flex items-center justify-center font-bold text-xs shrink-0">
+                                            <Sparkles size={15} />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h3 className="font-bold text-xs sm:text-sm text-heading flex items-center gap-1.5 whitespace-nowrap">
+                                                <span>4. Supplements</span>
+                                                <span className="text-[10px] bg-teal-50 text-teal-800 border border-teal-200 font-bold px-1.5 py-0.2 rounded-full shrink-0">
+                                                    {formData.supplements.length}
+                                                </span>
+                                            </h3>
+                                            <p className="text-[11px] text-para line-clamp-1 truncate">
+                                                {formData.supplements.filter(s => s.name).map(s => s.name).join(', ') || 'Nutraceuticals, vitamins & timings'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleAddSupp();
+                                                if (collapsed.supplements) toggleSection('supplements');
+                                            }}
+                                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-teal-50 text-teal-800 border border-teal-200 text-xs font-semibold rounded-lg transition cursor-pointer"
+                                        >
+                                            <Plus size={13} />
+                                        </button>
+                                        <span className="text-gray-400">
+                                            {collapsed.supplements ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {!collapsed.supplements && (
+                                    <div className="p-3.5 sm:p-5 space-y-2.5">
+                                        {formData.supplements.length === 0 ? (
+                                            <div className="py-4 px-4 border border-dashed border-gray-200 rounded-xl bg-gray-50 text-center">
+                                                <p className="text-xs text-gray-500">No supplements prescribed. Click &quot;Add&quot; to prescribe vitamins or minerals.</p>
+                                            </div>
+                                        ) : (
+                                            formData.supplements.map((supp, sIdx) => (
+                                                <div
+                                                    key={sIdx}
+                                                    className="bg-gray-50/70 sm:bg-transparent p-2.5 sm:p-0 rounded-xl border sm:border-0 border-gray-200/80 space-y-2 sm:space-y-0 sm:flex sm:items-center sm:gap-2"
+                                                >
+                                                    {/* Mobile Top Row: Supplement Name + Delete */}
+                                                    <div className="flex items-center gap-2 flex-1 sm:flex-2 min-w-0">
+                                                        <input
+                                                            type="text"
+                                                            value={supp.name}
+                                                            onChange={(e) => handleSuppChange(sIdx, 'name', e.target.value)}
+                                                            placeholder="Supplement (e.g. Omega-3)"
+                                                            className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:ring-1 focus:ring-primary/20 bg-white min-w-0"
+                                                        />
                                                         <button
                                                             type="button"
-                                                            onClick={() => handleAddMealOption(index)}
-                                                            className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-primary hover:text-primary-hover bg-primary/5 hover:bg-primary/10 border border-primary/20 px-2.5 py-1 rounded-lg transition cursor-pointer active:scale-95"
+                                                            onClick={() => handleRemoveSupp(sIdx)}
+                                                            className="sm:hidden text-gray-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg cursor-pointer shrink-0 transition"
+                                                            title="Delete Supplement"
                                                         >
-                                                            <Plus size={13} />
-                                                            <span>Add Option {getMealOptions(meal).length + 1}</span>
+                                                            <Trash2 size={15} />
                                                         </button>
                                                     </div>
 
-                                                    <div>
-                                                        <label className="text-[10px] font-bold text-gray-500 uppercase block mb-0.5">
-                                                            Chef / Cooking Note
-                                                        </label>
+                                                    {/* Mobile Bottom Row: Dosage & Timing / Desktop Inline */}
+                                                    <div className="flex items-center gap-2 sm:flex-2 min-w-0">
                                                         <input
                                                             type="text"
-                                                            value={meal.notes}
-                                                            onChange={(e) => handleMealChange(index, 'notes', e.target.value)}
-                                                            placeholder="e.g., Cook with max 1/2 tsp ghee; chew thoroughly."
-                                                            className="w-full text-xs px-3 py-1.5 rounded-lg border border-gray-200 focus:ring-1 focus:ring-primary/20 bg-white"
+                                                            value={supp.dosage}
+                                                            onChange={(e) => handleSuppChange(sIdx, 'dosage', e.target.value)}
+                                                            placeholder="Dosage (e.g. 1000mg)"
+                                                            className="flex-1 text-xs px-2.5 py-2 rounded-xl border border-gray-200 focus:ring-1 focus:ring-primary/20 bg-white min-w-0"
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            value={supp.timing}
+                                                            onChange={(e) => handleSuppChange(sIdx, 'timing', e.target.value)}
+                                                            placeholder="Timing (e.g. Post-Lunch)"
+                                                            className="flex-1 text-xs px-2.5 py-2 rounded-xl border border-gray-200 focus:ring-1 focus:ring-primary/20 bg-white min-w-0"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveSupp(sIdx)}
+                                                            className="hidden sm:block text-gray-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg cursor-pointer shrink-0 transition"
+                                                            title="Delete Supplement"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* ── SECTION 5: Special Clinical Directives (Edge-Case Page) ── */}
+                            <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden transition">
+                                <div
+                                    onClick={() => toggleSection('special')}
+                                    className="p-3.5 sm:p-4.5 flex items-center justify-between cursor-pointer hover:bg-gray-50/60 select-none border-b border-gray-100 gap-2"
+                                >
+                                    <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                                        <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-700 flex items-center justify-center font-bold text-xs shrink-0">
+                                            <ShieldAlert size={15} />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h3 className="font-bold text-xs sm:text-sm text-heading flex items-center gap-1.5 whitespace-nowrap">
+                                                <span>5. Special Directives</span>
+                                            </h3>
+                                            <p className="text-[11px] text-para line-clamp-1 truncate">
+                                                {formData.show_special_instructions
+                                                    ? `${formData.special_instructions_title || 'Special Directives'} (${formData.special_instructions_theme})`
+                                                    : 'Optional custom page for diabetes, renal, GERD'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setFormData(prev => ({ ...prev, show_special_instructions: !prev.show_special_instructions }));
+                                                if (collapsed.special) toggleSection('special');
+                                            }}
+                                            className={`text-xs font-semibold px-2 sm:px-2.5 py-1 rounded-lg border transition cursor-pointer ${formData.show_special_instructions
+                                                ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-200'
+                                                }`}
+                                        >
+                                            {formData.show_special_instructions ? 'Disable' : 'Enable'}
+                                        </button>
+                                        <span className="text-gray-400">
+                                            {collapsed.special ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {!collapsed.special && (
+                                    <div className="p-3.5 sm:p-5 space-y-4">
+                                        {!formData.show_special_instructions ? (
+                                            <div className="py-4 px-4 border border-dashed border-gray-200 rounded-xl bg-gray-50 text-center">
+                                                <p className="text-xs text-gray-500">This optional page is currently turned off for standard plans.</p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setFormData(prev => ({ ...prev, show_special_instructions: true }))}
+                                                    className="mt-2 text-xs font-bold text-primary hover:underline cursor-pointer"
+                                                >
+                                                    + Enable Dedicated Directives Page
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <>
+
+                                                {/* Theme and Box Style */}
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200/80">
+                                                    <div>
+                                                        <label className="block text-[10.5px] font-semibold text-gray-600 mb-1">Color Accent</label>
+                                                        <div className="flex flex-wrap items-center gap-1.5">
+                                                            {['emerald', 'amber', 'indigo', 'rose', 'slate'].map(thm => (
+                                                                <button
+                                                                    key={thm}
+                                                                    type="button"
+                                                                    onClick={() => setFormData(prev => ({ ...prev, special_instructions_theme: thm }))}
+                                                                    className={`px-2 py-1 text-[10px] font-bold rounded-lg capitalize border ${formData.special_instructions_theme === thm
+                                                                        ? 'bg-white border-primary shadow-xs ring-1 ring-primary/20 text-primary'
+                                                                        : 'bg-gray-100 border-transparent text-gray-600'
+                                                                        }`}
+                                                                >
+                                                                    {thm}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10.5px] font-semibold text-gray-600 mb-1">Frame Style</label>
+                                                        <div className="flex flex-wrap items-center gap-1.5">
+                                                            {[
+                                                                { key: 'callout', label: 'Callout Bar' },
+                                                                { key: 'framed', label: 'Bordered' },
+                                                                { key: 'banner', label: 'Top Banner' }
+                                                            ].map(st => (
+                                                                <button
+                                                                    key={st.key}
+                                                                    type="button"
+                                                                    onClick={() => setFormData(prev => ({ ...prev, special_instructions_style: st.key }))}
+                                                                    className={`px-2 py-1 text-[10px] font-bold rounded-lg border ${formData.special_instructions_style === st.key
+                                                                        ? 'bg-white border-primary shadow-xs ring-1 ring-primary/20 text-primary'
+                                                                        : 'bg-gray-100 border-transparent text-gray-600'
+                                                                        }`}
+                                                                >
+                                                                    {st.label}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Title & Badge */}
+                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                                    <div className="sm:col-span-2">
+                                                        <label className="block text-[11px] font-semibold text-gray-700 mb-1">Box Title</label>
+                                                        <input
+                                                            type="text"
+                                                            value={formData.special_instructions_title}
+                                                            onChange={(e) => setFormData(prev => ({ ...prev, special_instructions_title: e.target.value }))}
+                                                            className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[11px] font-semibold text-gray-700 mb-1">Badge Tag</label>
+                                                        <input
+                                                            type="text"
+                                                            value={formData.special_instructions_badge}
+                                                            onChange={(e) => setFormData(prev => ({ ...prev, special_instructions_badge: e.target.value }))}
+                                                            className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 uppercase"
                                                         />
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
+
+                                                {/* Textarea */}
+                                                <div>
+                                                    <label className="block text-[11px] font-semibold text-gray-700 mb-1">Clinical Directives (Bulleted)</label>
+                                                    <textarea
+                                                        rows={4}
+                                                        value={formData.special_instructions}
+                                                        onChange={(e) => setFormData(prev => ({ ...prev, special_instructions: e.target.value }))}
+                                                        placeholder="- Strict 3-hour intervals\n- Avoid simple sugars"
+                                                        className="w-full text-xs p-3 rounded-xl border border-gray-200 font-mono"
+                                                    />
+                                                </div>
+
+                                                {/* Warning Strip */}
+                                                <div>
+                                                    <label className="block text-[11px] font-semibold text-rose-800 mb-1">Critical Caution / Red Flags (Optional Warning Strip)</label>
+                                                    <input
+                                                        type="text"
+                                                        value={formData.special_instructions_warning}
+                                                        onChange={(e) => setFormData(prev => ({ ...prev, special_instructions_warning: e.target.value }))}
+                                                        placeholder="e.g. If glucose drops < 70, take 15g fast carbs immediately."
+                                                        className="w-full text-xs px-3 py-2 rounded-xl border border-rose-200 bg-rose-50/30"
+                                                    />
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
-                            {/* Section 4: Prescribed Supplements */}
-                            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-xs">
-                                <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
-                                    <h3 className="font-heading font-bold text-heading text-sm flex items-center gap-2">
-                                        <Sparkles size={16} className="text-primary" />
-                                        4. Prescribed Supplements
-                                    </h3>
-                                    <button
-                                        type="button"
-                                        onClick={handleAddSupp}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary text-xs font-semibold rounded-xl transition cursor-pointer"
-                                    >
-                                        <Plus size={14} />
-                                        Add Supplement
-                                    </button>
+                            {/* ── SECTION 6: Rules, Don'ts & Personal Note ────────── */}
+                            <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden transition">
+                                <div
+                                    onClick={() => toggleSection('rules')}
+                                    className="p-3.5 sm:p-4.5 flex items-center justify-between cursor-pointer hover:bg-gray-50/60 select-none border-b border-gray-100 gap-2"
+                                >
+                                    <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                                        <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-xs shrink-0">
+                                            <CheckCircle size={15} />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h3 className="font-bold text-xs sm:text-sm text-heading flex items-center gap-1.5 whitespace-nowrap">
+                                                <span>6. Rules & Notes</span>
+                                                <span className="text-[10px] bg-indigo-50 text-indigo-800 border border-indigo-200 font-bold px-1.5 py-0.2 rounded-full shrink-0">
+                                                    {formData.guidelines.length} Do&apos;s • {formData.donts.length} Don&apos;ts
+                                                </span>
+                                            </h3>
+                                            <p className="text-[11px] text-para line-clamp-1 truncate">
+                                                {formData.guidelines.length > 0 || formData.donts.length > 0
+                                                    ? `${formData.guidelines.length} Do's • ${formData.donts.length} Don'ts`
+                                                    : 'Client guidelines, restrictions, and dietitian note'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-gray-400 shrink-0">
+                                        {collapsed.rules ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+                                    </div>
                                 </div>
 
-                                <div className="space-y-2.5">
-                                    {formData.supplements.length === 0 ? (
-                                        <div className="py-3 px-4 border border-dashed border-gray-200 rounded-xl bg-gray-50/40 text-center">
-                                            <p className="text-xs text-gray-400">No supplements added. Click &quot;Add Supplement&quot; if needed.</p>
-                                        </div>
-                                    ) : (
-                                        formData.supplements.map((supp, sIdx) => (
-                                            <div key={sIdx} className="flex items-center gap-2">
-                                                <input
-                                                    type="text"
-                                                    value={supp.name}
-                                                    onChange={(e) => handleSuppChange(sIdx, 'name', e.target.value)}
-                                                    placeholder="Supplement Name (e.g. Omega-3)"
-                                                    className="flex-2 text-xs px-3 py-2 rounded-xl border border-gray-200 focus:ring-1 focus:ring-primary/20"
-                                                />
-                                                <input
-                                                    type="text"
-                                                    value={supp.dosage}
-                                                    onChange={(e) => handleSuppChange(sIdx, 'dosage', e.target.value)}
-                                                    placeholder="Dosage (e.g. 1,000 mg)"
-                                                    className="flex-1 text-xs px-3 py-2 rounded-xl border border-gray-200 focus:ring-1 focus:ring-primary/20"
-                                                />
-                                                <input
-                                                    type="text"
-                                                    value={supp.timing}
-                                                    onChange={(e) => handleSuppChange(sIdx, 'timing', e.target.value)}
-                                                    placeholder="Timing (e.g. With Lunch)"
-                                                    className="flex-1 text-xs px-3 py-2 rounded-xl border border-gray-200 focus:ring-1 focus:ring-primary/20"
-                                                />
+                                {!collapsed.rules && (
+                                    <div className="p-3.5 sm:p-5 space-y-4">
+                                        {/* Guidelines (Do's) */}
+                                        <div>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <label className="text-xs font-bold text-emerald-800">
+                                                    ✓ Daily Rules
+                                                </label>
                                                 <button
                                                     type="button"
-                                                    onClick={() => handleRemoveSupp(sIdx)}
-                                                    className="text-gray-400 hover:text-red-500 p-1.5 cursor-pointer"
+                                                    onClick={handleAddRule}
+                                                    className="text-[11px] text-primary hover:underline font-semibold cursor-pointer"
                                                 >
-                                                    <Trash2 size={15} />
+                                                    + Add
                                                 </button>
                                             </div>
-                                        ))
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Section 5: Golden Rules, Don'ts & Personal Note */}
-                            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-xs">
-                                <h3 className="font-heading font-bold text-heading text-sm border-b border-gray-100 pb-3 mb-4">
-                                    5. Golden Rules, Restrictions & Dietitian Message
-                                </h3>
-
-                                <div className="space-y-4">
-                                    {/* Guidelines (Do's) */}
-                                    <div>
-                                        <div className="flex items-center justify-between mb-2">
-                                            <label className="text-xs font-bold text-emerald-800">
-                                                ✓ Golden Rules & Daily Habits
-                                            </label>
-                                            <button
-                                                type="button"
-                                                onClick={handleAddRule}
-                                                className="text-[11px] text-primary hover:underline font-semibold cursor-pointer"
-                                            >
-                                                + Add Rule
-                                            </button>
+                                            <div className="space-y-1.5">
+                                                {formData.guidelines.length === 0 ? (
+                                                    <p className="text-xs text-gray-400 italic">No rules added. Click &quot;+ Add&quot; to include guidelines.</p>
+                                                ) : (
+                                                    formData.guidelines.map((rule, rIdx) => (
+                                                        <div key={rIdx} className="flex items-center gap-2">
+                                                            <span className="text-emerald-600 font-bold text-xs">•</span>
+                                                            <input
+                                                                type="text"
+                                                                value={rule}
+                                                                onChange={(e) => handleRuleChange(rIdx, e.target.value)}
+                                                                placeholder="e.g. Drink 3.5 litres of water evenly through the day"
+                                                                className="w-full text-xs px-3 py-1.5 rounded-lg border border-gray-200 focus:ring-1 focus:ring-primary/20"
+                                                            />
+                                                            <button type="button" onClick={() => handleRemoveRule(rIdx)} className="text-gray-400 hover:text-red-500 cursor-pointer">
+                                                                <Trash2 size={13} />
+                                                            </button>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
                                         </div>
-                                        <div className="space-y-2">
-                                            {formData.guidelines.length === 0 ? (
-                                                <p className="text-xs text-gray-400 italic py-1">No rules added. Click &quot;+ Add Rule&quot; to include guidelines.</p>
-                                            ) : (
-                                                formData.guidelines.map((rule, rIdx) => (
-                                                    <div key={rIdx} className="flex items-center gap-2">
-                                                        <span className="text-emerald-600 font-bold text-xs">•</span>
-                                                        <input
-                                                            type="text"
-                                                            value={rule}
-                                                            onChange={(e) => handleRuleChange(rIdx, e.target.value)}
-                                                            placeholder="e.g. Drink 3.5 litres of water evenly through the day"
-                                                            className="w-full text-xs px-3 py-1.5 rounded-lg border border-gray-200 focus:ring-1 focus:ring-primary/20"
-                                                        />
-                                                        <button type="button" onClick={() => handleRemoveRule(rIdx)} className="text-gray-400 hover:text-red-500 cursor-pointer">
-                                                            <Trash2 size={14} />
-                                                        </button>
-                                                    </div>
-                                                ))
-                                            )}
-                                        </div>
-                                    </div>
 
-                                    {/* Don'ts */}
-                                    <div>
-                                        <div className="flex items-center justify-between mb-2">
-                                            <label className="text-xs font-bold text-red-800">
-                                                🚫 Foods & Habits to Strictly Avoid
-                                            </label>
-                                            <button
-                                                type="button"
-                                                onClick={handleAddDont}
-                                                className="text-[11px] text-red-600 hover:underline font-semibold cursor-pointer"
-                                            >
-                                                + Add Restriction
-                                            </button>
-                                        </div>
-                                        <div className="space-y-2">
-                                            {formData.donts.length === 0 ? (
-                                                <p className="text-xs text-gray-400 italic py-1">No restrictions added. Click &quot;+ Add Restriction&quot; to add foods to avoid.</p>
-                                            ) : (
-                                                formData.donts.map((dont, dIdx) => (
-                                                    <div key={dIdx} className="flex items-center gap-2">
-                                                        <span className="text-red-500 font-bold text-xs">✕</span>
-                                                        <input
-                                                            type="text"
-                                                            value={dont}
-                                                            onChange={(e) => handleDontChange(dIdx, e.target.value)}
-                                                            placeholder="e.g. No refined sugar, aerated drinks, or deep fried snacks"
-                                                            className="w-full text-xs px-3 py-1.5 rounded-lg border border-gray-200 focus:ring-1 focus:ring-primary/20"
-                                                        />
-                                                        <button type="button" onClick={() => handleRemoveDont(dIdx)} className="text-gray-400 hover:text-red-500 cursor-pointer">
-                                                            <Trash2 size={14} />
-                                                        </button>
-                                                    </div>
-                                                ))
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Personal Message */}
-                                    <div>
-                                        <label className="block text-xs font-bold text-heading mb-1">
-                                            Dietitian&apos;s Personal Note & Sign-off
-                                        </label>
-                                        <textarea
-                                            rows={2}
-                                            value={formData.dietitian_note}
-                                            onChange={(e) => setFormData({ ...formData, dietitian_note: e.target.value })}
-                                            className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:ring-1 focus:ring-primary/20 bg-green-50/30"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Section 6: Attached Clinical Recipe Formulations */}
-                            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-xs">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3 mb-4">
-                                    <div>
-                                        <h3 className="font-heading font-bold text-heading text-sm flex items-center gap-2">
-                                            <ChefHat size={16} className="text-primary" />
-                                            6. Attached Recipe Annexure ({formData.recipes?.length || 0} Dishes Selected)
-                                        </h3>
-                                        <p className="text-[11px] text-para mt-0.5">
-                                            Select dishes to automatically format a structured recipe table & culinary preparation guide in the PDF
-                                        </p>
-                                    </div>
-
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={handleAutoMatchRecipes}
-                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-semibold rounded-xl transition cursor-pointer"
-                                            title="Scan meals and auto-attach matching recipes"
-                                        >
-                                            <Sparkles size={13} className="text-amber-600" />
-                                            <span>Auto-Match from Meals</span>
-                                        </button>
-
-                                        <Link
-                                            href="/admin/recipes"
-                                            target="_blank"
-                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-xl transition cursor-pointer"
-                                            title="Open Recipe Bank in new tab"
-                                        >
-                                            <Utensils size={13} />
-                                            <span>Manage Recipes</span>
-                                        </Link>
-                                    </div>
-                                </div>
-
-                                {/* Selected Dishes Chips Bar */}
-                                {formData.recipes?.length > 0 && (
-                                    <div className="mb-4 p-3 rounded-2xl bg-emerald-50/60 border border-emerald-200/80">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-[11px] font-bold text-emerald-900 uppercase">
-                                                Attached Dishes ({formData.recipes.length}):
-                                            </span>
-                                            <button
-                                                type="button"
-                                                onClick={handleClearAllRecipes}
-                                                className="text-[10px] font-semibold text-red-600 hover:underline cursor-pointer"
-                                            >
-                                                Clear All
-                                            </button>
-                                        </div>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {formData.recipes.map((r) => (
-                                                <span
-                                                    key={r.id}
-                                                    className="inline-flex items-center gap-1.5 bg-white text-emerald-900 border border-emerald-200 px-2.5 py-1 rounded-lg text-xs font-medium shadow-2xs"
+                                        {/* Don'ts */}
+                                        <div>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <label className="text-xs font-bold text-red-800">
+                                                    🚫 Foods to Avoid
+                                                </label>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAddDont}
+                                                    className="text-[11px] text-red-600 hover:underline font-semibold cursor-pointer"
                                                 >
-                                                    <span className="font-bold text-primary">{r.name}</span>
-                                                    <span className="text-[10px] text-gray-500">({r.calories || r.category})</span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleRemoveSelectedRecipe(r.id)}
-                                                        className="text-gray-400 hover:text-red-500 cursor-pointer ml-0.5"
-                                                    >
-                                                        <X size={12} />
-                                                    </button>
-                                                </span>
-                                            ))}
+                                                    + Add
+                                                </button>
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                {formData.donts.length === 0 ? (
+                                                    <p className="text-xs text-gray-400 italic">No restrictions added.</p>
+                                                ) : (
+                                                    formData.donts.map((dont, dIdx) => (
+                                                        <div key={dIdx} className="flex items-center gap-2">
+                                                            <span className="text-red-500 font-bold text-xs">✕</span>
+                                                            <input
+                                                                type="text"
+                                                                value={dont}
+                                                                onChange={(e) => handleDontChange(dIdx, e.target.value)}
+                                                                placeholder="e.g. No refined sugar, aerated drinks, or deep fried snacks"
+                                                                className="w-full text-xs px-3 py-1.5 rounded-lg border border-gray-200 focus:ring-1 focus:ring-primary/20"
+                                                            />
+                                                            <button type="button" onClick={() => handleRemoveDont(dIdx)} className="text-gray-400 hover:text-red-500 cursor-pointer">
+                                                                <Trash2 size={13} />
+                                                            </button>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Dietitian Message */}
+                                        <div>
+                                            <label className="block text-xs font-bold text-heading mb-1">
+                                                Dietitian&apos;s Note
+                                            </label>
+                                            <textarea
+                                                rows={2}
+                                                value={formData.dietitian_note}
+                                                onChange={(e) => setFormData({ ...formData, dietitian_note: e.target.value })}
+                                                placeholder="e.g., Consistency is key. Reach out to me directly on WhatsApp if you experience hunger spikes."
+                                                className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:ring-1 focus:ring-primary/20 bg-green-50/20"
+                                            />
                                         </div>
                                     </div>
                                 )}
+                            </div>
 
-                                {/* Search & Category Filter */}
-                                <div className="flex flex-col sm:flex-row gap-2 mb-3">
-                                    <div className="relative flex-1">
-                                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                        <input
-                                            type="text"
-                                            value={recipeSearch}
-                                            onChange={(e) => setRecipeSearch(e.target.value)}
-                                            placeholder="Filter dishes by name or category..."
-                                            className="w-full text-xs pl-8 pr-3 py-1.5 rounded-xl border border-gray-200 focus:ring-1 focus:ring-primary/20 bg-gray-50/50"
-                                        />
+                            {/* ── SECTION 7: Attached Clinical Recipe Annexure ─────────── */}
+                            <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden transition">
+                                <div
+                                    onClick={() => toggleSection('recipes')}
+                                    className="p-4 sm:p-4.5 flex items-center justify-between cursor-pointer hover:bg-gray-50/60 select-none border-b border-gray-100"
+                                >
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="w-7 h-7 rounded-lg bg-emerald-50 text-primary flex items-center justify-center font-bold text-xs shrink-0">
+                                            <ChefHat size={15} />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h3 className="font-bold text-xs sm:text-sm text-heading flex items-center gap-2 truncate">
+                                                <span className="truncate">7. Attached Recipes</span>
+                                                <span className="text-[10px] bg-primary/10 text-primary font-bold px-2 py-0.2 rounded-full shrink-0">
+                                                    {formData.recipes?.length || 0} Attached
+                                                </span>
+                                            </h3>
+                                            <p className="text-[11px] text-para truncate">
+                                                {formData.recipes?.length > 0
+                                                    ? formData.recipes.map(r => r.name).join(', ')
+                                                    : 'Search and attach clinical recipes to this plan'}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none">
-                                        {['All', 'Breakfast', 'Lunch', 'Dinner', 'Snack', 'Beverage'].map(cat => (
-                                            <button
-                                                key={cat}
-                                                type="button"
-                                                onClick={() => setRecipeCategoryFilter(cat)}
-                                                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold whitespace-nowrap transition cursor-pointer ${
-                                                    recipeCategoryFilter === cat
-                                                        ? 'bg-primary text-white shadow-2xs'
-                                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200/70'
-                                                }`}
-                                            >
-                                                {cat}
-                                            </button>
-                                        ))}
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <span className="text-gray-400">
+                                            {collapsed.recipes ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+                                        </span>
                                     </div>
                                 </div>
 
-                                {/* Dish Selector Grid */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-64 overflow-y-auto pr-1">
-                                    {loadingRecipes ? (
-                                        <div className="col-span-full py-6 text-center text-xs text-gray-400">Loading recipe bank...</div>
-                                    ) : availableRecipes.length === 0 ? (
-                                        <div className="col-span-full py-6 text-center text-xs text-gray-400">
-                                            No recipes in bank. <Link href="/admin/recipes" className="text-primary underline">Create recipes</Link> to attach them here.
-                                        </div>
-                                    ) : (
-                                        availableRecipes
-                                            .filter(r => {
-                                                const matchCat = recipeCategoryFilter === 'All' || r.category?.toLowerCase() === recipeCategoryFilter.toLowerCase();
-                                                const matchQ = !recipeSearch.trim() || r.name.toLowerCase().includes(recipeSearch.toLowerCase().trim());
-                                                return matchCat && matchQ;
-                                            })
-                                            .map(recipe => {
-                                                const isSelected = (formData.recipes || []).some(r => r.id === recipe.id);
-                                                return (
-                                                    <div
-                                                        key={recipe.id}
-                                                        onClick={() => handleToggleRecipe(recipe)}
-                                                        className={`p-2.5 rounded-xl border transition cursor-pointer flex flex-col justify-between ${
-                                                            isSelected
-                                                                ? 'bg-emerald-50/80 border-emerald-300 ring-1 ring-emerald-300'
-                                                                : 'bg-gray-50/50 border-gray-200 hover:border-primary/40'
-                                                        }`}
+                                {!collapsed.recipes && (
+                                    <div className="p-4 sm:p-5 space-y-4">
+                                        {/* ── ATTACHED DISHES WITH SOFT-EDITING ── */}
+                                        {formData.recipes?.length > 0 && (
+                                            <div className="p-3 sm:p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200/80 space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs font-bold text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
+                                                        <Utensils size={13} className="text-primary" />
+                                                        <span>Selected Dishes for this Plan ({formData.recipes.length})</span>
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleClearAllRecipes}
+                                                        className="text-[11px] font-semibold text-red-600 hover:underline cursor-pointer"
                                                     >
-                                                        <div className="flex items-start justify-between gap-1.5 mb-1">
-                                                            <span className="text-[10px] font-bold text-gray-500 uppercase">
-                                                                {recipe.category}
-                                                            </span>
-                                                            <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                                                                isSelected ? 'bg-primary text-white' : 'border border-gray-300 text-transparent'
-                                                            }`}>
-                                                                ✓
-                                                            </span>
-                                                        </div>
-                                                        <h4 className="text-xs font-bold text-heading line-clamp-1 mb-1">
-                                                            {recipe.name}
-                                                        </h4>
-                                                        <div className="flex items-center justify-between text-[10px] text-gray-500 pt-1 border-t border-gray-100">
-                                                            <span>{recipe.calories || '—'}</span>
-                                                            <span className="font-semibold text-primary">{recipe.protein ? `P: ${recipe.protein}` : ''}</span>
+                                                        Remove All
+                                                    </button>
+                                                </div>
+
+                                                {/* Recipe Cards List with Soft-Edit Toggle */}
+                                                <div className="space-y-2">
+                                                    {formData.recipes.map((recipe, rIdx) => {
+                                                        const isEditing = editingRecipeId === recipe.id;
+                                                        const hasEdits = Boolean(recipe.is_soft_edited);
+
+                                                        return (
+                                                            <div
+                                                                key={recipe.id || rIdx}
+                                                                className={`rounded-xl border transition ${isEditing
+                                                                    ? 'bg-white border-primary shadow-sm ring-2 ring-primary/10'
+                                                                    : 'bg-white border-emerald-200/80 hover:border-primary/40'
+                                                                    }`}
+                                                            >
+                                                                {/* Summary Strip */}
+                                                                <div className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                                                                    <div className="flex items-start sm:items-center gap-2">
+                                                                        <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                                                                            {rIdx + 1}
+                                                                        </span>
+                                                                        <div>
+                                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                                <h4 className="font-bold text-xs sm:text-sm text-heading">
+                                                                                    {recipe.name}
+                                                                                </h4>
+                                                                                <span className="text-[10px] font-semibold bg-gray-100 text-gray-700 px-2 py-0.2 rounded-md">
+                                                                                    {recipe.category || 'General'}
+                                                                                </span>
+                                                                                {hasEdits && (
+                                                                                    <span className="text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.2 rounded-md">
+                                                                                        Customized for Client
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                            <div className="flex items-center gap-2 text-[10px] text-gray-500 mt-0.5">
+                                                                                <span>{recipe.servings || '1 serving'}</span>
+                                                                                <span>•</span>
+                                                                                <span>{recipe.calories || 'Portion Calibrated'}</span>
+                                                                                {recipe.protein && <span>• P: {recipe.protein}</span>}
+                                                                                {recipe.carbs && <span>• C: {recipe.carbs}</span>}
+                                                                                {recipe.fats && <span>• F: {recipe.fats}</span>}
+                                                                                {recipe.fiber && <span>• Fib: {recipe.fiber}</span>}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setEditingRecipeId(isEditing ? null : recipe.id)}
+                                                                            className={`${isEditing
+                                                                                ? 'hidden'
+                                                                                : 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer bg-emerald-50 hover:bg-emerald-100 text-primary border border-emerald-200'
+                                                                                }`}
+                                                                            title="Soft-edit portions, ingredients or tips for this client"
+                                                                        >
+                                                                            <Edit3 size={11} />
+                                                                            <span>{isEditing ? 'Close Edit' : 'Soft Edit'}</span>
+                                                                        </button>
+
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleRemoveSelectedRecipe(recipe.id)}
+                                                                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                                                                            title="Remove recipe from plan"
+                                                                        >
+                                                                            <Trash2 size={13} />
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* ── EXPANDED SOFT-EDITOR FOR THIS RECIPE ── */}
+                                                                {isEditing && (
+                                                                    <div className="p-3.5 bg-slate-50/70 border-t border-gray-100 rounded-b-xl space-y-3">
+                                                                        <div className="flex items-center justify-between text-xs">
+                                                                            <div className="flex items-center gap-1.5 text-primary font-bold">
+                                                                                <Sliders size={13} />
+                                                                                <span>Customize Recipe</span>
+                                                                            </div>
+                                                                            {hasEdits && (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => handleResetRecipeToMaster(recipe.id)}
+                                                                                    className="inline-flex items-center gap-1 text-[11px] text-amber-700 hover:underline font-semibold cursor-pointer"
+                                                                                >
+                                                                                    <Undo2 size={11} />
+                                                                                    <span>Reset to Master</span>
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+
+                                                                        {/* Portions, Timing, Macros */}
+                                                                        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+                                                                            <div>
+                                                                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Portions</label>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={recipe.servings || ''}
+                                                                                    onChange={(e) => handleSoftEditRecipe(recipe.id, 'servings', e.target.value)}
+                                                                                    placeholder="1 serving"
+                                                                                    className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white"
+                                                                                />
+                                                                            </div>
+                                                                            <div>
+                                                                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Prep Time</label>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={recipe.prep_time || ''}
+                                                                                    onChange={(e) => handleSoftEditRecipe(recipe.id, 'prep_time', e.target.value)}
+                                                                                    placeholder="10m"
+                                                                                    className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white"
+                                                                                />
+                                                                            </div>
+                                                                            <div>
+                                                                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Cook Time</label>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={recipe.cook_time || ''}
+                                                                                    onChange={(e) => handleSoftEditRecipe(recipe.id, 'cook_time', e.target.value)}
+                                                                                    placeholder="15m"
+                                                                                    className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white"
+                                                                                />
+                                                                            </div>
+                                                                            <div>
+                                                                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Calories</label>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={recipe.calories || ''}
+                                                                                    onChange={(e) => handleSoftEditRecipe(recipe.id, 'calories', e.target.value)}
+                                                                                    placeholder="250 kcal"
+                                                                                    className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white"
+                                                                                />
+                                                                            </div>
+                                                                            <div>
+                                                                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Protein</label>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={recipe.protein || ''}
+                                                                                    onChange={(e) => handleSoftEditRecipe(recipe.id, 'protein', e.target.value)}
+                                                                                    placeholder="15g"
+                                                                                    className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white"
+                                                                                />
+                                                                            </div>
+                                                                            <div>
+                                                                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Carbs</label>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={recipe.carbs || ''}
+                                                                                    onChange={(e) => handleSoftEditRecipe(recipe.id, 'carbs', e.target.value)}
+                                                                                    placeholder="28g"
+                                                                                    className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white"
+                                                                                />
+                                                                            </div>
+                                                                            <div>
+                                                                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Fats</label>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={recipe.fats || ''}
+                                                                                    onChange={(e) => handleSoftEditRecipe(recipe.id, 'fats', e.target.value)}
+                                                                                    placeholder="6g"
+                                                                                    className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white"
+                                                                                />
+                                                                            </div>
+                                                                            <div>
+                                                                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Fiber</label>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={recipe.fiber || ''}
+                                                                                    onChange={(e) => handleSoftEditRecipe(recipe.id, 'fiber', e.target.value)}
+                                                                                    placeholder="4g"
+                                                                                    className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white"
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* Ingredients & Instructions Textareas */}
+                                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                                            <div>
+                                                                                <label className="block text-[10px] font-bold text-gray-700 mb-1">
+                                                                                    Ingredients (one per line)
+                                                                                </label>
+                                                                                <textarea
+                                                                                    rows={4}
+                                                                                    value={Array.isArray(recipe.ingredients) ? recipe.ingredients.join('\n') : (recipe.ingredients || '')}
+                                                                                    onChange={(e) => handleSoftEditIngredientsText(recipe.id, e.target.value)}
+                                                                                    placeholder="100g Chicken breast&#10;1 tsp Olive oil"
+                                                                                    className="w-full text-xs p-2.5 rounded-lg border border-gray-200 bg-white font-mono leading-relaxed"
+                                                                                />
+                                                                            </div>
+
+                                                                            <div>
+                                                                                <label className="block text-[10px] font-bold text-gray-700 mb-1">
+                                                                                    Instructions (one per line)
+                                                                                </label>
+                                                                                <textarea
+                                                                                    rows={4}
+                                                                                    value={Array.isArray(recipe.instructions) ? recipe.instructions.join('\n') : (recipe.instructions || '')}
+                                                                                    onChange={(e) => handleSoftEditInstructionsText(recipe.id, e.target.value)}
+                                                                                    placeholder="Sauté spices in olive oil.&#10;Add vegetables and simmer covered."
+                                                                                    className="w-full text-xs p-2.5 rounded-lg border border-gray-200 bg-white font-mono leading-relaxed"
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* Dietitian Clinical Tip */}
+                                                                        <div>
+                                                                            <label className="block text-[10px] font-bold text-gray-700 mb-0.5">
+                                                                                Dietitian Tip
+                                                                            </label>
+                                                                            <input
+                                                                                type="text"
+                                                                                value={recipe.dietitian_tip || ''}
+                                                                                onChange={(e) => handleSoftEditRecipe(recipe.id, 'dietitian_tip', e.target.value)}
+                                                                                placeholder="e.g. Rich in prebiotic fibers. Consume within 20 mins of cooking."
+                                                                                className="w-full text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white"
+                                                                            />
+                                                                        </div>
+
+                                                                        <div className="flex justify-end pt-1">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setEditingRecipeId(null)}
+                                                                                className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-lg shadow-2xs cursor-pointer"
+                                                                            >
+                                                                                Done
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* ── RECIPE BANK BROWSER ── */}
+                                        <div className="space-y-3 pt-1">
+                                            <div className="flex flex-col sm:flex-row gap-2">
+                                                {/* Search bar */}
+                                                <div className="relative flex-1">
+                                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                                    <input
+                                                        type="text"
+                                                        value={recipeSearch}
+                                                        onChange={(e) => setRecipeSearch(e.target.value)}
+                                                        placeholder="Search recipes by name (e.g. Oats, Smoothie, Wrap)..."
+                                                        className="w-full text-xs pl-8 pr-7 py-2 rounded-xl border border-gray-200 focus:ring-1 focus:ring-primary/20 bg-gray-50/50"
+                                                    />
+                                                    {recipeSearch && (
+                                                        <button
+                                                            onClick={() => setRecipeSearch('')}
+                                                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                        >
+                                                            <X size={13} />
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                {/* Category pills */}
+                                                <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none">
+                                                    {['All', 'Breakfast', 'Lunch', 'Dinner', 'Snack', 'Beverage', 'Soup & Salad'].map(cat => (
+                                                        <button
+                                                            key={cat}
+                                                            type="button"
+                                                            onClick={() => setRecipeCategoryFilter(cat)}
+                                                            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition cursor-pointer ${recipeCategoryFilter === cat
+                                                                ? 'bg-primary text-white shadow-2xs font-bold'
+                                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200/70'
+                                                                }`}
+                                                        >
+                                                            {cat}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Dish Cards Grid */}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-72 overflow-y-auto pr-1">
+                                                {loadingRecipes ? (
+                                                    <div className="col-span-full py-8 text-center text-xs text-gray-400">
+                                                        <RefreshCw size={14} className="animate-spin inline mr-1 text-primary" />
+                                                        Searching clinic recipe bank...
+                                                    </div>
+                                                ) : !recipeSearch.trim() && recipeCategoryFilter === 'All' ? (
+                                                    <div className="col-span-full py-6 px-4 text-center text-xs bg-gray-50/60 rounded-xl border border-dashed border-gray-200">
+                                                        <Search size={18} className="mx-auto mb-1.5 text-gray-400" />
+                                                        <p className="font-bold text-gray-700">Search Clinical Recipes</p>
+                                                        <p className="text-[11px] text-gray-400 mt-0.5 max-w-sm mx-auto">
+                                                            Type a dish name or click a category above to browse and attach recipes to this plan.
+                                                        </p>
+                                                        <div className="flex flex-wrap items-center justify-center gap-1.5 mt-3">
+                                                            <span className="text-[10px] text-gray-400 font-medium">Quick search:</span>
+                                                            {['Oats', 'Smoothie', 'Salad', 'Wrap', 'Pancake', 'Soup', 'Chicken'].map(suggest => (
+                                                                <button
+                                                                    key={suggest}
+                                                                    type="button"
+                                                                    onClick={() => setRecipeSearch(suggest)}
+                                                                    className="px-2 py-0.5 rounded-md bg-white border border-gray-200 hover:border-primary text-[10px] font-semibold text-gray-600 hover:text-primary transition cursor-pointer"
+                                                                >
+                                                                    + {suggest}
+                                                                </button>
+                                                            ))}
                                                         </div>
                                                     </div>
-                                                );
-                                            })
-                                    )}
-                                </div>
+                                                ) : availableRecipes.length === 0 ? (
+                                                    <div className="col-span-full py-8 text-center text-xs text-gray-400">
+                                                        No recipes found matching &ldquo;{recipeSearch}&rdquo;. Try another term or clear filter.
+                                                    </div>
+                                                ) : (
+                                                    availableRecipes.map(recipe => {
+                                                        const isSelected = (formData.recipes || []).some(r => r.id === recipe.id);
+                                                        return (
+                                                            <div
+                                                                key={recipe.id}
+                                                                onClick={() => handleToggleRecipe(recipe)}
+                                                                className={`p-2.5 rounded-xl border transition cursor-pointer flex flex-col justify-between select-none ${isSelected
+                                                                    ? 'bg-emerald-50/90 border-emerald-400 ring-1 ring-emerald-300 shadow-2xs'
+                                                                    : 'bg-white border-gray-200/80 hover:border-primary/40 hover:bg-gray-50/50'
+                                                                    }`}
+                                                            >
+                                                                <div className="flex items-start justify-between gap-1.5 mb-1">
+                                                                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">
+                                                                        {recipe.category || 'General'}
+                                                                    </span>
+                                                                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${isSelected ? 'bg-primary text-white' : 'border border-gray-300 text-transparent'
+                                                                        }`}>
+                                                                        ✓
+                                                                    </span>
+                                                                </div>
+                                                                <h4 className="text-xs font-bold text-heading line-clamp-1 mb-1">
+                                                                    {recipe.name}
+                                                                </h4>
+                                                                <div className="flex items-center justify-between text-[10px] text-gray-500 pt-1 border-t border-gray-100">
+                                                                    <span>{recipe.calories || 'Portion Calibrated'}</span>
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        {recipe.protein && <span className="font-semibold text-primary">P: {recipe.protein}</span>}
+                                                                        {recipe.fiber && <span className="font-semibold text-teal-700">Fib: {recipe.fiber}</span>}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                         </div>
                     )}
 
-                    {/* ════════════════ LIVE PDF PREVIEW ════════════════ */}
+                    {/* ════════════════ LIVE PDF PREVIEW COLUMN ════════════════ */}
                     {(activeView === 'preview' || activeView === 'split') && (
-                        <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-xs flex flex-col h-full sticky top-24">
+                        <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-gray-200/80 shadow-xs flex flex-col h-full sticky top-20">
                             <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                     <Eye size={16} className="text-primary" />
-                                    <h3 className="font-heading font-bold text-heading text-sm">
+                                    <h3 className="font-heading font-bold text-heading text-xs sm:text-sm">
                                         Live Vector PDF Preview
                                     </h3>
-                                    <div className="flex items-center gap-1.5">
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                            formData.pdf_theme === 'senior' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${formData.pdf_theme === 'senior' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
                                         }`}>
-                                            {formData.pdf_theme === 'senior' ? '🎨 Senior Large-Print' : '🌿 Clinical Standard'}
-                                        </span>
-                                        <span className="text-[10px] bg-gray-100 text-gray-700 font-bold px-2 py-0.5 rounded-full">
-                                            {formData.pdf_theme === 'senior'
-                                                ? (formData.recipes?.length > 0 ? '4 Pages' : '3 Pages')
-                                                : (formData.recipes?.length > 0 ? '3 Pages' : '2 Pages')}
-                                        </span>
-                                    </div>
+                                        {formData.pdf_theme === 'senior' ? '🎨 Senior Large-Print' : '🌿 Clinical Standard'}
+                                    </span>
+                                    <span className="text-[10px] bg-gray-100 text-gray-700 font-bold px-2 py-0.5 rounded-full">
+                                        {formData.pdf_theme === 'senior'
+                                            ? (formData.recipes?.length > 0 ? '4 Pages' : '3 Pages')
+                                            : (formData.recipes?.length > 0 ? '3 Pages' : '2 Pages')}
+                                    </span>
                                 </div>
                                 <button
                                     onClick={() => setPreviewKey(k => k + 1)}
@@ -1603,19 +2229,19 @@ export default function AdminPdfGeneratorPage() {
                                     title="Refresh Preview"
                                 >
                                     <RefreshCw size={13} />
-                                    Refresh
+                                    <span>Refresh</span>
                                 </button>
                             </div>
 
-                            <div className="flex-1 w-full min-h-[680px] rounded-xl overflow-hidden border border-gray-200">
+                            <div className="flex-1 w-full min-h-[580px] sm:min-h-[680px] rounded-xl overflow-hidden border border-gray-200">
                                 <PDFViewer key={previewKey} width="100%" height="100%" showToolbar={true}>
                                     <DietPlanPdfDocument plan={formData} />
                                 </PDFViewer>
                             </div>
 
-                            <div className="mt-3 flex items-center justify-between text-[11px] text-gray-400">
-                                <span>Powered by The Diet Cascade Engine • {formData.pdf_theme === 'senior' ? 'Senior Friendly Large Print Theme' : 'Clinical Precision Theme'}</span>
-                                <span>{formData.pdf_theme === 'senior' ? 'Spacious 3-4 Page Print' : 'Compact 2-3 Page Print'}</span>
+                            <div className="mt-2.5 flex items-center justify-between text-[11px] text-gray-400">
+                                <span>The Diet Cascade Engine • {formData.pdf_theme === 'senior' ? 'Large Print Theme' : 'Clinical Precision Theme'}</span>
+                                <span>{formData.pdf_theme === 'senior' ? '3-4 Pages' : '2-3 Pages'}</span>
                             </div>
                         </div>
                     )}

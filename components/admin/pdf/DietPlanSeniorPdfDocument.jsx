@@ -731,7 +731,244 @@ const styles = StyleSheet.create({
         fontStyle: 'italic',
         lineHeight: 1.25,
     },
+
+    // ─── Special Clinical Instructions Page (Edge Case) ───
+    specialBanner: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#f8fafc',
+        borderRadius: 8,
+        borderWidth: 1.5,
+        borderColor: '#cbd5e1',
+        paddingVertical: 7,
+        paddingHorizontal: 10,
+        marginTop: 6,
+        marginBottom: 8,
+    },
+    specialBannerClient: {
+        fontSize: 9.5,
+        fontFamily: 'Helvetica-Bold',
+        color: '#0f172a',
+    },
+    specialBannerMeta: {
+        fontSize: 8,
+        color: '#64748b',
+        marginTop: 1,
+    },
+    specialBoxCallout: {
+        borderRadius: 8,
+        padding: 12,
+        marginTop: 4,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderLeftWidth: 5,
+    },
+    specialBoxFramed: {
+        borderRadius: 8,
+        padding: 12,
+        marginTop: 4,
+        marginBottom: 8,
+        borderWidth: 2,
+    },
+    specialBoxBanner: {
+        borderRadius: 8,
+        marginTop: 4,
+        marginBottom: 8,
+        borderWidth: 1.5,
+        overflow: 'hidden',
+    },
+    specialBoxBannerHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderBottomWidth: 1,
+    },
+    specialBoxBannerBody: {
+        padding: 12,
+        backgroundColor: '#ffffff',
+    },
+    specialBoxHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        borderBottomWidth: 1,
+        paddingBottom: 7,
+        marginBottom: 9,
+    },
+    specialBoxTitle: {
+        fontSize: 12,
+        fontFamily: 'Helvetica-Bold',
+    },
+    specialBoxBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 12,
+        borderWidth: 1,
+    },
+    specialBoxBadgeText: {
+        fontSize: 7.5,
+        fontFamily: 'Helvetica-Bold',
+        letterSpacing: 0.5,
+        textTransform: 'uppercase',
+    },
+    specialInstructionItem: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        marginBottom: 6,
+    },
+    specialInstructionDot: {
+        width: 5.5,
+        height: 5.5,
+        borderRadius: 2.75,
+        marginTop: 4,
+        marginRight: 8,
+        flexShrink: 0,
+    },
+    specialInstructionNum: {
+        fontSize: 8.5,
+        fontFamily: 'Helvetica-Bold',
+        width: 16,
+        marginRight: 6,
+        marginTop: 0.5,
+        flexShrink: 0,
+    },
+    specialInstructionText: {
+        fontSize: 9.5,
+        color: '#0f172a',
+        lineHeight: 1.45,
+        flex: 1,
+    },
+    specialParagraphText: {
+        fontSize: 9.5,
+        color: '#0f172a',
+        lineHeight: 1.5,
+        marginBottom: 7,
+    },
+    specialWarningCard: {
+        backgroundColor: '#fff1f2',
+        borderWidth: 1.5,
+        borderColor: '#fecdd3',
+        borderRadius: 8,
+        padding: 9,
+        marginTop: 6,
+    },
+    specialWarningHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 2,
+    },
+    specialWarningTitle: {
+        fontSize: 8,
+        fontFamily: 'Helvetica-Bold',
+        color: '#9f1239',
+        letterSpacing: 0.5,
+        textTransform: 'uppercase',
+    },
+    specialWarningText: {
+        fontSize: 8.5,
+        color: '#881337',
+        lineHeight: 1.35,
+    },
+    specialVerificationCard: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#f8fafc',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        borderRadius: 8,
+        paddingVertical: 7,
+        paddingHorizontal: 10,
+        marginTop: 8,
+    },
+    specialVerificationName: {
+        fontSize: 9,
+        fontFamily: 'Helvetica-Bold',
+        color: '#166534',
+    },
+    specialVerificationTitle: {
+        fontSize: 7.5,
+        color: '#64748b',
+        marginTop: 1,
+    },
+    specialVerificationStamp: {
+        backgroundColor: '#f0fdf4',
+        borderWidth: 1,
+        borderColor: '#86efac',
+        borderRadius: 6,
+        paddingVertical: 3,
+        paddingHorizontal: 8,
+    },
+    specialVerificationStampText: {
+        fontSize: 7.5,
+        fontFamily: 'Helvetica-Bold',
+        color: '#166534',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
 });
+
+// Customizable Design Text Box Color Schemes
+const SPECIAL_BOX_THEMES = {
+    emerald: {
+        primary: '#166534',
+        accent: '#15803d',
+        bg: '#f0fdf4',
+        border: '#86efac',
+        badgeBg: '#dcfce7',
+        badgeText: '#14532d',
+        badgeBorder: '#bbf7d0',
+        dot: '#16a34a',
+        headerBg: '#dcfce7',
+    },
+    amber: {
+        primary: '#92400e',
+        accent: '#b45309',
+        bg: '#fffbeb',
+        border: '#fde68a',
+        badgeBg: '#fef3c7',
+        badgeText: '#78350f',
+        badgeBorder: '#fcd34d',
+        dot: '#d97706',
+        headerBg: '#fef3c7',
+    },
+    indigo: {
+        primary: '#1e3a8a',
+        accent: '#2563eb',
+        bg: '#eff6ff',
+        border: '#bfdbfe',
+        badgeBg: '#dbeafe',
+        badgeText: '#1e40af',
+        badgeBorder: '#93c5fd',
+        dot: '#3b82f6',
+        headerBg: '#dbeafe',
+    },
+    rose: {
+        primary: '#881337',
+        accent: '#be123c',
+        bg: '#fff1f2',
+        border: '#fecdd3',
+        badgeBg: '#ffe4e6',
+        badgeText: '#9f1239',
+        badgeBorder: '#fda4af',
+        dot: '#e11d48',
+        headerBg: '#ffe4e6',
+    },
+    slate: {
+        primary: '#1e293b',
+        accent: '#475569',
+        bg: '#f8fafc',
+        border: '#cbd5e1',
+        badgeBg: '#e2e8f0',
+        badgeText: '#334155',
+        badgeBorder: '#94a3b8',
+        dot: '#64748b',
+        headerBg: '#e2e8f0',
+    },
+};
 
 // Vibrant Meal Color Palette (distinguishable for senior eyes)
 const MEAL_PALETTES = [
@@ -831,7 +1068,7 @@ const ensureList = (val) => {
     }
     if (typeof val === 'string') {
         if (val.includes('\n')) {
-            return val.split('\n').map(s => s.replace(/^[-*•\d.)\s]+/, '').trim()).filter(Boolean);
+            return val.split('\n').map(s => s.replace(/^(?:[-*•✓·–—\u2022]\s*|\(?\d+[\.\)]\s+)/, '').trim()).filter(Boolean);
         }
         if (val.includes('•')) {
             return val.split('•').map(s => s.trim()).filter(Boolean);
@@ -860,6 +1097,58 @@ export default function DietPlanSeniorPdfDocument({ plan: rawPlan }) {
         ? plan.recipes.filter(r => r && (typeof r === 'object' ? r.name : r))
         : [];
 
+    const hasSpecialInstructions = Boolean(
+        plan?.show_special_instructions ||
+        (typeof plan?.special_instructions === 'string' && plan.special_instructions.trim().length > 0)
+    );
+    const specialThemeName = plan?.special_instructions_theme || 'emerald';
+    const specialTheme = SPECIAL_BOX_THEMES[specialThemeName] || SPECIAL_BOX_THEMES.emerald;
+    const specialBoxStyle = plan?.special_instructions_style || 'callout';
+
+    const specialInstructionsText = plan?.special_instructions || '';
+    const instructionLines = specialInstructionsText
+        .split('\n')
+        .map(line => line.trim())
+        .filter(Boolean);
+
+    const renderedInstructions = instructionLines.length > 0 ? (
+        instructionLines.map((line, lIdx) => {
+            const isBullet = /^[-*•\u2022]\s*/.test(line);
+            const isNumbered = /^\d+[\.\)]\s*/.test(line);
+            const cleanLine = line.replace(/^(?:[-*•\u2022]\s*|\d+[\.\)]\s*)/, '').trim();
+
+            if (isNumbered) {
+                const numMatch = line.match(/^(\d+)[\.\)]/);
+                const numStr = numMatch ? `${numMatch[1]}.` : `${lIdx + 1}.`;
+                return (
+                    <View key={lIdx} style={styles.specialInstructionItem}>
+                        <Text style={[styles.specialInstructionNum, { color: specialTheme.primary }]}>{numStr}</Text>
+                        <Text style={styles.specialInstructionText}>{cleanLine}</Text>
+                    </View>
+                );
+            }
+
+            if (isBullet) {
+                return (
+                    <View key={lIdx} style={styles.specialInstructionItem}>
+                        <View style={[styles.specialInstructionDot, { backgroundColor: specialTheme.dot }]} />
+                        <Text style={styles.specialInstructionText}>{cleanLine}</Text>
+                    </View>
+                );
+            }
+
+            return (
+                <Text key={lIdx} style={styles.specialParagraphText}>
+                    {line}
+                </Text>
+            );
+        })
+    ) : (
+        <Text style={{ fontSize: 9.5, color: '#64748b', fontStyle: 'italic', paddingVertical: 12 }}>
+            No special instructions specified. Adhere to daily meal schedule and prescribed clinical routine.
+        </Text>
+    );
+
     const logoSrc = plan?.logo_url || (typeof window !== 'undefined'
         ? `${window.location.origin}/images/logo.png`
         : '/images/logo.png');
@@ -879,7 +1168,7 @@ export default function DietPlanSeniorPdfDocument({ plan: rawPlan }) {
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
                         <View style={styles.clinicBadge}>
-                            <Text style={styles.clinicBadgeText}>LARGE PRINT EDITION</Text>
+                            <Text style={styles.clinicBadgeText}>CLINICAL REGIMEN</Text>
                         </View>
                         <Text style={styles.dietitianText}>Lead Dietitian: {plan?.dietitian_name || 'Dt. Sabah Ghare'}</Text>
                     </View>
@@ -1156,6 +1445,134 @@ export default function DietPlanSeniorPdfDocument({ plan: rawPlan }) {
                 </View>
             </Page>
 
+            {/* ════════════════════ PAGE: SPECIAL CLINICAL INSTRUCTIONS (EDGE CASE) ════════════════════ */}
+            {hasSpecialInstructions && (
+                <Page size="A4" style={styles.page}>
+                    {/* Secondary Header */}
+                    <View style={styles.headerContainer}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Image src={logoSrc} style={styles.logoImageSmall} alt="The Diet Cascade Logo" />
+                            <View style={{ marginLeft: 8 }}>
+                                <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', color: '#166534' }}>
+                                    THE DIET CASCADE
+                                </Text>
+                                <Text style={{ fontSize: 8.5, color: '#64748b' }}>
+                                    {plan?.client_name ? `${plan.client_name}'s Protocol` : 'Protocol'} | Edge-Case Clinical Directives
+                                </Text>
+                            </View>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                            <View style={[styles.clinicBadge, { backgroundColor: specialTheme.badgeBg, borderColor: specialTheme.badgeBorder }]}>
+                                <Text style={[styles.clinicBadgeText, { color: specialTheme.badgeText }]}>
+                                    {plan?.special_instructions_badge || 'EDGE CASE ADVISORY'}
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Section Header */}
+                    <View style={styles.sectionHeader}>
+                        <Text style={[styles.sectionTitle, { color: specialTheme.primary }]}>
+                            {plan?.special_instructions_title || 'Special Clinical Instructions & Edge-Case Directives'}
+                        </Text>
+                        <View style={[styles.sectionLine, { backgroundColor: specialTheme.accent }]} />
+                    </View>
+
+                    {/* Client Context Banner */}
+                    <View style={styles.specialBanner}>
+                        <View>
+                            <Text style={styles.specialBannerClient}>
+                                Patient: {plan?.client_name || 'Designated Client'} {plan?.client_age ? `(${plan.client_age} yrs)` : ''}
+                            </Text>
+                            <Text style={styles.specialBannerMeta}>
+                                Primary Health Target: {plan?.goal || 'Individualized Regimen Optimization'}
+                            </Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                            <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: '#64748b', textTransform: 'uppercase' }}>
+                                Protocol Priority
+                            </Text>
+                            <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: specialTheme.primary }}>
+                                High Priority Care
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Customizable Design Text Box */}
+                    {specialBoxStyle === 'banner' ? (
+                        <View style={[styles.specialBoxBanner, { borderColor: specialTheme.border }]}>
+                            <View style={[styles.specialBoxBannerHeader, { backgroundColor: specialTheme.headerBg, borderBottomColor: specialTheme.border }]}>
+                                <Text style={[styles.specialBoxTitle, { color: specialTheme.primary }]}>
+                                    {plan?.special_instructions_title || 'Special Clinical Instructions'}
+                                </Text>
+                                <View style={[styles.specialBoxBadge, { backgroundColor: '#ffffff', borderColor: specialTheme.badgeBorder }]}>
+                                    <Text style={[styles.specialBoxBadgeText, { color: specialTheme.badgeText }]}>
+                                        {plan?.special_instructions_badge || 'EDGE CASE'}
+                                    </Text>
+                                </View>
+                            </View>
+                            <View style={styles.specialBoxBannerBody}>
+                                {renderedInstructions}
+                            </View>
+                        </View>
+                    ) : specialBoxStyle === 'framed' ? (
+                        <View style={[styles.specialBoxFramed, { backgroundColor: specialTheme.bg, borderColor: specialTheme.accent }]}>
+                            <View style={[styles.specialBoxHeader, { borderBottomColor: specialTheme.border }]}>
+                                <Text style={[styles.specialBoxTitle, { color: specialTheme.primary }]}>
+                                    {plan?.special_instructions_title || 'Special Clinical Instructions'}
+                                </Text>
+                                <View style={[styles.specialBoxBadge, { backgroundColor: specialTheme.badgeBg, borderColor: specialTheme.badgeBorder }]}>
+                                    <Text style={[styles.specialBoxBadgeText, { color: specialTheme.badgeText }]}>
+                                        {plan?.special_instructions_badge || 'EDGE CASE'}
+                                    </Text>
+                                </View>
+                            </View>
+                            {renderedInstructions}
+                        </View>
+                    ) : (
+                        // Default: 'callout'
+                        <View style={[styles.specialBoxCallout, { backgroundColor: specialTheme.bg, borderLeftColor: specialTheme.accent, borderColor: specialTheme.border }]}>
+                            <View style={[styles.specialBoxHeader, { borderBottomColor: specialTheme.border }]}>
+                                <Text style={[styles.specialBoxTitle, { color: specialTheme.primary }]}>
+                                    {plan?.special_instructions_title || 'Special Clinical Instructions'}
+                                </Text>
+                                <View style={[styles.specialBoxBadge, { backgroundColor: specialTheme.badgeBg, borderColor: specialTheme.badgeBorder }]}>
+                                    <Text style={[styles.specialBoxBadgeText, { color: specialTheme.badgeText }]}>
+                                        {plan?.special_instructions_badge || 'EDGE CASE'}
+                                    </Text>
+                                </View>
+                            </View>
+                            {renderedInstructions}
+                        </View>
+                    )}
+
+                    {/* Optional Critical Precaution Warning Box */}
+                    {plan?.special_instructions_warning ? (
+                        <View style={styles.specialWarningCard}>
+                            <View style={styles.specialWarningHeader}>
+                                <Text style={styles.specialWarningTitle}>
+                                    Critical Precaution & Clinical Red Flags:
+                                </Text>
+                            </View>
+                            <Text style={styles.specialWarningText}>
+                                {plan.special_instructions_warning}
+                            </Text>
+                        </View>
+                    ) : null}
+
+
+                    {/* Page Footer */}
+                    <View style={styles.footerContainer}>
+                        <Text style={styles.footerNote}>Special Directives | Strictly Confidential & Individualized</Text>
+                        <Text style={styles.footerContact}>WhatsApp: +91 98920 30733 | @thedietcascade</Text>
+                        <Text
+                            style={styles.pageNumber}
+                            render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
+                        />
+                    </View>
+                </Page>
+            )}
+
             {/* ════════════════════ PAGE 3: RULES, RESTRICTIONS & MESSAGE ════════════════════ */}
             <Page size="A4" style={styles.page}>
                 {/* Secondary Header */}
@@ -1311,6 +1728,22 @@ export default function DietPlanSeniorPdfDocument({ plan: rawPlan }) {
                             const instList = ensureList(recipe.instructions);
                             const isAlt = rIdx % 2 === 1;
 
+                            // Build dynamic macro pills based on available nutrients
+                            const isMacroVal = (val) => {
+                                if (!val && val !== 0) return false;
+                                const s = String(val).trim();
+                                return s !== '' && s !== '-' && s !== '—' && s.toLowerCase() !== 'n/a' && s.toLowerCase() !== 'none';
+                            };
+
+                            const macroPills = [];
+                            if (isMacroVal(recipe.protein)) macroPills.push(`P: ${String(recipe.protein).trim()}`);
+                            if (isMacroVal(recipe.carbs)) macroPills.push(`C: ${String(recipe.carbs).trim()}`);
+                            if (isMacroVal(recipe.fats)) macroPills.push(`F: ${String(recipe.fats).trim()}`);
+                            if (isMacroVal(recipe.fiber)) macroPills.push(`Fib: ${String(recipe.fiber).trim()}`);
+
+                            const hasCalories = isMacroVal(recipe.calories);
+                            const hasMacroPills = macroPills.length > 0;
+
                             return (
                                 <View
                                     key={rIdx}
@@ -1326,14 +1759,22 @@ export default function DietPlanSeniorPdfDocument({ plan: rawPlan }) {
                                         <Text style={styles.recipeMetaText}>
                                             {recipe.servings || '1 serving'} | {(recipe.prep_time || '10m')} prep / {(recipe.cook_time || '15m')} cook
                                         </Text>
-                                        <View style={styles.recipeMacroBox}>
-                                            <Text style={styles.recipeMacroCal}>
-                                                {recipe.calories ? formatTarget(recipe.calories, 'kcal') : 'Calibrated Portion'}
-                                            </Text>
-                                            <Text style={styles.recipeMacroPills}>
-                                                P: {recipe.protein || '-'} | C: {recipe.carbs || '-'} | F: {recipe.fats || '-'}
-                                            </Text>
-                                        </View>
+                                        {(hasCalories || hasMacroPills) && (
+                                            <View style={styles.recipeMacroBox}>
+                                                {hasCalories ? (
+                                                    <Text style={styles.recipeMacroCal}>
+                                                        {formatTarget(recipe.calories, 'kcal')}
+                                                    </Text>
+                                                ) : (
+                                                    <Text style={styles.recipeMacroCal}>Calibrated Portion</Text>
+                                                )}
+                                                {hasMacroPills && (
+                                                    <Text style={styles.recipeMacroPills}>
+                                                        {macroPills.join(' | ')}
+                                                    </Text>
+                                                )}
+                                            </View>
+                                        )}
                                     </View>
 
                                     {/* Column 2: Measured Ingredients */}

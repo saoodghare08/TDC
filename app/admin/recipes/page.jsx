@@ -15,13 +15,14 @@ const CATEGORIES = ['All', 'Breakfast', 'Lunch', 'Dinner', 'Snack', 'Beverage', 
 const EMPTY_RECIPE = {
     name: '',
     category: 'Breakfast',
-    prep_time: '10 mins',
-    cook_time: '15 mins',
-    servings: '1 serving',
-    calories: '250 kcal',
-    protein: '14g',
-    carbs: '26g',
-    fats: '6g',
+    prep_time: '',
+    cook_time: '',
+    servings: '',
+    calories: '',
+    protein: '',
+    carbs: '',
+    fats: '',
+    fiber: '',
     ingredients: [''],
     instructions: [''],
     dietitian_tip: '',
@@ -135,6 +136,7 @@ export default function RecipesAdminPage() {
                 protein: recipe.protein || '',
                 carbs: recipe.carbs || '',
                 fats: recipe.fats || '',
+                fiber: recipe.fiber || '',
                 ingredients: recipe.ingredients || [],
                 instructions: recipe.instructions || [],
                 dietitian_tip: recipe.dietitian_tip || '',
@@ -241,6 +243,7 @@ export default function RecipesAdminPage() {
                 protein: formData.protein?.trim() || '',
                 carbs: formData.carbs?.trim() || '',
                 fats: formData.fats?.trim() || '',
+                fiber: formData.fiber?.trim() || '',
                 ingredients: cleanIngredients,
                 instructions: cleanInstructions.length > 0 ? cleanInstructions : ['Cook as directed.'],
                 dietitian_tip: formData.dietitian_tip?.trim() || '',
@@ -321,7 +324,7 @@ export default function RecipesAdminPage() {
     const handleApplyBulkIngredients = () => {
         const lines = bulkIngredientsText
             .split('\n')
-            .map(l => l.replace(/^[-•*✓\d.)\s]+/, '').trim())
+            .map(l => l.replace(/^(?:[-*•✓·–—\u2022]\s*|\(?\d+[\.\)]\s+)/, '').trim())
             .filter(Boolean);
 
         if (lines.length > 0) {
@@ -359,7 +362,7 @@ export default function RecipesAdminPage() {
     const handleApplyBulkInstructions = () => {
         const lines = bulkInstructionsText
             .split('\n')
-            .map(l => l.replace(/^[-•*✓\d.)\s]+/, '').trim())
+            .map(l => l.replace(/^(?:Step\s*\d+[:.]?\s*|[-*•✓·–—\u2022]\s*|\(?\d+[\.\)]\s+)/i, '').trim())
             .filter(Boolean);
 
         if (lines.length > 0) {
@@ -448,8 +451,8 @@ export default function RecipesAdminPage() {
                                 key={cat}
                                 onClick={() => setSelectedCategory(cat)}
                                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer ${active
-                                        ? 'bg-primary text-white shadow-xs'
-                                        : 'bg-gray-100/70 text-gray-600 hover:bg-gray-200/60'
+                                    ? 'bg-primary text-white shadow-xs'
+                                    : 'bg-gray-100/70 text-gray-600 hover:bg-gray-200/60'
                                     }`}
                             >
                                 {cat}
@@ -518,7 +521,7 @@ export default function RecipesAdminPage() {
                                     </h3>
 
                                     {/* Macro Strip */}
-                                    <div className="grid grid-cols-4 gap-1.5 p-2 rounded-xl bg-gray-50/80 border border-gray-100 mb-3 text-center">
+                                    <div className="grid grid-cols-5 gap-1 p-2 rounded-xl bg-gray-50/80 border border-gray-100 mb-3 text-center">
                                         <div>
                                             <span className="block text-[9px] uppercase font-bold text-gray-400">Calories</span>
                                             <span className="text-[11px] font-bold text-emerald-800">{recipe.calories || '—'}</span>
@@ -534,6 +537,10 @@ export default function RecipesAdminPage() {
                                         <div>
                                             <span className="block text-[9px] uppercase font-bold text-gray-400">Fats</span>
                                             <span className="text-[11px] font-bold text-purple-700">{recipe.fats || '—'}</span>
+                                        </div>
+                                        <div>
+                                            <span className="block text-[9px] uppercase font-bold text-gray-400">Fibre</span>
+                                            <span className="text-[11px] font-bold text-teal-700">{recipe.fiber || '—'}</span>
                                         </div>
                                     </div>
 
@@ -699,7 +706,7 @@ export default function RecipesAdminPage() {
                                 <label className="block text-[10px] font-bold text-heading uppercase mb-2">
                                     Nutritional Profile (Per Serving)
                                 </label>
-                                <div className="grid grid-cols-4 gap-2">
+                                <div className="grid grid-cols-5 gap-2">
                                     <div>
                                         <span className="block text-[10px] text-gray-500 mb-0.5">Calories</span>
                                         <input
@@ -737,6 +744,16 @@ export default function RecipesAdminPage() {
                                             value={formData.fats}
                                             onChange={(e) => setFormData({ ...formData, fats: e.target.value })}
                                             placeholder="5g"
+                                            className="w-full text-xs font-semibold px-2 py-1.5 rounded-lg border border-gray-200 bg-white"
+                                        />
+                                    </div>
+                                    <div>
+                                        <span className="block text-[10px] text-gray-500 mb-0.5">Fibre</span>
+                                        <input
+                                            type="text"
+                                            value={formData.fiber}
+                                            onChange={(e) => setFormData({ ...formData, fiber: e.target.value })}
+                                            placeholder="4g"
                                             className="w-full text-xs font-semibold px-2 py-1.5 rounded-lg border border-gray-200 bg-white"
                                         />
                                     </div>
@@ -966,7 +983,7 @@ export default function RecipesAdminPage() {
                         </div>
 
                         {/* Nutrition Grid */}
-                        <div className="grid grid-cols-4 gap-2 p-2.5 rounded-2xl bg-gray-50 border border-gray-100 mb-4 text-center">
+                        <div className="grid grid-cols-5 gap-1.5 p-2.5 rounded-2xl bg-gray-50 border border-gray-100 mb-4 text-center">
                             <div>
                                 <span className="block text-[9px] uppercase font-bold text-gray-400">Calories</span>
                                 <span className="text-xs font-bold text-emerald-800">{previewRecipe.calories || '—'}</span>
@@ -982,6 +999,10 @@ export default function RecipesAdminPage() {
                             <div>
                                 <span className="block text-[9px] uppercase font-bold text-gray-400">Fats</span>
                                 <span className="text-xs font-bold text-purple-700">{previewRecipe.fats || '—'}</span>
+                            </div>
+                            <div>
+                                <span className="block text-[9px] uppercase font-bold text-gray-400">Fibre</span>
+                                <span className="text-xs font-bold text-teal-700">{previewRecipe.fiber || '—'}</span>
                             </div>
                         </div>
 

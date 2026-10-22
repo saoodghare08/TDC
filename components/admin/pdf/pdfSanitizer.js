@@ -127,6 +127,26 @@ export const cleanPlanData = (plan) => {
         dietitian_name: sanitizeVal(plan.dietitian_name, 'Dt. Sabah Ghare'),
 
         // Attached recipes
+        recipes: Array.isArray(plan.recipes)
+            ? plan.recipes.map(recipe => ({
+                ...recipe,
+                name: sanitizeVal(recipe?.name, 'Custom Dish'),
+                category: sanitizeVal(recipe?.category, 'General'),
+                servings: sanitizeVal(recipe?.servings, '1 serving'),
+                prep_time: sanitizeVal(recipe?.prep_time, '10 mins'),
+                cook_time: sanitizeVal(recipe?.cook_time, '15 mins'),
+                calories: sanitizeVal(recipe?.calories, ''),
+                protein: sanitizeVal(recipe?.protein, ''),
+                carbs: sanitizeVal(recipe?.carbs, ''),
+                fats: sanitizeVal(recipe?.fats, ''),
+                fiber: sanitizeVal(recipe?.fiber, ''),
+                ingredients: sanitizeStringList(recipe?.ingredients),
+                instructions: Array.isArray(recipe?.instructions)
+                    ? sanitizeStringList(recipe.instructions)
+                    : sanitizeVal(recipe?.instructions, ''),
+                dietitian_tip: sanitizeVal(recipe?.dietitian_tip, ''),
+            }))
+            : [],
         selected_recipes: Array.isArray(plan.selected_recipes)
             ? plan.selected_recipes.map(recipe => ({
                 ...recipe,
@@ -134,14 +154,38 @@ export const cleanPlanData = (plan) => {
                 servings: sanitizeVal(recipe?.servings, '1 serving'),
                 prep_time: sanitizeVal(recipe?.prep_time, '10 mins'),
                 cook_time: sanitizeVal(recipe?.cook_time, '15 mins'),
-                calories: sanitizeVal(recipe?.calories, '-'),
-                protein: sanitizeVal(recipe?.protein, '-'),
-                carbs: sanitizeVal(recipe?.carbs, '-'),
-                fats: sanitizeVal(recipe?.fats, '-'),
+                calories: sanitizeVal(recipe?.calories, ''),
+                protein: sanitizeVal(recipe?.protein, ''),
+                carbs: sanitizeVal(recipe?.carbs, ''),
+                fats: sanitizeVal(recipe?.fats, ''),
+                fiber: sanitizeVal(recipe?.fiber, ''),
                 ingredients: sanitizeStringList(recipe?.ingredients),
                 instructions: sanitizeVal(recipe?.instructions, ''),
                 notes: sanitizeVal(recipe?.notes, ''),
             }))
             : [],
+
+        // Special Clinical Instructions & Edge-Case Directives Page
+        show_special_instructions: Boolean(
+            plan.show_special_instructions ||
+            (typeof plan.special_instructions === 'string' && plan.special_instructions.trim().length > 0)
+        ),
+        special_instructions_title: sanitizeVal(
+            plan.special_instructions_title,
+            'Special Clinical Instructions & Edge-Case Directives'
+        ),
+        special_instructions_badge: sanitizeVal(
+            plan.special_instructions_badge,
+            'EDGE CASE ADVISORY'
+        ),
+        special_instructions_theme: ['emerald', 'amber', 'indigo', 'rose', 'slate'].includes(plan.special_instructions_theme)
+            ? plan.special_instructions_theme
+            : 'emerald',
+        special_instructions_style: ['callout', 'framed', 'banner'].includes(plan.special_instructions_style)
+            ? plan.special_instructions_style
+            : 'callout',
+        special_instructions: sanitizeVal(plan.special_instructions, ''),
+        special_instructions_warning: sanitizeVal(plan.special_instructions_warning, ''),
+        special_instructions_verified: plan.special_instructions_verified !== false,
     };
 };
