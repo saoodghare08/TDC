@@ -180,6 +180,83 @@ const styles = StyleSheet.create({
         marginTop: 2,
     },
 
+    // ─── Body Measurements Table ───
+    measurementsCard: {
+        borderRadius: 8,
+        borderWidth: 1.5,
+        borderColor: '#cbd5e1',
+        backgroundColor: '#ffffff',
+        marginTop: 8,
+        marginBottom: 8,
+        overflow: 'hidden',
+    },
+    measurementsHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f8fafc',
+        paddingVertical: 4.5,
+        paddingHorizontal: 10,
+        borderBottomWidth: 1.5,
+        borderBottomColor: '#cbd5e1',
+    },
+    measurementsIndicator: {
+        width: 4,
+        height: 12,
+        backgroundColor: '#166534',
+        borderRadius: 2,
+        marginRight: 6,
+    },
+    measurementsTitle: {
+        fontSize: 9,
+        fontFamily: 'Helvetica-Bold',
+        color: '#0f172a',
+        textTransform: 'uppercase',
+    },
+    measurementsTable: {
+        width: '100%',
+    },
+    measurementsTableHeaderRow: {
+        flexDirection: 'row',
+        backgroundColor: '#166534',
+    },
+    measurementsTableHeaderCol: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 4.5,
+        paddingHorizontal: 4,
+        borderRightWidth: 1,
+        borderRightColor: 'rgba(255,255,255,0.2)',
+    },
+    measurementsTableHeaderText: {
+        fontSize: 8,
+        fontFamily: 'Helvetica-Bold',
+        color: '#ffffff',
+        textTransform: 'uppercase',
+        textAlign: 'center',
+    },
+    measurementsTableRow: {
+        flexDirection: 'row',
+        borderBottomWidth: 1,
+        borderBottomColor: '#e2e8f0',
+        backgroundColor: '#ffffff',
+    },
+    measurementsTableRowAlt: {
+        backgroundColor: '#f0fdf4',
+    },
+    measurementsTableCol: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 4,
+        paddingHorizontal: 4,
+        borderRightWidth: 1,
+        borderRightColor: '#e2e8f0',
+    },
+    measurementsTableCellText: {
+        fontSize: 8.5,
+        color: '#0f172a',
+        textAlign: 'center',
+    },
+
     // ─── Section Header ───
     sectionHeader: {
         flexDirection: 'row',
@@ -252,6 +329,13 @@ const styles = StyleSheet.create({
         fontSize: 8.5,
         fontFamily: 'Helvetica-Bold',
         color: '#c2410c',
+        width: 65,
+        marginTop: 1,
+    },
+    optionTagOptional: {
+        fontSize: 8.5,
+        fontFamily: 'Helvetica-Bold',
+        color: '#6d28d9',
         width: 65,
         marginTop: 1,
     },
@@ -372,6 +456,113 @@ const styles = StyleSheet.create({
         color: '#64748b',
         fontStyle: 'italic',
         paddingVertical: 4,
+    },
+
+    // ─── Prescribed Movement & Mobility Regimen (Senior) ───
+    workoutCard: {
+        backgroundColor: '#ffffff',
+        borderRadius: 8,
+        borderWidth: 1.5,
+        borderColor: '#e2e8f0',
+        borderLeftWidth: 4,
+        borderLeftColor: '#166534',
+        padding: 7,
+        paddingHorizontal: 8,
+        marginTop: 10,
+    },
+    workoutHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 5,
+        paddingBottom: 4,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f1f5f9',
+    },
+    workoutIndicator: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#166534',
+        marginRight: 5,
+    },
+    workoutTitle: {
+        fontSize: 10,
+        fontFamily: 'Helvetica-Bold',
+        color: '#0f172a',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+    },
+    workoutBadge: {
+        backgroundColor: '#f0fdf4',
+        borderWidth: 1,
+        borderColor: '#bbf7d0',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    workoutBadgeText: {
+        fontSize: 7,
+        fontFamily: 'Helvetica-Bold',
+        color: '#166534',
+        textTransform: 'uppercase',
+    },
+    workoutTable: {
+        width: '100%',
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#cbd5e1',
+        overflow: 'hidden',
+    },
+    workoutTableHeaderRow: {
+        flexDirection: 'row',
+        backgroundColor: '#166534',
+        paddingVertical: 4,
+        paddingHorizontal: 6,
+    },
+    workoutTh: {
+        fontSize: 7.2,
+        fontFamily: 'Helvetica-Bold',
+        color: '#ffffff',
+        letterSpacing: 0.3,
+    },
+    workoutTableRow: {
+        flexDirection: 'row',
+        paddingVertical: 5,
+        paddingHorizontal: 6,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e2e8f0',
+        backgroundColor: '#ffffff',
+    },
+    workoutTableRowAlt: {
+        backgroundColor: '#f8fafc',
+    },
+    workoutDayName: {
+        fontSize: 8.5,
+        fontFamily: 'Helvetica-Bold',
+        color: '#0f172a',
+    },
+    workoutDayFocus: {
+        fontSize: 7.2,
+        color: '#15803d',
+        fontFamily: 'Helvetica-Bold',
+        marginTop: 1,
+    },
+    workoutTextMain: {
+        fontSize: 7.8,
+        color: '#1e293b',
+        lineHeight: 1.3,
+    },
+    workoutTextCardio: {
+        fontSize: 7.5,
+        color: '#0369a1',
+        lineHeight: 1.25,
+    },
+    workoutTextNotes: {
+        fontSize: 7.2,
+        color: '#64748b',
+        fontStyle: 'italic',
+        lineHeight: 1.25,
     },
 
     // ─── Unified Rules & Foods to Avoid (2 Big Vibrant Columns) ───
@@ -1081,16 +1272,30 @@ const ensureList = (val) => {
 
 export default function DietPlanSeniorPdfDocument({ plan: rawPlan }) {
     const plan = cleanPlanData(rawPlan);
+    const rawMeasurements = Array.isArray(plan?.measurements) ? plan.measurements : [];
+    const ALL_MEASUREMENT_COLS = [
+        { key: 'date', label: 'Date' },
+        { key: 'weight', label: 'Weight' },
+        { key: 'belly_button', label: 'Belly Button' },
+        { key: 'hip', label: 'Hip' },
+        { key: 'thigh', label: 'Thigh' },
+        { key: 'neck', label: 'Neck' },
+        { key: 'bicep', label: 'Bicep' },
+    ];
+    // Dynamic columns: only columns that have data in at least one row
+    const activeMeasurementCols = ALL_MEASUREMENT_COLS.filter(col =>
+        rawMeasurements.some(m => m && m[col.key] && String(m[col.key]).trim() !== '' && String(m[col.key]).trim() !== '-')
+    );
+    // Rows that have at least one non-empty value in active columns
+    const validMeasurementRows = rawMeasurements.filter(m =>
+        m && activeMeasurementCols.some(col => m[col.key] && String(m[col.key]).trim() !== '' && String(m[col.key]).trim() !== '-')
+    );
+    const hasMeasurements = activeMeasurementCols.length > 0 && validMeasurementRows.length > 0;
+
     const meals = plan?.meals || [];
-    // Senior Friendly Paging:
-    // Page 1: Vitals, Targets + First 3 Meals (Early Morning, Breakfast, Mid-Morning)
-    // Page 2: Next Meals (Lunch, Evening Snack, Dinner, Bedtime) + Prescribed Supplements
-    // Page 3: Golden Rules & Habits + Foods to Avoid + Dietitian's Note + Disclaimer
-    // Page 4 (Optional): Recipe Annexure Table
-    const page1Meals = meals.slice(0, 3);
-    const page2Meals = meals.slice(3);
 
     const supplements = Array.isArray(plan?.supplements) ? plan.supplements : [];
+    const workouts = Array.isArray(plan?.workouts) ? plan.workouts : [];
     const guidelines = ensureList(plan?.guidelines);
     const donts = ensureList(plan?.donts);
     const attachedRecipes = Array.isArray(plan?.recipes)
@@ -1110,6 +1315,16 @@ export default function DietPlanSeniorPdfDocument({ plan: rawPlan }) {
         .split('\n')
         .map(line => line.trim())
         .filter(Boolean);
+
+    const seniorTargetItems = [
+        (plan?.calories && plan?.calories !== '-') ? { label: 'Calories', value: formatTarget(plan?.calories, 'kcal') } : null,
+        (plan?.protein && plan?.protein !== '-') ? { label: 'Protein', value: formatTarget(plan?.protein, 'g') } : null,
+        (plan?.carbs && plan?.carbs !== '-') ? { label: 'Carbs', value: formatTarget(plan?.carbs, 'g') } : null,
+        (plan?.fats && plan?.fats !== '-') ? { label: 'Healthy Fats', value: formatTarget(plan?.fats, 'g') } : null,
+        (plan?.fibre && plan?.fibre !== '-') ? { label: 'Dietary Fibre', value: formatTarget(plan?.fibre, 'g') } : null,
+        (plan?.water && plan?.water !== '-') ? { label: 'Daily Water', value: formatTarget(plan?.water, 'L'), color: '#0284c7' } : null,
+        (plan?.steps && plan?.steps !== '-') ? { label: 'Daily Steps', value: String(plan.steps), color: '#16a34a' } : null,
+    ].filter(Boolean);
 
     const renderedInstructions = instructionLines.length > 0 ? (
         instructionLines.map((line, lIdx) => {
@@ -1190,6 +1405,7 @@ export default function DietPlanSeniorPdfDocument({ plan: rawPlan }) {
                     </View>
 
                     {/* Vitals Grid */}
+                    {/* Row 1: Core Vitals & Demographics */}
                     <View style={styles.clientGrid}>
                         <View style={styles.clientCol4}>
                             <Text style={styles.infoLabel}>Client Name</Text>
@@ -1197,7 +1413,13 @@ export default function DietPlanSeniorPdfDocument({ plan: rawPlan }) {
                         </View>
                         <View style={styles.clientCol4}>
                             <Text style={styles.infoLabel}>Age</Text>
-                            <Text style={styles.infoValue}>{plan?.client_age ? `${plan.client_age} yrs` : '-'}</Text>
+                            <Text style={styles.infoValue}>
+                                {plan?.client_age ? `${plan.client_age}${String(plan.client_age).toLowerCase().includes('yr') ? '' : ' yrs'}` : '-'}
+                            </Text>
+                        </View>
+                        <View style={styles.clientCol4}>
+                            <Text style={styles.infoLabel}>Height</Text>
+                            <Text style={styles.infoValue}>{plan?.client_height || '-'}</Text>
                         </View>
                         <View style={styles.clientCol4}>
                             <Text style={styles.infoLabel}>Current Weight</Text>
@@ -1205,11 +1427,27 @@ export default function DietPlanSeniorPdfDocument({ plan: rawPlan }) {
                                 {plan?.start_weight ? `${plan.start_weight}${String(plan.start_weight).toLowerCase().includes('kg') ? '' : ' kg'}` : '-'}
                             </Text>
                         </View>
+                    </View>
+
+                    {/* Row 2: Targets, Habits & Contact */}
+                    <View style={[styles.clientGrid, { marginTop: 3 }]}>
                         <View style={styles.clientCol4}>
-                            <Text style={styles.infoLabel}>Target Weight</Text>
+                            <Text style={styles.infoLabel}>Ideal Body Weight(IBW)</Text>
                             <Text style={[styles.infoValue, { color: '#16a34a' }]}>
                                 {plan?.target_weight ? `${plan.target_weight}${String(plan.target_weight).toLowerCase().includes('kg') ? '' : ' kg'}` : '-'}
                             </Text>
+                        </View>
+                        <View style={styles.clientCol4}>
+                            <Text style={styles.infoLabel}>Food Habits</Text>
+                            <Text style={styles.infoValue}>{plan?.food_habits || '-'}</Text>
+                        </View>
+                        <View style={styles.clientCol4}>
+                            <Text style={styles.infoLabel}>Lifestyle</Text>
+                            <Text style={styles.infoValue}>{plan?.lifestyle || '-'}</Text>
+                        </View>
+                        <View style={styles.clientCol4}>
+                            <Text style={styles.infoLabel}>Phone / WhatsApp</Text>
+                            <Text style={styles.infoValue}>{plan?.client_phone || '-'}</Text>
                         </View>
                     </View>
 
@@ -1225,7 +1463,7 @@ export default function DietPlanSeniorPdfDocument({ plan: rawPlan }) {
                                 <Text style={styles.clinicalValue}>{plan?.medication || 'None'}</Text>
                             </View>
                             <View style={styles.clinicalCol}>
-                                <Text style={styles.clinicalLabel}>Lifestyle & Habits:</Text>
+                                <Text style={styles.clinicalLabel}>Health Abuses / Habits & Lifestyle:</Text>
                                 <Text style={styles.clinicalValue}>{plan?.health_abuses || 'None'}</Text>
                             </View>
                         </View>
@@ -1233,50 +1471,94 @@ export default function DietPlanSeniorPdfDocument({ plan: rawPlan }) {
                 </View>
 
                 {/* Daily Targets Banner */}
-                <View style={styles.targetsCard}>
-                    <View style={styles.targetItem}>
-                        <Text style={styles.targetLabel}>Calories</Text>
-                        <Text style={styles.targetValue}>{formatTarget(plan?.calories, 'kcal')}</Text>
+                {seniorTargetItems.length > 0 ? (
+                    <View style={styles.targetsCard}>
+                        {seniorTargetItems.map((target, idx) => (
+                            <React.Fragment key={idx}>
+                                {idx > 0 ? <View style={styles.targetDivider} /> : null}
+                                <View style={styles.targetItem}>
+                                    <Text style={styles.targetLabel}>{target.label}</Text>
+                                    <Text style={{
+                                        ...styles.targetValue,
+                                        ...(target.color ? { color: target.color } : {})
+                                    }}>
+                                        {target.value}
+                                    </Text>
+                                </View>
+                            </React.Fragment>
+                        ))}
                     </View>
-                    <View style={styles.targetDivider} />
-                    <View style={styles.targetItem}>
-                        <Text style={styles.targetLabel}>Protein</Text>
-                        <Text style={styles.targetValue}>{formatTarget(plan?.protein, 'g')}</Text>
+                ) : null}
+
+                {/* Body Measurements & Progress Tracker */}
+                {hasMeasurements ? (
+                    <View style={styles.measurementsCard}>
+                        <View style={styles.measurementsHeader}>
+                            <View style={styles.measurementsIndicator} />
+                            <Text style={styles.measurementsTitle}>Body Measurements & Progress Tracker</Text>
+                        </View>
+                        <View style={styles.measurementsTable}>
+                            <View style={styles.measurementsTableHeaderRow}>
+                                {activeMeasurementCols.map((col, cIdx) => (
+                                    <View
+                                        key={col.key}
+                                        style={{
+                                            ...styles.measurementsTableHeaderCol,
+                                            width: `${100 / Math.max(activeMeasurementCols.length, 1)}%`,
+                                            ...(cIdx === activeMeasurementCols.length - 1 ? { borderRightWidth: 0 } : {})
+                                        }}
+                                    >
+                                        <Text style={styles.measurementsTableHeaderText}>{col.label}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                            {validMeasurementRows.map((row, rIdx) => (
+                                <View
+                                    key={rIdx}
+                                    style={{
+                                        ...styles.measurementsTableRow,
+                                        ...(rIdx % 2 === 1 ? styles.measurementsTableRowAlt : {}),
+                                        ...(rIdx === validMeasurementRows.length - 1 ? { borderBottomWidth: 0 } : {})
+                                    }}
+                                >
+                                    {activeMeasurementCols.map((col, cIdx) => (
+                                        <View
+                                            key={col.key}
+                                            style={{
+                                                ...styles.measurementsTableCol,
+                                                width: `${100 / Math.max(activeMeasurementCols.length, 1)}%`,
+                                                ...(cIdx === activeMeasurementCols.length - 1 ? { borderRightWidth: 0 } : {})
+                                            }}
+                                        >
+                                            <Text
+                                                style={{
+                                                    ...styles.measurementsTableCellText,
+                                                    ...(col.key === 'date' ? { fontFamily: 'Helvetica-Bold' } : {}),
+                                                    ...(col.key === 'weight' ? { fontFamily: 'Helvetica-Bold', color: '#166534' } : {})
+                                                }}
+                                            >
+                                                {row[col.key] || '-'}
+                                            </Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            ))}
+                        </View>
                     </View>
-                    <View style={styles.targetDivider} />
-                    <View style={styles.targetItem}>
-                        <Text style={styles.targetLabel}>Carbs</Text>
-                        <Text style={styles.targetValue}>{formatTarget(plan?.carbs, 'g')}</Text>
-                    </View>
-                    <View style={styles.targetDivider} />
-                    <View style={styles.targetItem}>
-                        <Text style={styles.targetLabel}>Healthy Fats</Text>
-                        <Text style={styles.targetValue}>{formatTarget(plan?.fats, 'g')}</Text>
-                    </View>
-                    <View style={styles.targetDivider} />
-                    <View style={styles.targetItem}>
-                        <Text style={styles.targetLabel}>Daily Water</Text>
-                        <Text style={[styles.targetValue, { color: '#0284c7' }]}>{formatTarget(plan?.water, 'L')}</Text>
-                    </View>
-                    <View style={styles.targetDivider} />
-                    <View style={styles.targetItem}>
-                        <Text style={styles.targetLabel}>Daily Steps</Text>
-                        <Text style={[styles.targetValue, { color: '#16a34a' }]}>{plan?.steps ? String(plan.steps) : '-'}</Text>
-                    </View>
-                </View>
+                ) : null}
 
                 {/* Section Header */}
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Daily Meal Schedule - Part 1 (Morning to Mid-Day)</Text>
+                    <Text style={styles.sectionTitle}>Daily Meal Schedule Blueprint</Text>
                     <View style={styles.sectionLine} />
                 </View>
 
-                {/* Meals 1 to 3 */}
-                {page1Meals.length > 0 ? (
-                    page1Meals.map((meal, idx) => {
+                {/* All Meals in a Single Map Function */}
+                {meals.length > 0 ? (
+                    meals.map((meal, idx) => {
                         const palette = MEAL_PALETTES[idx % MEAL_PALETTES.length];
                         return (
-                            <View key={idx} style={[styles.mealCard, { borderColor: palette.border }]}>
+                            <View key={idx} style={[styles.mealCard, { borderColor: palette.border }]} wrap={false}>
                                 <View style={[styles.mealHeader, { backgroundColor: palette.headerBg, borderBottomColor: palette.border }]}>
                                     <Text style={[styles.mealName, { color: palette.titleColor }]}>
                                         {meal.name || `Meal ${idx + 1}`}
@@ -1296,6 +1578,12 @@ export default function DietPlanSeniorPdfDocument({ plan: rawPlan }) {
                                             <Text style={styles.optionContent}>{opt}</Text>
                                         </View>
                                     ))}
+                                    {meal.optional ? (
+                                        <View style={styles.optionRow}>
+                                            <Text style={styles.optionTagOptional}>OPTIONAL:</Text>
+                                            <Text style={styles.optionContent}>{meal.optional}</Text>
+                                        </View>
+                                    ) : null}
                                     {meal.notes ? (
                                         <View style={styles.chefNoteContainer}>
                                             <Text style={styles.chefNoteLabel}>NOTE:</Text>
@@ -1309,7 +1597,7 @@ export default function DietPlanSeniorPdfDocument({ plan: rawPlan }) {
                 ) : (
                     <View style={[styles.mealCard, { padding: 14, alignItems: 'center' }]}>
                         <Text style={{ fontSize: 9, color: '#94a3b8', fontStyle: 'italic' }}>
-                            No morning meals scheduled. Add meals in the form editor.
+                            No meals scheduled. Add meals in the form editor.
                         </Text>
                     </View>
                 )}
@@ -1347,55 +1635,8 @@ export default function DietPlanSeniorPdfDocument({ plan: rawPlan }) {
                     </View>
                 </View>
 
-                {/* Section Header */}
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Daily Meal Schedule - Part 2 (Lunch & Dinner)</Text>
-                    <View style={styles.sectionLine} />
-                </View>
-
-                {/* Meals 4 onwards */}
-                {page2Meals.length > 0 ? (
-                    page2Meals.map((meal, idx) => {
-                        const palette = MEAL_PALETTES[(idx + 3) % MEAL_PALETTES.length];
-                        return (
-                            <View key={idx} style={[styles.mealCard, { borderColor: palette.border }]}>
-                                <View style={[styles.mealHeader, { backgroundColor: palette.headerBg, borderBottomColor: palette.border }]}>
-                                    <Text style={[styles.mealName, { color: palette.titleColor }]}>
-                                        {meal.name || `Meal ${idx + 4}`}
-                                    </Text>
-                                    {meal.time ? (
-                                        <View style={[styles.mealTimePill, { backgroundColor: palette.badgeBg, borderColor: palette.badgeBorder }]}>
-                                            <Text style={[styles.mealTimeText, { color: palette.badgeText }]}>{meal.time}</Text>
-                                        </View>
-                                    ) : null}
-                                </View>
-                                <View style={styles.mealBody}>
-                                    {getMealOptions(meal).map((opt, optIdx) => (
-                                        <View key={optIdx} style={styles.optionRow}>
-                                            <Text style={optIdx === 0 ? styles.optionTagPrimary : styles.optionTagAlt}>
-                                                OPTION {optIdx + 1}:
-                                            </Text>
-                                            <Text style={styles.optionContent}>{opt}</Text>
-                                        </View>
-                                    ))}
-                                    {meal.notes ? (
-                                        <View style={styles.chefNoteContainer}>
-                                            <Text style={styles.chefNoteLabel}>NOTE:</Text>
-                                            <Text style={styles.chefNoteText}>{meal.notes}</Text>
-                                        </View>
-                                    ) : null}
-                                </View>
-                            </View>
-                        );
-                    })
-                ) : (
-                    <View style={[styles.mealCard, { padding: 12 }]}>
-                        <Text style={{ fontSize: 9, color: '#64748b' }}>No afternoon or evening meals specified.</Text>
-                    </View>
-                )}
-
                 {/* Prescribed Supplements Protocol */}
-                <View style={styles.supplementsCard}>
+                <View style={[styles.supplementsCard, { marginTop: 8 }]}>
                     <View style={styles.supplementsHeader}>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                             <Text style={styles.supplementsTitle}>Prescribed Daily Supplements Protocol</Text>
@@ -1410,10 +1651,10 @@ export default function DietPlanSeniorPdfDocument({ plan: rawPlan }) {
                             {supplements.map((supp, sIdx) => (
                                 <View
                                     key={sIdx}
-                                    style={[
-                                        styles.supplementPillCard,
-                                        supplements.length === 1 ? { width: '100%' } : null
-                                    ]}
+                                    style={{
+                                        ...styles.supplementPillCard,
+                                        ...(supplements.length === 1 ? { width: '100%' } : {})
+                                    }}
                                 >
                                     <View style={styles.supplementDot} />
                                     <View style={styles.supplementInfo}>
@@ -1433,6 +1674,55 @@ export default function DietPlanSeniorPdfDocument({ plan: rawPlan }) {
                         </Text>
                     )}
                 </View>
+
+                {/* Prescribed Movement & Mobility Regimen */}
+                {workouts.length > 0 && (
+                    <View style={styles.workoutCard} wrap={false}>
+                        <View style={styles.workoutHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <View style={styles.workoutIndicator} />
+                                <Text style={styles.workoutTitle}>Prescribed Movement & Mobility Regimen</Text>
+                            </View>
+                            <View style={styles.workoutBadge}>
+                                <Text style={styles.workoutBadgeText}>SENIOR MOBILITY & ACTIVITY</Text>
+                            </View>
+                        </View>
+
+                        <View style={styles.workoutTable}>
+                            <View style={styles.workoutTableHeaderRow}>
+                                <Text style={[styles.workoutTh, { width: '22%' }]}>DAY / ROUTINE</Text>
+                                <Text style={[styles.workoutTh, { width: '38%' }]}>EXERCISES / MOVEMENTS</Text>
+                                <Text style={[styles.workoutTh, { width: '24%' }]}>WALKING & ACTIVE TIME</Text>
+                                <Text style={[styles.workoutTh, { width: '16%' }]}>SAFETY NOTES</Text>
+                            </View>
+
+                            {workouts.map((w, wIdx) => (
+                                <View
+                                    key={wIdx}
+                                    style={{
+                                        ...styles.workoutTableRow,
+                                        ...(wIdx % 2 === 1 ? styles.workoutTableRowAlt : {}),
+                                        ...(wIdx === workouts.length - 1 ? { borderBottomWidth: 0 } : {})
+                                    }}
+                                >
+                                    <View style={{ width: '22%', paddingRight: 4 }}>
+                                        <Text style={styles.workoutDayName}>{w.day || `Day ${wIdx + 1}`}</Text>
+                                        {w.focus ? <Text style={styles.workoutDayFocus}>{w.focus}</Text> : null}
+                                    </View>
+                                    <View style={{ width: '38%', paddingRight: 4 }}>
+                                        <Text style={styles.workoutTextMain}>{w.exercises || '-'}</Text>
+                                    </View>
+                                    <View style={{ width: '24%', paddingRight: 4 }}>
+                                        <Text style={styles.workoutTextCardio}>{w.cardio || '-'}</Text>
+                                    </View>
+                                    <View style={{ width: '16%' }}>
+                                        <Text style={styles.workoutTextNotes}>{w.notes || '-'}</Text>
+                                    </View>
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+                )}
 
                 {/* Page 2 Footer */}
                 <View style={styles.footerContainer}>
@@ -1747,7 +2037,10 @@ export default function DietPlanSeniorPdfDocument({ plan: rawPlan }) {
                             return (
                                 <View
                                     key={rIdx}
-                                    style={[styles.recipeTableRow, isAlt ? styles.recipeTableRowAlt : null]}
+                                    style={{
+                                        ...styles.recipeTableRow,
+                                        ...(isAlt ? styles.recipeTableRowAlt : {})
+                                    }}
                                     wrap={false}
                                 >
                                     {/* Column 1: Dish & Macros */}

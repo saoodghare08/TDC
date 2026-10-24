@@ -86,9 +86,25 @@ export const cleanPlanData = (plan) => {
         protein: sanitizeVal(plan.protein, '-'),
         carbs: sanitizeVal(plan.carbs, '-'),
         fats: sanitizeVal(plan.fats, '-'),
+        fibre: sanitizeVal(plan.fibre, '-'),
         water: sanitizeVal(plan.water, '-'),
         sleep: sanitizeVal(plan.sleep, '-'),
         steps: sanitizeVal(plan.steps, '-'),
+
+        // Measurements
+        measurements: Array.isArray(plan.measurements)
+            ? plan.measurements
+                .filter(m => m && typeof m === 'object' && ['date', 'weight', 'belly_button', 'hip', 'thigh', 'neck', 'bicep'].some(k => m[k] && String(m[k]).trim() !== '' && String(m[k]).trim() !== '-'))
+                .map(m => ({
+                    date: sanitizeVal(m.date, '-'),
+                    weight: sanitizeVal(m.weight, '-'),
+                    belly_button: sanitizeVal(m.belly_button, '-'),
+                    hip: sanitizeVal(m.hip, '-'),
+                    thigh: sanitizeVal(m.thigh, '-'),
+                    neck: sanitizeVal(m.neck, '-'),
+                    bicep: sanitizeVal(m.bicep, '-'),
+                }))
+            : [],
 
         // Meals
         meals: Array.isArray(plan.meals)
@@ -101,18 +117,36 @@ export const cleanPlanData = (plan) => {
                 options: Array.isArray(meal?.options)
                     ? meal.options.map(opt => sanitizeVal(opt)).filter(Boolean)
                     : undefined,
+                optional: sanitizeVal(meal?.optional, ''),
                 notes: sanitizeVal(meal?.notes, ''),
             }))
             : [],
 
         // Supplements
         supplements: Array.isArray(plan.supplements)
-            ? plan.supplements.map(supp => ({
-                ...supp,
-                name: sanitizeVal(supp?.name, 'Supplement'),
-                dosage: sanitizeVal(supp?.dosage, ''),
-                timing: sanitizeVal(supp?.timing, ''),
-            }))
+            ? plan.supplements
+                .filter(supp => supp && typeof supp === 'object')
+                .map(supp => ({
+                    ...supp,
+                    name: sanitizeVal(supp?.name, 'Supplement'),
+                    dosage: sanitizeVal(supp?.dosage, ''),
+                    timing: sanitizeVal(supp?.timing, ''),
+                }))
+            : [],
+
+        // Workout Plans
+        workouts: Array.isArray(plan.workouts)
+            ? plan.workouts
+                .filter(w => w && typeof w === 'object')
+                .map(w => ({
+                    ...w,
+                    day: sanitizeVal(w?.day, ''),
+                    focus: sanitizeVal(w?.focus, ''),
+                    exercises: sanitizeVal(w?.exercises, ''),
+                    cardio: sanitizeVal(w?.cardio, ''),
+                    notes: sanitizeVal(w?.notes, ''),
+                }))
+                .filter(w => Boolean(w.day || w.focus || w.exercises || w.cardio || w.notes))
             : [],
 
         // Guidelines & Don'ts

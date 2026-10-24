@@ -9,7 +9,8 @@ import {
     Share2, Printer, RotateCcw, BookmarkPlus, Database,
     Info, Copy, ChefHat, Utensils, Search, X, Palette,
     ShieldAlert, ChevronDown, ChevronUp, Edit3, Undo2,
-    Maximize2, Minimize2, Check, ExternalLink, Sliders
+    Maximize2, Minimize2, Check, ExternalLink, Sliders,
+    Dumbbell, Activity
 } from 'lucide-react';
 import Link from 'next/link';
 import Swal from 'sweetalert2';
@@ -50,12 +51,15 @@ const EMPTY_FORM_STATE = {
     protein: '',
     carbs: '',
     fats: '',
+    fibre: '',
     water: '',
     steps: '',
+    measurements: [],
     dietitian_name: 'Dt. Sabah Ghare',
     dietitian_note: '',
     meals: [],
     supplements: [],
+    workouts: [],
     guidelines: [],
     donts: [],
     recipes: [],
@@ -81,11 +85,13 @@ export default function AdminPdfGeneratorPage() {
         presets: false,       // Presets (open by default, collapsible)
         profile: false,       // 1. Client Profile (open by default)
         targets: false,       // 2. Targets (open by default)
-        meals: false,         // 3. Meals (open by default)
-        supplements: true,    // 4. Supplements (collapsed by default)
-        special: true,        // 5. Special Directives (collapsed by default)
-        rules: true,          // 6. Rules (collapsed by default)
-        recipes: false        // 7. Recipes (open by default)
+        measurements: false,  // 3. Body Measurements (open by default)
+        meals: false,         // 4. Meals (open by default)
+        supplements: true,    // 5. Supplements (collapsed by default)
+        workouts: false,      // 6. Workouts (open by default)
+        special: true,        // 7. Special Directives (collapsed by default)
+        rules: true,          // 8. Rules (collapsed by default)
+        recipes: false        // 9. Recipes (open by default)
     });
 
     const toggleSection = (key) => {
@@ -97,8 +103,10 @@ export default function AdminPdfGeneratorPage() {
             presets: false,
             profile: false,
             targets: false,
+            measurements: false,
             meals: false,
             supplements: false,
+            workouts: false,
             special: false,
             rules: false,
             recipes: false
@@ -110,8 +118,10 @@ export default function AdminPdfGeneratorPage() {
             presets: true,
             profile: true,
             targets: true,
+            measurements: true,
             meals: true,
             supplements: true,
+            workouts: true,
             special: true,
             rules: true,
             recipes: true
@@ -258,12 +268,15 @@ export default function AdminPdfGeneratorPage() {
                     protein: template.protein || '',
                     carbs: template.carbs || '',
                     fats: template.fats || '',
+                    fibre: template.fibre || '',
                     water: template.water || '',
                     steps: template.steps || '',
+                    measurements: Array.isArray(template.measurements) ? JSON.parse(JSON.stringify(template.measurements)) : (prev.measurements || []),
                     dietitian_name: template.dietitian_name || prev.dietitian_name,
                     dietitian_note: template.dietitian_note || '',
                     meals: Array.isArray(template.meals) ? JSON.parse(JSON.stringify(template.meals)) : [],
                     supplements: Array.isArray(template.supplements) ? JSON.parse(JSON.stringify(template.supplements)) : [],
+                    workouts: Array.isArray(template.workouts) ? JSON.parse(JSON.stringify(template.workouts)) : [],
                     guidelines: Array.isArray(template.guidelines) ? JSON.parse(JSON.stringify(template.guidelines)) : [],
                     donts: Array.isArray(template.donts) ? JSON.parse(JSON.stringify(template.donts)) : [],
                     recipes: Array.isArray(template.recipes) ? JSON.parse(JSON.stringify(template.recipes)) : (prev.recipes || []),
@@ -339,12 +352,14 @@ export default function AdminPdfGeneratorPage() {
                     protein: formData.protein,
                     carbs: formData.carbs,
                     fats: formData.fats,
+                    fibre: formData.fibre,
                     water: formData.water,
                     steps: formData.steps,
                     dietitian_name: formData.dietitian_name,
                     dietitian_note: formData.dietitian_note,
                     meals: formData.meals,
                     supplements: formData.supplements,
+                    workouts: formData.workouts,
                     guidelines: formData.guidelines,
                     donts: formData.donts,
                     recipes: formData.recipes,
@@ -411,6 +426,51 @@ export default function AdminPdfGeneratorPage() {
             }
         });
     };
+
+    // ─── Measurements Helpers ───
+    const handleAddMeasurement = () => {
+        const today = new Date().toISOString().split('T')[0];
+        setFormData(prev => ({
+            ...prev,
+            measurements: [
+                ...(prev.measurements || []),
+                {
+                    date: today,
+                    weight: (prev.measurements && prev.measurements.length > 0)
+                        ? prev.measurements[prev.measurements.length - 1].weight || ''
+                        : (prev.start_weight || ''),
+                    belly_button: '',
+                    hip: '',
+                    thigh: '',
+                    neck: '',
+                    bicep: ''
+                }
+            ]
+        }));
+    };
+
+    const handleMeasurementChange = (index, field, value) => {
+        const updated = [...(formData.measurements || [])];
+        updated[index] = { ...updated[index], [field]: value };
+        setFormData(prev => ({ ...prev, measurements: updated }));
+    };
+
+    const handleRemoveMeasurement = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            measurements: (prev.measurements || []).filter((_, i) => i !== index)
+        }));
+    };
+
+    const handleClearMeasurements = () => {
+        setFormData(prev => ({ ...prev, measurements: [] }));
+    };
+
+    const activeMeasurementColsCount = useMemo(() => {
+        const rows = formData.measurements || [];
+        const cols = ['date', 'weight', 'belly_button', 'hip', 'thigh', 'neck', 'bicep'];
+        return cols.filter(c => rows.some(r => r && r[c] && String(r[c]).trim() !== '' && String(r[c]).trim() !== '-')).length;
+    }, [formData.measurements]);
 
     // ─── Meals Helpers ───
     const getMealOptions = (meal) => {
@@ -484,6 +544,7 @@ export default function AdminPdfGeneratorPage() {
             options: ['', ''],
             option1: '',
             option2: '',
+            optional: '',
             notes: ''
         };
         setFormData(prev => ({ ...prev, meals: [...prev.meals, newMeal] }));
@@ -496,23 +557,106 @@ export default function AdminPdfGeneratorPage() {
 
     // ─── Supplements Helpers ───
     const handleSuppChange = (index, field, value) => {
-        const updated = [...formData.supplements];
-        updated[index] = { ...updated[index], [field]: value };
-        setFormData(prev => ({ ...prev, supplements: updated }));
+        const updated = [...(formData.supplements || [])];
+        if (updated[index]) {
+            updated[index] = { ...updated[index], [field]: value };
+            setFormData(prev => ({ ...prev, supplements: updated }));
+        }
     };
 
     const handleAddSupp = () => {
         setFormData(prev => ({
             ...prev,
-            supplements: [...prev.supplements, { name: '', dosage: '', timing: 'Post-Meal' }]
+            supplements: [...(prev.supplements || []), { name: '', dosage: '', timing: 'Post-Meal' }]
         }));
     };
 
     const handleRemoveSupp = (index) => {
         setFormData(prev => ({
             ...prev,
-            supplements: prev.supplements.filter((_, i) => i !== index)
+            supplements: (prev.supplements || []).filter((_, i) => i !== index)
         }));
+    };
+
+    // ─── Workout Plan Helpers ───
+    const handleWorkoutChange = (index, field, value) => {
+        const updated = [...(formData.workouts || [])];
+        if (updated[index]) {
+            updated[index] = { ...updated[index], [field]: value };
+            setFormData(prev => ({ ...prev, workouts: updated }));
+        }
+    };
+
+    const handleAddWorkout = () => {
+        setFormData(prev => ({
+            ...prev,
+            workouts: [
+                ...(prev.workouts || []),
+                {
+                    day: `Day ${(prev.workouts?.length || 0) + 1}`,
+                    focus: '',
+                    exercises: '',
+                    cardio: '',
+                    notes: ''
+                }
+            ]
+        }));
+    };
+
+    const handleRemoveWorkout = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            workouts: (prev.workouts || []).filter((_, i) => i !== index)
+        }));
+    };
+
+    const handleApplyWorkoutPreset = (type) => {
+        let preset = [];
+        if (type === '3day') {
+            preset = [
+                {
+                    day: 'Day 1 (Mon)',
+                    focus: 'Upper Body & Core',
+                    exercises: 'Incline Push-ups (3x12), Dumbbell Rows (3x10), Plank (3x45s)',
+                    cardio: '20 min brisk walk (Zone 2) / 8,000 steps',
+                    notes: 'Rest 60s between sets, controlled tempo'
+                },
+                {
+                    day: 'Day 2 (Wed)',
+                    focus: 'Lower Body & Posture',
+                    exercises: 'Bodyweight Squats (3x15), Glute Bridges (3x12), Calf Raises (3x20)',
+                    cardio: '25 min brisk walk / 8,500 steps',
+                    notes: 'Keep core braced, full range of motion'
+                },
+                {
+                    day: 'Day 3 (Fri)',
+                    focus: 'Full Body & Functional Mobility',
+                    exercises: 'Walking Lunges (3x10/side), Wall Angels (3x12), Deadbug (3x10/side)',
+                    cardio: '30 min brisk walk / 10,000 steps',
+                    notes: 'Dynamic warm-up and deep hamstring stretches'
+                }
+            ];
+        } else if (type === 'cardio') {
+            preset = [
+                {
+                    day: 'Mon / Wed / Fri',
+                    focus: 'Zone-2 Steady State Cardio',
+                    exercises: 'Incline treadmill walk or outdoor brisk walking',
+                    cardio: '35-45 min continuous pace @ 110-125 bpm',
+                    notes: 'Nasal breathing pace, hydrate before & after'
+                },
+                {
+                    day: 'Tue / Thu / Sat',
+                    focus: 'Mobility, Core & Active Steps',
+                    exercises: 'Cat-Cow (3x10), Bird-Dog (3x10), Hip Flexor Stretch (60s)',
+                    cardio: 'Daily 10,000 cumulative steps',
+                    notes: 'Post-meal 10-min walks recommended'
+                }
+            ];
+        } else if (type === 'clear') {
+            preset = [];
+        }
+        setFormData(prev => ({ ...prev, workouts: preset }));
     };
 
     // ─── Guidelines Helpers ───
@@ -1194,8 +1338,8 @@ export default function AdminPdfGeneratorPage() {
                                             </h3>
                                             <p className="text-[11px] text-para line-clamp-1">
                                                 {formData.calories
-                                                    ? `${formData.calories} kcal • P: ${formData.protein || '—'} • C: ${formData.carbs || '—'} • F: ${formData.fats || '—'} • ${formData.water || '—'}L Water`
-                                                    : 'Calories, Protein, Carbs, Fats, Water and Step goals'}
+                                                    ? `${formData.calories} kcal • P: ${formData.protein || '—'} • C: ${formData.carbs || '—'} • F: ${formData.fats || '—'}${formData.fibre ? ` • Fib: ${formData.fibre}` : ''} • ${formData.water || '—'}L Water`
+                                                    : 'Calories, Protein, Carbs, Fats, Fibre, Water and Step goals'}
                                             </p>
                                         </div>
                                     </div>
@@ -1206,7 +1350,7 @@ export default function AdminPdfGeneratorPage() {
 
                                 {!collapsed.targets && (
                                     <div className="p-4 sm:p-5">
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2.5">
                                             <div>
                                                 <label className="block text-[11px] font-semibold text-gray-600 mb-1">Calories (kcal)</label>
                                                 <input
@@ -1248,6 +1392,16 @@ export default function AdminPdfGeneratorPage() {
                                                 />
                                             </div>
                                             <div>
+                                                <label className="block text-[11px] font-semibold text-gray-600 mb-1">Fibre (g)</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.fibre}
+                                                    onChange={(e) => setFormData({ ...formData, fibre: e.target.value })}
+                                                    placeholder="e.g. 30g"
+                                                    className="w-full text-xs font-semibold px-2.5 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20"
+                                                />
+                                            </div>
+                                            <div>
                                                 <label className="block text-[11px] font-semibold text-gray-600 mb-1">Water (Litres)</label>
                                                 <input
                                                     type="text"
@@ -1272,7 +1426,236 @@ export default function AdminPdfGeneratorPage() {
                                 )}
                             </div>
 
-                            {/* ── SECTION 3: Daily Meal Schedule Blueprint ──────────────── */}
+                            {/* ── SECTION 3: Body Measurements & Progress Tracker ────────── */}
+                            <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden transition">
+                                <div
+                                    onClick={() => toggleSection('measurements')}
+                                    className="p-4 sm:p-4.5 flex items-center justify-between cursor-pointer hover:bg-gray-50/60 select-none border-b border-gray-100"
+                                >
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0">
+                                            <Scale size={15} />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h3 className="font-bold text-xs sm:text-sm text-heading flex items-center gap-2 truncate">
+                                                <span>3. Body Measurements</span>
+                                                <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.2 rounded-full shrink-0">
+                                                    {(formData.measurements || []).length} Records
+                                                </span>
+                                                {activeMeasurementColsCount > 0 && (
+                                                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.2 rounded-full shrink-0 hidden sm:inline-block">
+                                                        {activeMeasurementColsCount} Active Cols in PDF
+                                                    </span>
+                                                )}
+                                            </h3>
+                                            <p className="text-[11px] text-para truncate">
+                                                {(formData.measurements || []).length > 0
+                                                    ? `${(formData.measurements || []).length} checkpoint(s) logged • Dynamic PDF columns auto-format`
+                                                    : 'Track weight, belly button, hip, thigh, neck, bicep circumferences over time'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleAddMeasurement();
+                                                if (collapsed.measurements) toggleSection('measurements');
+                                            }}
+                                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary/10 hover:bg-primary/20 text-primary text-xs font-semibold rounded-lg transition cursor-pointer"
+                                        >
+                                            <Plus size={13} />
+                                        </button>
+                                        <span className="text-gray-400">
+                                            {collapsed.measurements ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {!collapsed.measurements && (
+                                    <div className="p-3.5 sm:p-5 space-y-3">
+                                        {(formData.measurements || []).length === 0 ? (
+                                            <div className="text-center py-7 px-4 rounded-xl border border-dashed border-gray-200 bg-gray-50/50">
+                                                <Scale className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                                                <p className="text-xs font-semibold text-gray-600 mb-1">No Measurement Checkpoints Logged Yet</p>
+                                                <p className="text-[11px] text-gray-400 max-w-md mx-auto mb-3">
+                                                    Record periodic client measurements (weight, belly button, hip, thigh, neck, bicep). Only columns with entered values will appear on the generated PDF.
+                                                </p>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAddMeasurement}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white text-xs font-semibold rounded-xl hover:bg-primary/90 transition shadow-xs cursor-pointer"
+                                                >
+                                                    <Plus size={13} />
+                                                    <span>Add First Measurement Row</span>
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-2xs">
+                                                    <table className="w-full text-left text-xs border-collapse">
+                                                        <thead>
+                                                            <tr className="bg-gray-50 text-[11px] font-bold text-gray-700 border-b border-gray-200">
+                                                                <th className="py-2.5 px-3 w-10 text-center">#</th>
+                                                                <th className="py-2.5 px-3 min-w-[130px]">
+                                                                    <div className="flex items-center gap-1">
+                                                                        <span>Date</span>
+                                                                    </div>
+                                                                </th>
+                                                                <th className="py-2.5 px-2.5 min-w-[105px]">
+                                                                    <div className="flex items-center gap-1">
+                                                                        <span>Weight</span>
+                                                                        <span className="text-[10px] text-gray-400 font-normal">(kg)</span>
+                                                                    </div>
+                                                                </th>
+                                                                <th className="py-2.5 px-2.5 min-w-[115px]">
+                                                                    <div className="flex items-center gap-1">
+                                                                        <span>Belly Button</span>
+                                                                        <span className="text-[10px] text-gray-400 font-normal">(in/cm)</span>
+                                                                    </div>
+                                                                </th>
+                                                                <th className="py-2.5 px-2.5 min-w-[105px]">
+                                                                    <div className="flex items-center gap-1">
+                                                                        <span>Hip</span>
+                                                                        <span className="text-[10px] text-gray-400 font-normal">(in/cm)</span>
+                                                                    </div>
+                                                                </th>
+                                                                <th className="py-2.5 px-2.5 min-w-[105px]">
+                                                                    <div className="flex items-center gap-1">
+                                                                        <span>Thigh</span>
+                                                                        <span className="text-[10px] text-gray-400 font-normal">(in/cm)</span>
+                                                                    </div>
+                                                                </th>
+                                                                <th className="py-2.5 px-2.5 min-w-[105px]">
+                                                                    <div className="flex items-center gap-1">
+                                                                        <span>Neck</span>
+                                                                        <span className="text-[10px] text-gray-400 font-normal">(in/cm)</span>
+                                                                    </div>
+                                                                </th>
+                                                                <th className="py-2.5 px-2.5 min-w-[105px]">
+                                                                    <div className="flex items-center gap-1">
+                                                                        <span>Bicep</span>
+                                                                        <span className="text-[10px] text-gray-400 font-normal">(in/cm)</span>
+                                                                    </div>
+                                                                </th>
+                                                                <th className="py-2.5 px-2 w-10 text-center"></th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-gray-100 bg-white">
+                                                            {formData.measurements.map((row, idx) => (
+                                                                <tr key={idx} className="hover:bg-gray-50/60 transition">
+                                                                    <td className="py-2 px-2 text-center text-gray-400 font-bold text-[11px]">
+                                                                        {idx + 1}
+                                                                    </td>
+                                                                    <td className="py-2 px-2">
+                                                                        <input
+                                                                            type="date"
+                                                                            value={row.date || ''}
+                                                                            onChange={(e) => handleMeasurementChange(idx, 'date', e.target.value)}
+                                                                            className="w-full text-xs px-2 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-primary/30 font-medium bg-white"
+                                                                        />
+                                                                    </td>
+                                                                    <td className="py-2 px-2">
+                                                                        <input
+                                                                            type="text"
+                                                                            value={row.weight || ''}
+                                                                            onChange={(e) => handleMeasurementChange(idx, 'weight', e.target.value)}
+                                                                            placeholder="e.g. 68.5 kg"
+                                                                            className="w-full text-xs px-2 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-primary/30 font-semibold text-emerald-800 bg-white"
+                                                                        />
+                                                                    </td>
+                                                                    <td className="py-2 px-2">
+                                                                        <input
+                                                                            type="text"
+                                                                            value={row.belly_button || ''}
+                                                                            onChange={(e) => handleMeasurementChange(idx, 'belly_button', e.target.value)}
+                                                                            placeholder="e.g. 34 in"
+                                                                            className="w-full text-xs px-2 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-primary/30 bg-white"
+                                                                        />
+                                                                    </td>
+                                                                    <td className="py-2 px-2">
+                                                                        <input
+                                                                            type="text"
+                                                                            value={row.hip || ''}
+                                                                            onChange={(e) => handleMeasurementChange(idx, 'hip', e.target.value)}
+                                                                            placeholder="e.g. 38 in"
+                                                                            className="w-full text-xs px-2 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-primary/30 bg-white"
+                                                                        />
+                                                                    </td>
+                                                                    <td className="py-2 px-2">
+                                                                        <input
+                                                                            type="text"
+                                                                            value={row.thigh || ''}
+                                                                            onChange={(e) => handleMeasurementChange(idx, 'thigh', e.target.value)}
+                                                                            placeholder="e.g. 22 in"
+                                                                            className="w-full text-xs px-2 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-primary/30 bg-white"
+                                                                        />
+                                                                    </td>
+                                                                    <td className="py-2 px-2">
+                                                                        <input
+                                                                            type="text"
+                                                                            value={row.neck || ''}
+                                                                            onChange={(e) => handleMeasurementChange(idx, 'neck', e.target.value)}
+                                                                            placeholder="e.g. 14 in"
+                                                                            className="w-full text-xs px-2 py-1.5 rounded-lg border border-gray-200 focus:ring-1 focus:ring-primary/30 bg-white"
+                                                                        />
+                                                                    </td>
+                                                                    <td className="py-2 px-2">
+                                                                        <input
+                                                                            type="text"
+                                                                            value={row.bicep || ''}
+                                                                            onChange={(e) => handleMeasurementChange(idx, 'bicep', e.target.value)}
+                                                                            placeholder="e.g. 12 in"
+                                                                            className="w-full text-xs px-2 py-1.5 rounded-lg border border-gray-200 focus:ring-1 focus:ring-primary/30 bg-white"
+                                                                        />
+                                                                    </td>
+                                                                    <td className="py-2 px-2 text-center">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleRemoveMeasurement(idx)}
+                                                                            className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg cursor-pointer transition"
+                                                                            title="Delete Row"
+                                                                        >
+                                                                            <Trash2 size={13} />
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+
+                                                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] text-gray-500">
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleAddMeasurement}
+                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold rounded-xl transition cursor-pointer text-xs"
+                                                        >
+                                                            <Plus size={13} />
+                                                            <span>Add Next Checkpoint</span>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleClearMeasurements}
+                                                            className="text-gray-400 hover:text-red-500 hover:underline px-2 py-1 cursor-pointer"
+                                                        >
+                                                            Clear All Rows
+                                                        </button>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 text-gray-400 text-[11px]">
+                                                        <Info size={12} className="text-primary shrink-0" />
+                                                        <span>Dynamic columns: only columns with entered data appear in the PDF report.</span>
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* ── SECTION 4: Daily Meal Schedule Blueprint ──────────────── */}
                             <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden transition">
                                 <div
                                     onClick={() => toggleSection('meals')}
@@ -1284,7 +1667,7 @@ export default function AdminPdfGeneratorPage() {
                                         </div>
                                         <div>
                                             <h3 className="font-bold text-xs sm:text-sm text-heading flex items-center gap-2">
-                                                <span>3. Daily Meal Blueprint</span>
+                                                <span>4. Daily Meal Schedule Blueprint</span>
                                                 <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.2 rounded-full">
                                                     {formData.meals.length} Slots
                                                 </span>
@@ -1406,14 +1789,44 @@ export default function AdminPdfGeneratorPage() {
                                                             </button>
                                                         </div>
 
-                                                        <div>
-                                                            <input
-                                                                type="text"
-                                                                value={meal.notes || ''}
-                                                                onChange={(e) => handleMealChange(index, 'notes', e.target.value)}
-                                                                placeholder="Chef Note (e.g. Cook with 1/2 tsp ghee; chew thoroughly)"
-                                                                className="w-full text-xs px-2.5 py-1 rounded-lg border border-gray-200/80 bg-white/70 focus:bg-white text-para"
-                                                            />
+                                                        <div className="space-y-1.5 pt-1">
+                                                            <div className="relative">
+                                                                <div className="flex items-center justify-between mb-0.5">
+                                                                    <label className="text-[10px] font-bold uppercase text-purple-700 flex items-center gap-1">
+                                                                        <span>Optional Dish (Add-on)</span>
+                                                                        <span className="text-[9px] font-normal text-gray-400 normal-case">(client can choose to have or skip in addition to options)</span>
+                                                                    </label>
+                                                                    {meal.optional && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleMealChange(index, 'optional', '')}
+                                                                            className="text-[10px] text-gray-400 hover:text-red-500 cursor-pointer"
+                                                                        >
+                                                                            Clear
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                                <input
+                                                                    type="text"
+                                                                    value={meal.optional || ''}
+                                                                    onChange={(e) => handleMealChange(index, 'optional', e.target.value)}
+                                                                    placeholder="e.g. 1 Boiled Egg / 1 Bowl Cucumber Salad (optional add-on)"
+                                                                    className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-purple-200/80 bg-purple-50/20 focus:bg-white focus:border-purple-400 text-purple-950 placeholder:text-gray-400 transition"
+                                                                />
+                                                            </div>
+
+                                                            <div>
+                                                                <label className="text-[10px] font-bold uppercase text-gray-500 mb-0.5 block">
+                                                                    Chef Note / Preparation
+                                                                </label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={meal.notes || ''}
+                                                                    onChange={(e) => handleMealChange(index, 'notes', e.target.value)}
+                                                                    placeholder="Chef Note (e.g. Cook with 1/2 tsp ghee; chew thoroughly)"
+                                                                    className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white text-para placeholder:text-gray-400 focus:border-primary transition"
+                                                                />
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1423,7 +1836,7 @@ export default function AdminPdfGeneratorPage() {
                                 )}
                             </div>
 
-                            {/* ── SECTION 4: Prescribed Supplements ─────────────────────── */}
+
                             <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden transition">
                                 <div
                                     onClick={() => toggleSection('supplements')}
@@ -1435,7 +1848,7 @@ export default function AdminPdfGeneratorPage() {
                                         </div>
                                         <div className="min-w-0">
                                             <h3 className="font-bold text-xs sm:text-sm text-heading flex items-center gap-1.5 whitespace-nowrap">
-                                                <span>4. Supplements</span>
+                                                <span>5. Supplements</span>
                                                 <span className="text-[10px] bg-teal-50 text-teal-800 border border-teal-200 font-bold px-1.5 py-0.2 rounded-full shrink-0">
                                                     {formData.supplements.length}
                                                 </span>
@@ -1526,7 +1939,168 @@ export default function AdminPdfGeneratorPage() {
                                 )}
                             </div>
 
-                            {/* ── SECTION 5: Special Clinical Directives (Edge-Case Page) ── */}
+                            {/* ── SECTION 6: Prescribed Workout Regimen ───────────────────────── */}
+                            <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden transition">
+                                <div
+                                    onClick={() => toggleSection('workouts')}
+                                    className="p-3.5 sm:p-4.5 flex items-center justify-between cursor-pointer hover:bg-gray-50/60 select-none border-b border-gray-100 gap-2"
+                                >
+                                    <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                                        <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xs shrink-0">
+                                            <Dumbbell size={15} />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h3 className="font-bold text-xs sm:text-sm text-heading flex items-center gap-1.5 whitespace-nowrap">
+                                                <span>6. Workout & Movement Regimen</span>
+                                                <span className="text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold px-1.5 py-0.2 rounded-full shrink-0">
+                                                    {formData.workouts?.length || 0}
+                                                </span>
+                                            </h3>
+                                            <p className="text-[11px] text-para line-clamp-1 truncate">
+                                                {formData.workouts && formData.workouts.length > 0
+                                                    ? formData.workouts.map(w => w.day || 'Day').join(', ')
+                                                    : 'Day-by-day split, exercises, cardio & notes'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleAddWorkout();
+                                                if (collapsed.workouts) toggleSection('workouts');
+                                            }}
+                                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold rounded-lg transition cursor-pointer hover:bg-emerald-100"
+                                        >
+                                            <Plus size={13} />
+                                            <span className="hidden sm:inline">Add Day</span>
+                                        </button>
+                                        <span className="text-gray-400">
+                                            {collapsed.workouts ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {!collapsed.workouts && (
+                                    <div className="p-3.5 sm:p-5 space-y-3">
+                                        {/* Quick Presets Bar */}
+                                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-gray-100">
+                                            <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                                                Quick Presets:
+                                            </span>
+                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleApplyWorkoutPreset('3day')}
+                                                    className="px-2 py-0.5 text-[11px] bg-gray-100 hover:bg-emerald-50 hover:text-emerald-700 text-gray-700 rounded-md font-medium transition cursor-pointer"
+                                                >
+                                                    3-Day Split
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleApplyWorkoutPreset('cardio')}
+                                                    className="px-2 py-0.5 text-[11px] bg-gray-100 hover:bg-emerald-50 hover:text-emerald-700 text-gray-700 rounded-md font-medium transition cursor-pointer"
+                                                >
+                                                    Cardio & Steps
+                                                </button>
+                                                {formData.workouts && formData.workouts.length > 0 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleApplyWorkoutPreset('clear')}
+                                                        className="px-2 py-0.5 text-[11px] bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-md font-medium transition cursor-pointer"
+                                                    >
+                                                        Clear
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Workout Days List */}
+                                        {(!formData.workouts || formData.workouts.length === 0) ? (
+                                            <div className="py-6 px-4 border border-dashed border-gray-200 rounded-xl bg-gray-50/70 text-center space-y-2">
+                                                <p className="text-xs text-gray-500">No workout routine prescribed yet.</p>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAddWorkout}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 text-xs font-medium text-gray-700 rounded-lg hover:border-emerald-500 hover:text-emerald-700 transition shadow-xs cursor-pointer"
+                                                >
+                                                    <Plus size={13} />
+                                                    Add Workout Day
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            formData.workouts.map((workout, wIdx) => (
+                                                <div
+                                                    key={wIdx}
+                                                    className="p-3 sm:p-3.5 rounded-xl border border-gray-200/90 bg-gray-50/40 hover:bg-white hover:border-emerald-200 transition space-y-2.5 shadow-2xs"
+                                                >
+                                                    {/* Header: Day/Split + Focus + Remove */}
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-1/3 min-w-[120px]">
+                                                            <input
+                                                                type="text"
+                                                                value={workout.day}
+                                                                onChange={(e) => handleWorkoutChange(wIdx, 'day', e.target.value)}
+                                                                placeholder="Day (e.g. Day 1 (Mon))"
+                                                                className="w-full text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-gray-200 focus:ring-1 focus:ring-primary/20 bg-white"
+                                                            />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <input
+                                                                type="text"
+                                                                value={workout.focus}
+                                                                onChange={(e) => handleWorkoutChange(wIdx, 'focus', e.target.value)}
+                                                                placeholder="Focus (e.g. Upper Body & Core)"
+                                                                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 focus:ring-1 focus:ring-primary/20 bg-white"
+                                                            />
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveWorkout(wIdx)}
+                                                            className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg cursor-pointer transition shrink-0"
+                                                            title="Delete Workout Day"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+
+                                                    {/* Exercises / Routine Textarea/Input */}
+                                                    <div>
+                                                        <input
+                                                            type="text"
+                                                            value={workout.exercises}
+                                                            onChange={(e) => handleWorkoutChange(wIdx, 'exercises', e.target.value)}
+                                                            placeholder="Exercises (e.g. Push-ups 3x12, DB Rows 3x10, Plank 3x45s)"
+                                                            className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 focus:ring-1 focus:ring-primary/20 bg-white"
+                                                        />
+                                                    </div>
+
+                                                    {/* Cardio & Steps + Directives / Notes */}
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                        <input
+                                                            type="text"
+                                                            value={workout.cardio}
+                                                            onChange={(e) => handleWorkoutChange(wIdx, 'cardio', e.target.value)}
+                                                            placeholder="Cardio & Steps (e.g. 20m brisk walk / 8k steps)"
+                                                            className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 focus:ring-1 focus:ring-primary/20 bg-white"
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            value={workout.notes}
+                                                            onChange={(e) => handleWorkoutChange(wIdx, 'notes', e.target.value)}
+                                                            placeholder="Notes / Rest (e.g. Rest 60s, stay hydrated)"
+                                                            className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 focus:ring-1 focus:ring-primary/20 bg-white"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* ── SECTION 7: Special Clinical Directives (Edge-Case Page) ── */}
                             <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden transition">
                                 <div
                                     onClick={() => toggleSection('special')}
@@ -1538,7 +2112,7 @@ export default function AdminPdfGeneratorPage() {
                                         </div>
                                         <div className="min-w-0">
                                             <h3 className="font-bold text-xs sm:text-sm text-heading flex items-center gap-1.5 whitespace-nowrap">
-                                                <span>5. Special Directives</span>
+                                                <span>7. Special Directives</span>
                                             </h3>
                                             <p className="text-[11px] text-para line-clamp-1 truncate">
                                                 {formData.show_special_instructions
@@ -1679,7 +2253,7 @@ export default function AdminPdfGeneratorPage() {
                                 )}
                             </div>
 
-                            {/* ── SECTION 6: Rules, Don'ts & Personal Note ────────── */}
+                            {/* ── SECTION 8: Rules, Don'ts & Personal Note ────────── */}
                             <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden transition">
                                 <div
                                     onClick={() => toggleSection('rules')}
@@ -1691,7 +2265,7 @@ export default function AdminPdfGeneratorPage() {
                                         </div>
                                         <div className="min-w-0">
                                             <h3 className="font-bold text-xs sm:text-sm text-heading flex items-center gap-1.5 whitespace-nowrap">
-                                                <span>6. Rules & Notes</span>
+                                                <span>8. Rules & Notes</span>
                                                 <span className="text-[10px] bg-indigo-50 text-indigo-800 border border-indigo-200 font-bold px-1.5 py-0.2 rounded-full shrink-0">
                                                     {formData.guidelines.length} Do&apos;s • {formData.donts.length} Don&apos;ts
                                                 </span>
@@ -1801,7 +2375,7 @@ export default function AdminPdfGeneratorPage() {
                                 )}
                             </div>
 
-                            {/* ── SECTION 7: Attached Clinical Recipe Annexure ─────────── */}
+                            {/* ── SECTION 9: Attached Clinical Recipe Annexure ─────────── */}
                             <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden transition">
                                 <div
                                     onClick={() => toggleSection('recipes')}
@@ -1813,7 +2387,7 @@ export default function AdminPdfGeneratorPage() {
                                         </div>
                                         <div className="min-w-0">
                                             <h3 className="font-bold text-xs sm:text-sm text-heading flex items-center gap-2 truncate">
-                                                <span className="truncate">7. Attached Recipes</span>
+                                                <span className="truncate">9. Attached Recipes</span>
                                                 <span className="text-[10px] bg-primary/10 text-primary font-bold px-2 py-0.2 rounded-full shrink-0">
                                                     {formData.recipes?.length || 0} Attached
                                                 </span>

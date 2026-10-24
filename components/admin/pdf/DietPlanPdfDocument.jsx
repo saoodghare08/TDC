@@ -152,6 +152,7 @@ const styles = StyleSheet.create({
         marginBottom: 14,
     },
     targetItem: {
+        flex: 1,
         alignItems: 'center',
     },
     targetLabel: {
@@ -247,6 +248,12 @@ const styles = StyleSheet.create({
         fontSize: 7,
         fontFamily: 'Helvetica-Bold',
         color: '#d97706',
+        width: 52,
+    },
+    optionTagOptional: {
+        fontSize: 7,
+        fontFamily: 'Helvetica-Bold',
+        color: '#7c3aed',
         width: 52,
     },
     optionContent: {
@@ -373,6 +380,115 @@ const styles = StyleSheet.create({
         color: '#94a3b8',
         fontStyle: 'italic',
         paddingVertical: 2,
+    },
+
+    // Prescribed Workout Regimen Table Card
+    workoutCard: {
+        backgroundColor: '#ffffff',
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        borderLeftWidth: 3,
+        borderLeftColor: '#0d9488',
+        padding: 5,
+        paddingHorizontal: 6,
+        marginTop: 6,
+    },
+    workoutHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 3,
+        paddingBottom: 2.5,
+        borderBottomWidth: 0.5,
+        borderBottomColor: '#f1f5f9',
+    },
+    workoutIndicator: {
+        width: 4.5,
+        height: 4.5,
+        borderRadius: 2.25,
+        backgroundColor: '#0d9488',
+        marginRight: 4,
+    },
+    workoutTitle: {
+        fontSize: 7.2,
+        fontFamily: 'Helvetica-Bold',
+        color: '#000a2d',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+    },
+    workoutBadge: {
+        backgroundColor: '#f0fdfa',
+        borderWidth: 0.5,
+        borderColor: '#99f6e4',
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 3,
+    },
+    workoutBadgeText: {
+        fontSize: 5.5,
+        fontFamily: 'Helvetica-Bold',
+        color: '#0f766e',
+        textTransform: 'uppercase',
+    },
+    workoutTable: {
+        width: '100%',
+        borderRadius: 4,
+        borderWidth: 0.5,
+        borderColor: '#e2e8f0',
+        overflow: 'hidden',
+    },
+    workoutTableHeaderRow: {
+        flexDirection: 'row',
+        backgroundColor: '#f8fafc',
+        borderBottomWidth: 0.5,
+        borderBottomColor: '#cbd5e1',
+        paddingVertical: 2.5,
+        paddingHorizontal: 4,
+    },
+    workoutTh: {
+        fontSize: 5.6,
+        fontFamily: 'Helvetica-Bold',
+        color: '#475569',
+        letterSpacing: 0.3,
+    },
+    workoutTableRow: {
+        flexDirection: 'row',
+        paddingVertical: 3,
+        paddingHorizontal: 4,
+        borderBottomWidth: 0.5,
+        borderBottomColor: '#f1f5f9',
+        backgroundColor: '#ffffff',
+    },
+    workoutTableRowAlt: {
+        backgroundColor: '#fbfcfd',
+    },
+    workoutDayName: {
+        fontSize: 6.5,
+        fontFamily: 'Helvetica-Bold',
+        color: '#0f172a',
+    },
+    workoutDayFocus: {
+        fontSize: 5.5,
+        color: '#0d9488',
+        fontFamily: 'Helvetica-Bold',
+        marginTop: 0.5,
+    },
+    workoutTextMain: {
+        fontSize: 6,
+        color: '#334155',
+        lineHeight: 1.25,
+    },
+    workoutTextCardio: {
+        fontSize: 5.8,
+        color: '#0369a1',
+        lineHeight: 1.2,
+    },
+    workoutTextNotes: {
+        fontSize: 5.6,
+        color: '#64748b',
+        fontStyle: 'italic',
+        lineHeight: 1.2,
     },
 
     // Unified Guidelines & Food Restrictions Section
@@ -555,6 +671,83 @@ const styles = StyleSheet.create({
         fontSize: 5.6,
         color: '#64748b',
         lineHeight: 1.25,
+    },
+
+    // ─── Body Measurements Table ───
+    measurementsCard: {
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#cbd5e1',
+        backgroundColor: '#ffffff',
+        marginBottom: 8,
+        overflow: 'hidden',
+    },
+    measurementsHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f8fafc',
+        paddingVertical: 3.5,
+        paddingHorizontal: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e2e8f0',
+    },
+    measurementsIndicator: {
+        width: 3,
+        height: 9,
+        backgroundColor: '#2d6a4f',
+        borderRadius: 1.5,
+        marginRight: 6,
+    },
+    measurementsTitle: {
+        fontSize: 8,
+        fontFamily: 'Helvetica-Bold',
+        color: '#0f172a',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+    },
+    measurementsTable: {
+        width: '100%',
+    },
+    measurementsTableHeaderRow: {
+        flexDirection: 'row',
+        backgroundColor: '#2d6a4f',
+    },
+    measurementsTableHeaderCol: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 3.5,
+        paddingHorizontal: 3,
+        borderRightWidth: 0.5,
+        borderRightColor: 'rgba(255,255,255,0.2)',
+    },
+    measurementsTableHeaderText: {
+        fontSize: 7,
+        fontFamily: 'Helvetica-Bold',
+        color: '#ffffff',
+        textTransform: 'uppercase',
+        textAlign: 'center',
+    },
+    measurementsTableRow: {
+        flexDirection: 'row',
+        borderBottomWidth: 0.5,
+        borderBottomColor: '#e2e8f0',
+        backgroundColor: '#ffffff',
+    },
+    measurementsTableRowAlt: {
+        backgroundColor: '#f8fafc',
+    },
+    measurementsTableCol: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 3,
+        paddingHorizontal: 3,
+        borderRightWidth: 0.5,
+        borderRightColor: '#f1f5f9',
+    },
+    measurementsTableCellText: {
+        fontSize: 7.5,
+        color: '#1e293b',
+        textAlign: 'center',
     },
 
     // ─── Recipe Annexure Table (Page 3) ───
@@ -1016,14 +1209,30 @@ export default function DietPlanPdfDocument({ plan: rawPlan, theme }) {
         return <DietPlanSeniorPdfDocument plan={plan} />;
     }
 
+    const rawMeasurements = Array.isArray(plan?.measurements) ? plan.measurements : [];
+    const ALL_MEASUREMENT_COLS = [
+        { key: 'date', label: 'Date' },
+        { key: 'weight', label: 'Weight' },
+        { key: 'belly_button', label: 'Belly Button' },
+        { key: 'hip', label: 'Hip' },
+        { key: 'thigh', label: 'Thigh' },
+        { key: 'neck', label: 'Neck' },
+        { key: 'bicep', label: 'Bicep' },
+    ];
+    // Dynamic columns: only columns that have data in at least one row
+    const activeMeasurementCols = ALL_MEASUREMENT_COLS.filter(col =>
+        rawMeasurements.some(m => m && m[col.key] && String(m[col.key]).trim() !== '' && String(m[col.key]).trim() !== '-')
+    );
+    // Rows that have at least one non-empty value in active columns
+    const validMeasurementRows = rawMeasurements.filter(m =>
+        m && activeMeasurementCols.some(col => m[col.key] && String(m[col.key]).trim() !== '' && String(m[col.key]).trim() !== '-')
+    );
+    const hasMeasurements = activeMeasurementCols.length > 0 && validMeasurementRows.length > 0;
+
     const meals = plan?.meals || [];
-    // Split meals cleanly across 2 pages:
-    // Page 1: First 4 meals (Early Morning, Breakfast, Mid-Morning, Lunch)
-    // Page 2: Remaining meals (Evening Snack, Dinner, Bedtime) + Guidelines + Supplements
-    const page1Meals = meals.slice(0, 4);
-    const page2Meals = meals.slice(4);
 
     const supplements = Array.isArray(plan?.supplements) ? plan.supplements : [];
+    const workouts = Array.isArray(plan?.workouts) ? plan.workouts : [];
     const guidelines = ensureList(plan?.guidelines);
     const donts = ensureList(plan?.donts);
     const attachedRecipes = Array.isArray(plan?.recipes)
@@ -1043,6 +1252,16 @@ export default function DietPlanPdfDocument({ plan: rawPlan, theme }) {
         .split('\n')
         .map(line => line.trim())
         .filter(Boolean);
+
+    const targetItems = [
+        (plan?.calories && plan?.calories !== '-') ? { label: 'Daily Calories', value: formatTarget(plan?.calories, 'kcal') } : null,
+        (plan?.protein && plan?.protein !== '-') ? { label: 'Protein', value: formatTarget(plan?.protein, 'g') } : null,
+        (plan?.carbs && plan?.carbs !== '-') ? { label: 'Carbohydrates', value: formatTarget(plan?.carbs, 'g') } : null,
+        (plan?.fats && plan?.fats !== '-') ? { label: 'Healthy Fats', value: formatTarget(plan?.fats, 'g') } : null,
+        (plan?.fibre && plan?.fibre !== '-') ? { label: 'Dietary Fibre', value: formatTarget(plan?.fibre, 'g') } : null,
+        (plan?.water && plan?.water !== '-') ? { label: 'Water Target', value: formatTarget(plan?.water, 'L') } : null,
+        (plan?.steps && plan?.steps !== '-') ? { label: 'Daily Steps', value: String(plan.steps) } : null,
+    ].filter(Boolean);
 
     const renderedInstructions = instructionLines.length > 0 ? (
         instructionLines.map((line, lIdx) => {
@@ -1148,7 +1367,7 @@ export default function DietPlanPdfDocument({ plan: rawPlan, theme }) {
                     {/* Row 2: Targets, Habits & Contact */}
                     <View style={[styles.clientGrid, { marginTop: 3 }]}>
                         <View style={styles.clientCol4}>
-                            <Text style={styles.infoLabel}>Target Weight</Text>
+                            <Text style={styles.infoLabel}>Ideal Body Weight(IBW)</Text>
                             <Text style={[styles.infoValue, { color: '#2d6a4f' }]}>
                                 {plan?.target_weight ? `${plan.target_weight}${String(plan.target_weight).toLowerCase().includes('kg') ? '' : ' kg'}` : '-'}
                             </Text>
@@ -1187,48 +1406,87 @@ export default function DietPlanPdfDocument({ plan: rawPlan, theme }) {
                 </View>
 
                 {/* Daily Targets Banner */}
-                <View style={styles.targetsCard}>
-                    <View style={styles.targetItem}>
-                        <Text style={styles.targetLabel}>Daily Calories</Text>
-                        <Text style={styles.targetValue}>{formatTarget(plan?.calories, 'kcal')}</Text>
+                {targetItems.length > 0 ? (
+                    <View style={styles.targetsCard}>
+                        {targetItems.map((target, idx) => (
+                            <React.Fragment key={idx}>
+                                {idx > 0 ? <View style={styles.targetDivider} /> : null}
+                                <View style={styles.targetItem}>
+                                    <Text style={styles.targetLabel}>{target.label}</Text>
+                                    <Text style={styles.targetValue}>{target.value}</Text>
+                                </View>
+                            </React.Fragment>
+                        ))}
                     </View>
-                    <View style={styles.targetDivider} />
-                    <View style={styles.targetItem}>
-                        <Text style={styles.targetLabel}>Protein</Text>
-                        <Text style={styles.targetValue}>{formatTarget(plan?.protein, 'g')}</Text>
+                ) : null}
+
+                {/* Body Measurements & Progress Tracker */}
+                {hasMeasurements ? (
+                    <View style={styles.measurementsCard}>
+                        <View style={styles.measurementsHeader}>
+                            <View style={styles.measurementsIndicator} />
+                            <Text style={styles.measurementsTitle}>Body Measurements & Anthropometric Progress</Text>
+                        </View>
+                        <View style={styles.measurementsTable}>
+                            <View style={styles.measurementsTableHeaderRow}>
+                                {activeMeasurementCols.map((col, cIdx) => (
+                                    <View
+                                        key={col.key}
+                                        style={{
+                                            ...styles.measurementsTableHeaderCol,
+                                            width: `${100 / Math.max(activeMeasurementCols.length, 1)}%`,
+                                            ...(cIdx === activeMeasurementCols.length - 1 ? { borderRightWidth: 0 } : {})
+                                        }}
+                                    >
+                                        <Text style={styles.measurementsTableHeaderText}>{col.label}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                            {validMeasurementRows.map((row, rIdx) => (
+                                <View
+                                    key={rIdx}
+                                    style={{
+                                        ...styles.measurementsTableRow,
+                                        ...(rIdx % 2 === 1 ? styles.measurementsTableRowAlt : {}),
+                                        ...(rIdx === validMeasurementRows.length - 1 ? { borderBottomWidth: 0 } : {})
+                                    }}
+                                >
+                                    {activeMeasurementCols.map((col, cIdx) => (
+                                        <View
+                                            key={col.key}
+                                            style={{
+                                                ...styles.measurementsTableCol,
+                                                width: `${100 / Math.max(activeMeasurementCols.length, 1)}%`,
+                                                ...(cIdx === activeMeasurementCols.length - 1 ? { borderRightWidth: 0 } : {})
+                                            }}
+                                        >
+                                            <Text
+                                                style={{
+                                                    ...styles.measurementsTableCellText,
+                                                    ...(col.key === 'date' ? { fontFamily: 'Helvetica-Bold' } : {}),
+                                                    ...(col.key === 'weight' ? { fontFamily: 'Helvetica-Bold', color: '#166534' } : {})
+                                                }}
+                                            >
+                                                {row[col.key] || '-'}
+                                            </Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            ))}
+                        </View>
                     </View>
-                    <View style={styles.targetDivider} />
-                    <View style={styles.targetItem}>
-                        <Text style={styles.targetLabel}>Carbohydrates</Text>
-                        <Text style={styles.targetValue}>{formatTarget(plan?.carbs, 'g')}</Text>
-                    </View>
-                    <View style={styles.targetDivider} />
-                    <View style={styles.targetItem}>
-                        <Text style={styles.targetLabel}>Healthy Fats</Text>
-                        <Text style={styles.targetValue}>{formatTarget(plan?.fats, 'g')}</Text>
-                    </View>
-                    <View style={styles.targetDivider} />
-                    <View style={styles.targetItem}>
-                        <Text style={styles.targetLabel}>Water Target</Text>
-                        <Text style={styles.targetValue}>{formatTarget(plan?.water, 'L')}</Text>
-                    </View>
-                    <View style={styles.targetDivider} />
-                    <View style={styles.targetItem}>
-                        <Text style={styles.targetLabel}>Daily Steps</Text>
-                        <Text style={styles.targetValue}>{plan?.steps ? String(plan.steps) : '-'}</Text>
-                    </View>
-                </View>
+                ) : null}
 
                 {/* Section Header */}
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Daily Meal Blueprint - Part 1</Text>
+                    <Text style={styles.sectionTitle}>Daily Meal Schedule Blueprint</Text>
                     <View style={styles.sectionLine} />
                 </View>
 
-                {/* Meals 1 to 4 */}
-                {page1Meals.length > 0 ? (
-                    page1Meals.map((meal, idx) => (
-                        <View key={idx} style={styles.mealCard}>
+                {/* All Meals in a Single Map Function */}
+                {meals.length > 0 ? (
+                    meals.map((meal, idx) => (
+                        <View key={idx} style={styles.mealCard} wrap={false}>
                             <View style={styles.mealHeader}>
                                 <Text style={styles.mealName}>{meal.name || `Meal ${idx + 1}`}</Text>
                                 {meal.time ? (
@@ -1246,6 +1504,12 @@ export default function DietPlanPdfDocument({ plan: rawPlan, theme }) {
                                         <Text style={styles.optionContent}>{opt}</Text>
                                     </View>
                                 ))}
+                                {meal.optional ? (
+                                    <View style={styles.optionRow}>
+                                        <Text style={styles.optionTagOptional}>OPTIONAL:</Text>
+                                        <Text style={styles.optionContent}>{meal.optional}</Text>
+                                    </View>
+                                ) : null}
                                 {meal.notes ? (
                                     <View style={styles.chefNoteContainer}>
                                         <Text style={styles.chefNoteLabel}>NOTE:</Text>
@@ -1258,7 +1522,27 @@ export default function DietPlanPdfDocument({ plan: rawPlan, theme }) {
                 ) : (
                     <View style={[styles.mealCard, { padding: 14, alignItems: 'center' }]}>
                         <Text style={{ fontSize: 8, color: '#94a3b8', fontStyle: 'italic' }}>
-                            No daytime meals added yet. Add meals in the form editor or load a clinical preset.
+                            No meals added yet. Add meals in the form editor or load a clinical preset.
+                        </Text>
+                    </View>
+                )}
+
+                {/* Special Clinical Instructions Banner (Page 1) */}
+                {hasSpecialInstructions && (
+                    <View style={{
+                        ...styles.specialBox,
+                        ...(specialBoxStyle === 'bordered' ? styles.specialBoxBordered : {}),
+                        backgroundColor: specialTheme.bg,
+                        borderColor: specialTheme.border
+                    }}>
+                        <View style={styles.specialHeader}>
+                            <View style={[styles.specialIndicator, { backgroundColor: specialTheme.indicator }]} />
+                            <Text style={[styles.specialTitle, { color: specialTheme.title }]}>
+                                {plan?.special_instructions_title || 'Special Clinical Directives'}
+                            </Text>
+                        </View>
+                        <Text style={[styles.specialText, { color: specialTheme.text }]}>
+                            {instructionLines.slice(0, 2).join('\n')}
                         </Text>
                     </View>
                 )}
@@ -1296,50 +1580,8 @@ export default function DietPlanPdfDocument({ plan: rawPlan, theme }) {
                     </View>
                 </View>
 
-                {/* Section Header: Part 2 */}
-                <View style={[styles.sectionHeader, { marginTop: 8 }]}>
-                    <Text style={styles.sectionTitle}>Daily Meal Blueprint - Part 2</Text>
-                    <View style={styles.sectionLine} />
-                </View>
-
-                {/* Meals 5 onwards */}
-                {page2Meals.length > 0 ? (
-                    page2Meals.map((meal, idx) => (
-                        <View key={idx} style={styles.mealCard}>
-                            <View style={styles.mealHeader}>
-                                <Text style={styles.mealName}>{meal.name || `Meal ${idx + 5}`}</Text>
-                                {meal.time ? (
-                                    <View style={styles.mealTimePill}>
-                                        <Text style={styles.mealTimeText}>{meal.time}</Text>
-                                    </View>
-                                ) : null}
-                            </View>
-                            <View style={styles.mealBody}>
-                                {getMealOptions(meal).map((opt, optIdx) => (
-                                    <View key={optIdx} style={styles.optionRow}>
-                                        <Text style={optIdx === 0 ? styles.optionTagPrimary : styles.optionTagAlt}>
-                                            OPTION {optIdx + 1}:
-                                        </Text>
-                                        <Text style={styles.optionContent}>{opt}</Text>
-                                    </View>
-                                ))}
-                                {meal.notes ? (
-                                    <View style={styles.chefNoteContainer}>
-                                        <Text style={styles.chefNoteLabel}>NOTE:</Text>
-                                        <Text style={styles.chefNoteText}>{meal.notes}</Text>
-                                    </View>
-                                ) : null}
-                            </View>
-                        </View>
-                    ))
-                ) : (
-                    <View style={[styles.mealCard, { padding: 8 }]}>
-                        <Text style={{ fontSize: 8, color: '#64748b' }}>No evening meals specified.</Text>
-                    </View>
-                )}
-
                 {/* Prescribed Supplements Protocol */}
-                <View style={styles.supplementsCard}>
+                <View style={[styles.supplementsCard, { marginTop: 8 }]}>
                     <View style={styles.supplementsHeader}>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                             <View style={styles.supplementsIndicator} />
@@ -1355,10 +1597,10 @@ export default function DietPlanPdfDocument({ plan: rawPlan, theme }) {
                             {supplements.map((supp, sIdx) => (
                                 <View
                                     key={sIdx}
-                                    style={[
-                                        styles.supplementPillCard,
-                                        supplements.length === 1 ? { width: '100%' } : null
-                                    ]}
+                                    style={{
+                                        ...styles.supplementPillCard,
+                                        ...(supplements.length === 1 ? { width: '100%' } : {})
+                                    }}
                                 >
                                     <View style={styles.supplementDot} />
                                     <View style={styles.supplementInfo}>
@@ -1378,6 +1620,55 @@ export default function DietPlanPdfDocument({ plan: rawPlan, theme }) {
                         </Text>
                     )}
                 </View>
+
+                {/* Prescribed Workout & Movement Regimen */}
+                {workouts.length > 0 && (
+                    <View style={styles.workoutCard} wrap={false}>
+                        <View style={styles.workoutHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <View style={styles.workoutIndicator} />
+                                <Text style={styles.workoutTitle}>Prescribed Movement & Workout Regimen</Text>
+                            </View>
+                            <View style={styles.workoutBadge}>
+                                <Text style={styles.workoutBadgeText}>ACTIVITY & EXERCISE</Text>
+                            </View>
+                        </View>
+
+                        <View style={styles.workoutTable}>
+                            <View style={styles.workoutTableHeaderRow}>
+                                <Text style={[styles.workoutTh, { width: '22%' }]}>DAY / SPLIT</Text>
+                                <Text style={[styles.workoutTh, { width: '38%' }]}>EXERCISES / ROUTINE</Text>
+                                <Text style={[styles.workoutTh, { width: '24%' }]}>CARDIO & STEPS</Text>
+                                <Text style={[styles.workoutTh, { width: '16%' }]}>DIRECTIVES</Text>
+                            </View>
+
+                            {workouts.map((w, wIdx) => (
+                                <View
+                                    key={wIdx}
+                                    style={{
+                                        ...styles.workoutTableRow,
+                                        ...(wIdx % 2 === 1 ? styles.workoutTableRowAlt : {}),
+                                        ...(wIdx === workouts.length - 1 ? { borderBottomWidth: 0 } : {})
+                                    }}
+                                >
+                                    <View style={{ width: '22%', paddingRight: 4 }}>
+                                        <Text style={styles.workoutDayName}>{w.day || `Day ${wIdx + 1}`}</Text>
+                                        {w.focus ? <Text style={styles.workoutDayFocus}>{w.focus}</Text> : null}
+                                    </View>
+                                    <View style={{ width: '38%', paddingRight: 4 }}>
+                                        <Text style={styles.workoutTextMain}>{w.exercises || '-'}</Text>
+                                    </View>
+                                    <View style={{ width: '24%', paddingRight: 4 }}>
+                                        <Text style={styles.workoutTextCardio}>{w.cardio || '-'}</Text>
+                                    </View>
+                                    <View style={{ width: '16%' }}>
+                                        <Text style={styles.workoutTextNotes}>{w.notes || '-'}</Text>
+                                    </View>
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+                )}
 
                 {/* Unified Section: GOLDEN RULES & HABITS and FOODS TO AVOID */}
                 <View style={styles.unifiedRulesContainer}>
@@ -1652,7 +1943,10 @@ export default function DietPlanPdfDocument({ plan: rawPlan, theme }) {
                             return (
                                 <View
                                     key={rIdx}
-                                    style={[styles.recipeTableRow, isAlt ? styles.recipeTableRowAlt : null]}
+                                    style={{
+                                        ...styles.recipeTableRow,
+                                        ...(isAlt ? styles.recipeTableRowAlt : {})
+                                    }}
                                     wrap={false}
                                 >
                                     {/* Column 1: Dish & Macros */}
