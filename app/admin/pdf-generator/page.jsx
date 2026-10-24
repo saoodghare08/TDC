@@ -353,8 +353,10 @@ export default function AdminPdfGeneratorPage() {
                     carbs: formData.carbs,
                     fats: formData.fats,
                     fibre: formData.fibre,
+                    fiber: formData.fibre,
                     water: formData.water,
                     steps: formData.steps,
+                    measurements: formData.measurements,
                     dietitian_name: formData.dietitian_name,
                     dietitian_note: formData.dietitian_note,
                     meals: formData.meals,
@@ -363,6 +365,14 @@ export default function AdminPdfGeneratorPage() {
                     guidelines: formData.guidelines,
                     donts: formData.donts,
                     recipes: formData.recipes,
+                    show_special_instructions: formData.show_special_instructions,
+                    special_instructions_title: formData.special_instructions_title,
+                    special_instructions_badge: formData.special_instructions_badge,
+                    special_instructions_theme: formData.special_instructions_theme,
+                    special_instructions_style: formData.special_instructions_style,
+                    special_instructions: formData.special_instructions,
+                    special_instructions_warning: formData.special_instructions_warning,
+                    special_instructions_verified: formData.special_instructions_verified,
                     is_preset: false
                 }]);
 
@@ -657,6 +667,107 @@ export default function AdminPdfGeneratorPage() {
             preset = [];
         }
         setFormData(prev => ({ ...prev, workouts: preset }));
+    };
+
+    // ─── Special Directives Presets ───
+    const handleApplySpecialPreset = (type) => {
+        if (type === 'diabetes') {
+            setFormData(prev => ({
+                ...prev,
+                show_special_instructions: true,
+                special_instructions_title: 'Type 2 Diabetes & Glycemic Control Directives',
+                special_instructions_badge: 'GLYCEMIC CARE',
+                special_instructions_theme: 'emerald',
+                special_instructions_style: 'callout',
+                special_instructions: [
+                    'Strict 3 to 4-hour meal timing intervals to prevent reactive glycemic volatility.',
+                    'Always combine complex carbohydrates with soluble dietary fibre and high-BV protein.',
+                    'Morning blood sugar testing: record fasting and 2-hour post-prandial readings 3x/week.',
+                    'Zero refined sugars, white flour (maida), commercial fruit syrups, or packaged juices.',
+                    'Engage in a 15-20 minute light post-meal brisk stroll to accelerate muscular glucose uptake.'
+                ].join('\n'),
+                special_instructions_warning: 'If blood glucose drops < 70 mg/dL (hypoglycemia), consume 15g fast-acting carbs (3 glucose tablets or 1/2 cup fruit juice) immediately and recheck in 15 minutes.'
+            }));
+        } else if (type === 'cardiac') {
+            setFormData(prev => ({
+                ...prev,
+                show_special_instructions: true,
+                special_instructions_title: 'Cardiac Health & Low-Sodium Hypertension Protocol',
+                special_instructions_badge: 'CARDIAC CARE',
+                special_instructions_theme: 'amber',
+                special_instructions_style: 'framed',
+                special_instructions: [
+                    'Strict daily sodium ceiling: limit total intake to < 1,500mg daily (~1/2 tsp total salt).',
+                    'Strictly avoid papads, commercial pickles, salted snacks, canned broths, and packaged sauces.',
+                    'Enhance plate palatability using fresh lime, kokum, roasted jeera powder, garlic, and fresh herbs.',
+                    'Emphasize natural potassium & magnesium: tender coconut water, steamed drumstick, and gourd sabzis.',
+                    'Record resting blood pressure twice weekly in the morning before caffeine or breakfast.'
+                ].join('\n'),
+                special_instructions_warning: 'Contact supervising cardiologist immediately if resting systolic BP exceeds 160 mmHg, or if experiencing unexplained chest tightness, dizziness, or shortness of breath.'
+            }));
+        } else if (type === 'gerd') {
+            setFormData(prev => ({
+                ...prev,
+                show_special_instructions: true,
+                special_instructions_title: 'Acid Reflux (GERD) & Gut Mucosa Healing Directives',
+                special_instructions_badge: 'GUT HEALTH',
+                special_instructions_theme: 'amber',
+                special_instructions_style: 'banner',
+                special_instructions: [
+                    'Finish dinner at least 3 to 3.5 hours before lying down to sleep at night.',
+                    'Elevate the head of your bed by 6 inches if nighttime reflux or coughing episodes occur.',
+                    'Strictly avoid raw onion/garlic, excessive black pepper, citrus juices on an empty stomach, mint, and cocoa.',
+                    'Mindful chewing: chew each bite 25-30 times to saturate bolus with alkaline salivary enzymes.',
+                    'Sip warm cumin-fennel infusion 30 minutes post-meals; do not chug cold liquids during meals.'
+                ].join('\n'),
+                special_instructions_warning: 'Avoid prolonged fasting or skipping prescribed meal intervals; accumulated gastric acid in an empty stomach accelerates esophageal mucosal erosion.'
+            }));
+        } else if (type === 'fatty_liver') {
+            setFormData(prev => ({
+                ...prev,
+                show_special_instructions: true,
+                special_instructions_title: 'Non-Alcoholic Fatty Liver (NAFLD) & Lipid Optimization',
+                special_instructions_badge: 'LIVER RECOVERY',
+                special_instructions_theme: 'emerald',
+                special_instructions_style: 'callout',
+                special_instructions: [
+                    'Zero tolerance for refined high-fructose corn syrups, alcohol, and reheated cooking oils.',
+                    'Limit visible cooking fats to measured cold-pressed oils (maximum 2-3 tsp daily total).',
+                    'Incorporate cruciferous vegetables (broccoli, cabbage, radishes) to support hepatic phase-2 detox.',
+                    'Daily soluble prebiotic fiber target (> 35g/day) via soaked chia seeds, flaxseeds, and jowar/nachni.',
+                    'Minimum 30-40 minutes of daily Zone-2 continuous brisk walking to oxidize hepatic triglycerides.'
+                ].join('\n'),
+                special_instructions_warning: 'Do not consume over-the-counter NSAIDs, paracetamol in excess, or unverified fat-loss herbal powders without clinical authorization.'
+            }));
+        } else if (type === 'pcos') {
+            setFormData(prev => ({
+                ...prev,
+                show_special_instructions: true,
+                special_instructions_title: 'PCOS Hormonal Balance & Anti-Inflammatory Directives',
+                special_instructions_badge: 'HORMONAL CARE',
+                special_instructions_theme: 'rose',
+                special_instructions_style: 'callout',
+                special_instructions: [
+                    'Strict low-glycemic load plate composition to prevent insulin-driven androgen surges.',
+                    'Seed cycling protocol: 1 tbsp flax + pumpkin seeds (Follicular phase); sunflower + sesame (Luteal phase).',
+                    'Prioritize 7.5 to 8 hours of uninterrupted sleep in a cool, pitch-dark bedroom.',
+                    'Drink 1-2 cups of organic spearmint tea daily to aid free testosterone modulation.',
+                    'Morning cortisol hygiene: 10 minutes of direct morning sunlight exposure and gentle breathwork.'
+                ].join('\n'),
+                special_instructions_warning: 'Avoid severe caloric deficits (> 500 kcal) or intense fasting; endocrine pathways require nutritional stability for regular ovulatory signaling.'
+            }));
+        } else if (type === 'clear') {
+            setFormData(prev => ({
+                ...prev,
+                show_special_instructions: false,
+                special_instructions_title: 'Special Clinical Instructions & Edge-Case Directives',
+                special_instructions_badge: 'EDGE CASE ADVISORY',
+                special_instructions_theme: 'emerald',
+                special_instructions_style: 'callout',
+                special_instructions: '',
+                special_instructions_warning: ''
+            }));
+        }
     };
 
     // ─── Guidelines Helpers ───
@@ -2144,6 +2255,65 @@ export default function AdminPdfGeneratorPage() {
 
                                 {!collapsed.special && (
                                     <div className="p-3.5 sm:p-5 space-y-4">
+                                        {/* Clinical Condition Quick Presets Bar */}
+                                        <div className="p-3 bg-linear-to-r from-teal-50/80 via-emerald-50/60 to-indigo-50/60 rounded-xl border border-teal-200/80 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[11px] font-bold text-teal-900 flex items-center gap-1.5 uppercase tracking-wider">
+                                                    <Sparkles size={13} className="text-teal-700" />
+                                                    Clinical Condition Presets:
+                                                </span>
+                                                <span className="text-[10px] text-teal-700/80 font-medium hidden sm:inline">
+                                                    1-click evidence-based protocols
+                                                </span>
+                                            </div>
+                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleApplySpecialPreset('diabetes')}
+                                                    className="px-2.5 py-1 text-[11px] bg-white hover:bg-emerald-100/80 hover:text-emerald-900 text-emerald-800 border border-emerald-300 rounded-lg font-semibold transition cursor-pointer shadow-2xs"
+                                                >
+                                                    🩺 Type 2 Diabetes
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleApplySpecialPreset('cardiac')}
+                                                    className="px-2.5 py-1 text-[11px] bg-white hover:bg-amber-100/80 hover:text-amber-900 text-amber-800 border border-amber-300 rounded-lg font-semibold transition cursor-pointer shadow-2xs"
+                                                >
+                                                    ❤️ Cardiac & Low-Sodium
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleApplySpecialPreset('gerd')}
+                                                    className="px-2.5 py-1 text-[11px] bg-white hover:bg-orange-100/80 hover:text-orange-900 text-orange-800 border border-orange-300 rounded-lg font-semibold transition cursor-pointer shadow-2xs"
+                                                >
+                                                    🛡️ GERD & Gut Healing
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleApplySpecialPreset('fatty_liver')}
+                                                    className="px-2.5 py-1 text-[11px] bg-white hover:bg-teal-100/80 hover:text-teal-900 text-teal-800 border border-teal-300 rounded-lg font-semibold transition cursor-pointer shadow-2xs"
+                                                >
+                                                    🥗 Fatty Liver & Lipids
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleApplySpecialPreset('pcos')}
+                                                    className="px-2.5 py-1 text-[11px] bg-white hover:bg-rose-100/80 hover:text-rose-900 text-rose-800 border border-rose-300 rounded-lg font-semibold transition cursor-pointer shadow-2xs"
+                                                >
+                                                    🌸 PCOS & Hormonal
+                                                </button>
+                                                {formData.show_special_instructions && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleApplySpecialPreset('clear')}
+                                                        className="px-2.5 py-1 text-[11px] bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg font-semibold transition cursor-pointer"
+                                                    >
+                                                        Clear
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+
                                         {!formData.show_special_instructions ? (
                                             <div className="py-4 px-4 border border-dashed border-gray-200 rounded-xl bg-gray-50 text-center">
                                                 <p className="text-xs text-gray-500">This optional page is currently turned off for standard plans.</p>

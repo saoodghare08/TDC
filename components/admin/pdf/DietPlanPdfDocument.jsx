@@ -1527,26 +1527,6 @@ export default function DietPlanPdfDocument({ plan: rawPlan, theme }) {
                     </View>
                 )}
 
-                {/* Special Clinical Instructions Banner (Page 1) */}
-                {hasSpecialInstructions && (
-                    <View style={{
-                        ...styles.specialBox,
-                        ...(specialBoxStyle === 'bordered' ? styles.specialBoxBordered : {}),
-                        backgroundColor: specialTheme.bg,
-                        borderColor: specialTheme.border
-                    }}>
-                        <View style={styles.specialHeader}>
-                            <View style={[styles.specialIndicator, { backgroundColor: specialTheme.indicator }]} />
-                            <Text style={[styles.specialTitle, { color: specialTheme.title }]}>
-                                {plan?.special_instructions_title || 'Special Clinical Directives'}
-                            </Text>
-                        </View>
-                        <Text style={[styles.specialText, { color: specialTheme.text }]}>
-                            {instructionLines.slice(0, 2).join('\n')}
-                        </Text>
-                    </View>
-                )}
-
                 {/* Page 1 Footer */}
                 <View style={styles.footerContainer}>
                     <Text style={styles.footerNote}>Personalized for {plan?.client_name || 'Client'} | The Diet Cascade</Text>
