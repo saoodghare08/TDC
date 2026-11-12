@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import {
     MessageSquareQuote, FileText, Settings, Users,
-    RefreshCcw, PenLine, CheckCircle, ArrowRight
+    RefreshCcw, PenLine, CheckCircle, ArrowRight, Receipt
 } from 'lucide-react';
 import Link from 'next/link';
 import clsx from 'clsx';
@@ -228,6 +228,17 @@ export default function AdminDashboard() {
                         <div className="flex-1 min-w-0">
                             <p className="font-bold text-heading">SEO Settings</p>
                             <p className="text-xs text-gray-400">Manage titles, descriptions & keywords</p>
+                        </div>
+                        <ArrowRight size={16} className="text-gray-300 group-hover:text-gray-500 group-hover:translate-x-0.5 transition-all" />
+                    </Link>
+
+                    <Link href="/admin/invoice-generator" className="group bg-white border border-gray-100 rounded-2xl p-5 flex items-center gap-4 hover:shadow-md transition-all hover:-translate-y-0.5 active:scale-[0.98] shadow-sm">
+                        <div className="w-11 h-11 rounded-xl bg-teal-50 flex items-center justify-center text-primary transition-transform group-hover:scale-110">
+                            <Receipt size={22} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="font-bold text-heading">Invoice Generator</p>
+                            <p className="text-xs text-gray-400">Create client invoices & downloadable PDF</p>
                         </div>
                         <ArrowRight size={16} className="text-gray-300 group-hover:text-gray-500 group-hover:translate-x-0.5 transition-all" />
                     </Link>

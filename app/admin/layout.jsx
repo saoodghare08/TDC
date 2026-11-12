@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { LayoutDashboard, MessageSquareQuote, FileText, Settings, LogOut, Menu, X, Users, ChevronRight, MessageCircle, FileDown, ChefHat } from 'lucide-react';
+import { LayoutDashboard, MessageSquareQuote, FileText, Settings, LogOut, Menu, X, Users, ChevronRight, MessageCircle, FileDown, ChefHat, Receipt } from 'lucide-react';
 import clsx from 'clsx';
 import Image from 'next/image';
 
@@ -14,6 +14,7 @@ const navItems = [
     { href: '/admin/clients', label: 'Clients', icon: Users },
     { href: '/admin/recipes', label: 'Recipes', icon: ChefHat },
     { href: '/admin/pdf-generator', label: 'PDF Generator', icon: FileDown },
+    { href: '/admin/invoice-generator', label: 'Invoice Generator', icon: Receipt },
     { href: '/admin/reviews', label: 'Reviews', icon: MessageSquareQuote },
     { href: '/admin/blog', label: 'Blog', icon: FileText },
     { href: '/admin/seo', label: 'SEO', icon: Settings },
