@@ -13,7 +13,7 @@ const navItems = [
     { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/admin/clients', label: 'Clients', icon: Users },
     { href: '/admin/recipes', label: 'Recipes', icon: ChefHat },
-    { href: '/admin/pdf-generator', label: 'PDF Generator', icon: FileDown },
+    { href: '/admin/diet-plan-generator', label: 'Diet Plan Generator', icon: FileDown },
     { href: '/admin/invoice-generator', label: 'Invoice Generator', icon: Receipt },
     { href: '/admin/reviews', label: 'Reviews', icon: MessageSquareQuote },
     { href: '/admin/blog', label: 'Blog', icon: FileText },

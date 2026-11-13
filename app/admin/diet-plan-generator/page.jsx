@@ -47,6 +47,22 @@ const DEFAULT_CALC_CONFIG = {
     showCalculator: true,
 };
 
+const EMPTY_NEW_RECIPE = {
+    name: '',
+    category: 'Breakfast',
+    prep_time: '',
+    cook_time: '',
+    servings: '',
+    calories: '',
+    protein: '',
+    carbs: '',
+    fats: '',
+    fiber: '',
+    ingredients: [''],
+    instructions: [''],
+    dietitian_tip: '',
+};
+
 const roundOne = (num) => Math.round(num * 10) / 10;
 
 const parseNumericValue = (val) => {
@@ -195,7 +211,7 @@ const EMPTY_FORM_STATE = {
     calc_config: DEFAULT_CALC_CONFIG,
 };
 
-export default function AdminPdfGeneratorPage() {
+export default function AdminDietPlanGeneratorPage() {
     const supabase = createClient();
 
     // Form State (Starts Empty On Load)
@@ -262,6 +278,16 @@ export default function AdminPdfGeneratorPage() {
     const [loadingRecipes, setLoadingRecipes] = useState(false);
     const [recipeSearch, setRecipeSearch] = useState('');
     const [recipeCategoryFilter, setRecipeCategoryFilter] = useState('All');
+
+    // Inline Create New Recipe Modal State
+    const [isNewRecipeModalOpen, setIsNewRecipeModalOpen] = useState(false);
+    const [newRecipeForm, setNewRecipeForm] = useState(EMPTY_NEW_RECIPE);
+    const [savingNewRecipe, setSavingNewRecipe] = useState(false);
+    const [saveNewRecipeToBank, setSaveNewRecipeToBank] = useState(true);
+    const [newRecipeBulkIngOpen, setNewRecipeBulkIngOpen] = useState(false);
+    const [newRecipeBulkIngText, setNewRecipeBulkIngText] = useState('');
+    const [newRecipeBulkInstOpen, setNewRecipeBulkInstOpen] = useState(false);
+    const [newRecipeBulkInstText, setNewRecipeBulkInstText] = useState('');
 
     // UI state
     const [activeView, setActiveView] = useState('editor'); // 'editor' | 'preview' | 'split'
@@ -1566,6 +1592,197 @@ export default function AdminPdfGeneratorPage() {
             timer: 1500,
             showConfirmButton: false
         });
+    };
+
+    // ─── Create & Attach New Recipe Inline Modal Helpers ───
+    const handleOpenNewRecipeModal = () => {
+        const prefilledCategory =
+            recipeCategoryFilter && recipeCategoryFilter !== 'All'
+                ? recipeCategoryFilter
+                : 'Breakfast';
+        setNewRecipeForm({
+            ...EMPTY_NEW_RECIPE,
+            name: recipeSearch.trim(),
+            category: prefilledCategory,
+            ingredients: [''],
+            instructions: [''],
+        });
+        setSaveNewRecipeToBank(true);
+        setNewRecipeBulkIngOpen(false);
+        setNewRecipeBulkIngText('');
+        setNewRecipeBulkInstOpen(false);
+        setNewRecipeBulkInstText('');
+        setIsNewRecipeModalOpen(true);
+    };
+
+    const handleAddNewRecipeIngredient = () => {
+        setNewRecipeForm((prev) => ({
+            ...prev,
+            ingredients: [...prev.ingredients, ''],
+        }));
+    };
+
+    const handleNewRecipeIngredientChange = (index, value) => {
+        setNewRecipeForm((prev) => {
+            const updated = [...prev.ingredients];
+            updated[index] = value;
+            return { ...prev, ingredients: updated };
+        });
+    };
+
+    const handleRemoveNewRecipeIngredient = (index) => {
+        setNewRecipeForm((prev) => {
+            const updated = prev.ingredients.filter((_, i) => i !== index);
+            return { ...prev, ingredients: updated.length > 0 ? updated : [''] };
+        });
+    };
+
+    const handleApplyNewRecipeBulkIngredients = () => {
+        const lines = newRecipeBulkIngText
+            .split('\n')
+            .map((l) => l.replace(/^(?:[-*•✓·–—\u2022]\s*|\(?\d+[.)]\s+)/, '').trim())
+            .filter(Boolean);
+        if (lines.length > 0) {
+            setNewRecipeForm((prev) => ({ ...prev, ingredients: lines }));
+        }
+        setNewRecipeBulkIngOpen(false);
+        setNewRecipeBulkIngText('');
+    };
+
+    const handleAddNewRecipeInstruction = () => {
+        setNewRecipeForm((prev) => ({
+            ...prev,
+            instructions: [...prev.instructions, ''],
+        }));
+    };
+
+    const handleNewRecipeInstructionChange = (index, value) => {
+        setNewRecipeForm((prev) => {
+            const updated = [...prev.instructions];
+            updated[index] = value;
+            return { ...prev, instructions: updated };
+        });
+    };
+
+    const handleRemoveNewRecipeInstruction = (index) => {
+        setNewRecipeForm((prev) => {
+            const updated = prev.instructions.filter((_, i) => i !== index);
+            return { ...prev, instructions: updated.length > 0 ? updated : [''] };
+        });
+    };
+
+    const handleApplyNewRecipeBulkInstructions = () => {
+        const lines = newRecipeBulkInstText
+            .split('\n')
+            .map((l) => l.replace(/^(?:Step\s*\d+[:.]?\s*|[-*•✓·–—\u2022]\s*|\(?\d+[.)]\s+)/i, '').trim())
+            .filter(Boolean);
+        if (lines.length > 0) {
+            setNewRecipeForm((prev) => ({ ...prev, instructions: lines }));
+        }
+        setNewRecipeBulkInstOpen(false);
+        setNewRecipeBulkInstText('');
+    };
+
+    const handleCreateAndAttachRecipe = async (e) => {
+        e.preventDefault();
+        if (!newRecipeForm.name.trim()) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Missing Dish Name',
+                text: 'Please specify the recipe name.',
+            });
+            return;
+        }
+
+        const cleanIngredients = (newRecipeForm.ingredients || [])
+            .map((i) => String(i || '').trim())
+            .filter(Boolean);
+
+        const cleanInstructions = (newRecipeForm.instructions || [])
+            .map((i) => String(i || '').trim())
+            .filter(Boolean);
+
+        if (cleanIngredients.length === 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'No Ingredients',
+                text: 'Please add at least one ingredient.',
+            });
+            return;
+        }
+
+        setSavingNewRecipe(true);
+        try {
+            const payload = {
+                name: newRecipeForm.name.trim(),
+                category: newRecipeForm.category || 'Breakfast',
+                prep_time: newRecipeForm.prep_time?.trim() || '10 mins',
+                cook_time: newRecipeForm.cook_time?.trim() || '15 mins',
+                servings: newRecipeForm.servings?.trim() || '1 serving',
+                calories: newRecipeForm.calories?.trim() || '',
+                protein: newRecipeForm.protein?.trim() || '',
+                carbs: newRecipeForm.carbs?.trim() || '',
+                fats: newRecipeForm.fats?.trim() || '',
+                fiber: newRecipeForm.fiber?.trim() || '',
+                ingredients: cleanIngredients,
+                instructions:
+                    cleanInstructions.length > 0 ? cleanInstructions : ['Cook as directed.'],
+                dietitian_tip: newRecipeForm.dietitian_tip?.trim() || '',
+                updated_at: new Date().toISOString(),
+            };
+
+            let attachedRecipe = null;
+
+            if (saveNewRecipeToBank) {
+                const { data, error } = await supabase
+                    .from('recipes')
+                    .insert([payload])
+                    .select()
+                    .single();
+
+                if (error) throw error;
+                attachedRecipe = data;
+                setAvailableRecipes((prev) => [
+                    data,
+                    ...prev.filter((r) => r.id !== data.id),
+                ]);
+            } else {
+                attachedRecipe = {
+                    id: `custom_${Date.now()}`,
+                    ...payload,
+                    is_soft_edited: true,
+                };
+            }
+
+            setFormData((prev) => ({
+                ...prev,
+                recipes: [
+                    ...(prev.recipes || []),
+                    JSON.parse(JSON.stringify(attachedRecipe)),
+                ],
+            }));
+
+            setIsNewRecipeModalOpen(false);
+            Swal.fire({
+                icon: 'success',
+                title: saveNewRecipeToBank ? 'Recipe Saved & Attached!' : 'Recipe Attached!',
+                text: saveNewRecipeToBank
+                    ? `"${attachedRecipe.name}" was saved to the Clinic Recipe Bank and attached to this plan.`
+                    : `"${attachedRecipe.name}" was attached to this diet plan.`,
+                timer: 2000,
+                showConfirmButton: false,
+            });
+        } catch (err) {
+            console.error('Error creating recipe:', err);
+            Swal.fire({
+                icon: 'error',
+                title: 'Save Failed',
+                text: err.message,
+                confirmButtonColor: '#2d6a4f',
+            });
+        } finally {
+            setSavingNewRecipe(false);
+        }
     };
 
     // ─── Download PDF Client-Side ───
@@ -4138,25 +4355,39 @@ export default function AdminPdfGeneratorPage() {
 
                                         {/* ── RECIPE BANK BROWSER ── */}
                                         <div className="space-y-3 pt-1">
-                                            <div className="flex flex-col sm:flex-row gap-2">
-                                                {/* Search bar */}
-                                                <div className="relative flex-1">
-                                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                                    <input
-                                                        type="text"
-                                                        value={recipeSearch}
-                                                        onChange={(e) => setRecipeSearch(e.target.value)}
-                                                        placeholder="Search recipes by name (e.g. Oats, Smoothie, Wrap)..."
-                                                        className="w-full text-xs pl-8 pr-7 py-2 rounded-xl border border-gray-200 focus:ring-1 focus:ring-primary/20 bg-gray-50/50"
-                                                    />
-                                                    {recipeSearch && (
-                                                        <button
-                                                            onClick={() => setRecipeSearch('')}
-                                                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                                        >
-                                                            <X size={13} />
-                                                        </button>
-                                                    )}
+                                            <div className="space-y-2">
+                                                <div className="flex items-center gap-2">
+                                                    {/* Search bar */}
+                                                    <div className="relative flex-1">
+                                                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                                        <input
+                                                            type="text"
+                                                            value={recipeSearch}
+                                                            onChange={(e) => setRecipeSearch(e.target.value)}
+                                                            placeholder="Search recipes by name (e.g. Oats, Smoothie, Wrap)..."
+                                                            className="w-full text-xs pl-8 pr-7 py-2 rounded-xl border border-gray-200 focus:ring-1 focus:ring-primary/20 bg-gray-50/50"
+                                                        />
+                                                        {recipeSearch && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setRecipeSearch('')}
+                                                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                                                            >
+                                                                <X size={13} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Add New Recipe Button */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleOpenNewRecipeModal}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-primary border border-emerald-200 text-xs font-bold whitespace-nowrap transition cursor-pointer shrink-0"
+                                                        title="Create a new clinical recipe and attach it directly to this plan"
+                                                    >
+                                                        <Plus size={14} />
+                                                        <span>Add New Recipe</span>
+                                                    </button>
                                                 </div>
 
                                                 {/* Category pills */}
@@ -4206,8 +4437,32 @@ export default function AdminPdfGeneratorPage() {
                                                         </div>
                                                     </div>
                                                 ) : availableRecipes.length === 0 ? (
-                                                    <div className="col-span-full py-8 text-center text-xs text-gray-400">
-                                                        No recipes found matching &ldquo;{recipeSearch}&rdquo;. Try another term or clear filter.
+                                                    <div className="col-span-full py-7 px-4 text-center text-xs bg-gray-50/60 rounded-xl border border-dashed border-gray-200 space-y-3">
+                                                        <p className="text-gray-500">
+                                                            No recipes found matching{' '}
+                                                            {recipeSearch.trim() ? (
+                                                                <>
+                                                                    &ldquo;<span className="font-semibold text-heading">{recipeSearch.trim()}</span>&rdquo;
+                                                                </>
+                                                            ) : (
+                                                                <span className="font-semibold text-heading">{recipeCategoryFilter}</span>
+                                                            )}
+                                                            . Try another term, clear filter, or create a new recipe.
+                                                        </p>
+                                                        <div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleOpenNewRecipeModal}
+                                                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover shadow-sm shadow-primary/20 transition cursor-pointer"
+                                                            >
+                                                                <Plus size={14} />
+                                                                <span>
+                                                                    {recipeSearch.trim()
+                                                                        ? `Add "${recipeSearch.trim()}" as New Recipe`
+                                                                        : 'Add New Recipe'}
+                                                                </span>
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 ) : (
                                                     availableRecipes.map(recipe => {
@@ -4297,6 +4552,407 @@ export default function AdminPdfGeneratorPage() {
 
                 </div>
             </div>
+
+            {/* ═══════════════ CREATE & ATTACH NEW RECIPE MODAL ═══════════════ */}
+            {isNewRecipeModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs overflow-y-auto">
+                    <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-gray-100 my-8 max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-5">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                                    <ChefHat size={20} />
+                                </div>
+                                <div>
+                                    <h2 className="text-base font-bold font-heading text-heading">
+                                        Create &amp; Attach New Clinical Recipe
+                                    </h2>
+                                    <p className="text-[11px] text-para">
+                                        Add measured ingredients, cooking steps, and macros — attaches immediately to this diet plan
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsNewRecipeModalOpen(false)}
+                                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleCreateAndAttachRecipe} className="space-y-4">
+                            {/* Row 1: Dish Name & Category */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div className="sm:col-span-2">
+                                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                                        Dish Name *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={newRecipeForm.name}
+                                        onChange={(e) =>
+                                            setNewRecipeForm((prev) => ({ ...prev, name: e.target.value }))
+                                        }
+                                        placeholder="e.g., Moong Dal & Spinach Chilla"
+                                        className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                                        Category
+                                    </label>
+                                    <select
+                                        value={newRecipeForm.category}
+                                        onChange={(e) =>
+                                            setNewRecipeForm((prev) => ({ ...prev, category: e.target.value }))
+                                        }
+                                        className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                                    >
+                                        <option value="Breakfast">Breakfast</option>
+                                        <option value="Lunch">Lunch</option>
+                                        <option value="Dinner">Dinner</option>
+                                        <option value="Snack">Snack</option>
+                                        <option value="Beverage">Beverage</option>
+                                        <option value="Soup & Salad">Soup &amp; Salad</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Row 2: Times & Servings */}
+                            <div className="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label className="block text-[11px] font-bold text-gray-700 mb-1">Prep Time</label>
+                                    <input
+                                        type="text"
+                                        value={newRecipeForm.prep_time}
+                                        onChange={(e) =>
+                                            setNewRecipeForm((prev) => ({ ...prev, prep_time: e.target.value }))
+                                        }
+                                        placeholder="e.g. 10 mins"
+                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[11px] font-bold text-gray-700 mb-1">Cook Time</label>
+                                    <input
+                                        type="text"
+                                        value={newRecipeForm.cook_time}
+                                        onChange={(e) =>
+                                            setNewRecipeForm((prev) => ({ ...prev, cook_time: e.target.value }))
+                                        }
+                                        placeholder="e.g. 15 mins"
+                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[11px] font-bold text-gray-700 mb-1">Servings</label>
+                                    <input
+                                        type="text"
+                                        value={newRecipeForm.servings}
+                                        onChange={(e) =>
+                                            setNewRecipeForm((prev) => ({ ...prev, servings: e.target.value }))
+                                        }
+                                        placeholder="e.g. 1 serving"
+                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Row 3: Nutrition Profile */}
+                            <div className="bg-gray-50/70 p-3 rounded-2xl border border-gray-200/80">
+                                <label className="block text-[10px] font-bold text-heading uppercase mb-2">
+                                    Nutritional Profile (Per Serving)
+                                </label>
+                                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                                    <div>
+                                        <span className="block text-[10px] text-gray-500 mb-0.5">Calories</span>
+                                        <input
+                                            type="text"
+                                            value={newRecipeForm.calories}
+                                            onChange={(e) =>
+                                                setNewRecipeForm((prev) => ({ ...prev, calories: e.target.value }))
+                                            }
+                                            placeholder="240 kcal"
+                                            className="w-full text-xs font-semibold px-2 py-1.5 rounded-lg border border-gray-200 bg-white"
+                                        />
+                                    </div>
+                                    <div>
+                                        <span className="block text-[10px] text-gray-500 mb-0.5">Protein</span>
+                                        <input
+                                            type="text"
+                                            value={newRecipeForm.protein}
+                                            onChange={(e) =>
+                                                setNewRecipeForm((prev) => ({ ...prev, protein: e.target.value }))
+                                            }
+                                            placeholder="14g"
+                                            className="w-full text-xs font-semibold px-2 py-1.5 rounded-lg border border-gray-200 bg-white"
+                                        />
+                                    </div>
+                                    <div>
+                                        <span className="block text-[10px] text-gray-500 mb-0.5">Carbs</span>
+                                        <input
+                                            type="text"
+                                            value={newRecipeForm.carbs}
+                                            onChange={(e) =>
+                                                setNewRecipeForm((prev) => ({ ...prev, carbs: e.target.value }))
+                                            }
+                                            placeholder="28g"
+                                            className="w-full text-xs font-semibold px-2 py-1.5 rounded-lg border border-gray-200 bg-white"
+                                        />
+                                    </div>
+                                    <div>
+                                        <span className="block text-[10px] text-gray-500 mb-0.5">Fats</span>
+                                        <input
+                                            type="text"
+                                            value={newRecipeForm.fats}
+                                            onChange={(e) =>
+                                                setNewRecipeForm((prev) => ({ ...prev, fats: e.target.value }))
+                                            }
+                                            placeholder="5g"
+                                            className="w-full text-xs font-semibold px-2 py-1.5 rounded-lg border border-gray-200 bg-white"
+                                        />
+                                    </div>
+                                    <div>
+                                        <span className="block text-[10px] text-gray-500 mb-0.5">Fibre</span>
+                                        <input
+                                            type="text"
+                                            value={newRecipeForm.fiber}
+                                            onChange={(e) =>
+                                                setNewRecipeForm((prev) => ({ ...prev, fiber: e.target.value }))
+                                            }
+                                            placeholder="4g"
+                                            className="w-full text-xs font-semibold px-2 py-1.5 rounded-lg border border-gray-200 bg-white"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Measured Ingredients */}
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="text-xs font-bold text-heading">
+                                        Measured Ingredients ({newRecipeForm.ingredients.length}) *
+                                    </label>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setNewRecipeBulkIngOpen(!newRecipeBulkIngOpen)}
+                                            className="text-[11px] font-semibold text-gray-500 hover:text-heading cursor-pointer"
+                                        >
+                                            {newRecipeBulkIngOpen ? 'Close Paste Mode' : 'Bulk Paste'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleAddNewRecipeIngredient}
+                                            className="text-[11px] font-semibold text-primary hover:underline cursor-pointer"
+                                        >
+                                            + Add Ingredient
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {newRecipeBulkIngOpen ? (
+                                    <div className="p-3 bg-gray-50 rounded-2xl border border-gray-200 mb-3">
+                                        <p className="text-[11px] text-gray-500 mb-1.5">
+                                            Paste ingredients list (one per line):
+                                        </p>
+                                        <textarea
+                                            rows={4}
+                                            value={newRecipeBulkIngText}
+                                            onChange={(e) => setNewRecipeBulkIngText(e.target.value)}
+                                            placeholder={"1/2 cup yellow moong dal\n1/2 cup chopped spinach\n1/4 tsp turmeric\n1 tsp cold pressed oil"}
+                                            className="w-full text-xs p-2 rounded-xl border border-gray-200 bg-white"
+                                        />
+                                        <div className="mt-2 flex justify-end gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setNewRecipeBulkIngOpen(false)}
+                                                className="px-2.5 py-1 text-xs text-gray-600 rounded-lg hover:bg-gray-200 cursor-pointer"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={handleApplyNewRecipeBulkIngredients}
+                                                className="px-3 py-1 text-xs bg-primary text-white font-semibold rounded-lg cursor-pointer"
+                                            >
+                                                Apply Lines
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                                        {newRecipeForm.ingredients.map((ing, idx) => (
+                                            <div key={idx} className="flex items-center gap-2">
+                                                <span className="text-[11px] text-gray-400 w-4 text-center font-bold">•</span>
+                                                <input
+                                                    type="text"
+                                                    value={ing}
+                                                    onChange={(e) =>
+                                                        handleNewRecipeIngredientChange(idx, e.target.value)
+                                                    }
+                                                    placeholder="e.g. 1/2 cup rolled oats or 100g paneer"
+                                                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-primary/20"
+                                                />
+                                                {newRecipeForm.ingredients.length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemoveNewRecipeIngredient(idx)}
+                                                        className="text-gray-400 hover:text-red-500 p-1 cursor-pointer"
+                                                    >
+                                                        <Trash2 size={13} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Step-by-Step Instructions */}
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="text-xs font-bold text-heading">
+                                        Preparation Method / Instructions ({newRecipeForm.instructions.length})
+                                    </label>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setNewRecipeBulkInstOpen(!newRecipeBulkInstOpen)}
+                                            className="text-[11px] font-semibold text-gray-500 hover:text-heading cursor-pointer"
+                                        >
+                                            {newRecipeBulkInstOpen ? 'Close Paste Mode' : 'Bulk Paste'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleAddNewRecipeInstruction}
+                                            className="text-[11px] font-semibold text-primary hover:underline cursor-pointer"
+                                        >
+                                            + Add Step
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {newRecipeBulkInstOpen ? (
+                                    <div className="p-3 bg-gray-50 rounded-2xl border border-gray-200 mb-3">
+                                        <p className="text-[11px] text-gray-500 mb-1.5">
+                                            Paste cooking steps (one per line):
+                                        </p>
+                                        <textarea
+                                            rows={4}
+                                            value={newRecipeBulkInstText}
+                                            onChange={(e) => setNewRecipeBulkInstText(e.target.value)}
+                                            placeholder={"Soak moong dal for 2 hours\nBlend into smooth batter with ginger and chilli\nSpread on hot pan and cook with 1/2 tsp oil"}
+                                            className="w-full text-xs p-2 rounded-xl border border-gray-200 bg-white"
+                                        />
+                                        <div className="mt-2 flex justify-end gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setNewRecipeBulkInstOpen(false)}
+                                                className="px-2.5 py-1 text-xs text-gray-600 rounded-lg hover:bg-gray-200 cursor-pointer"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={handleApplyNewRecipeBulkInstructions}
+                                                className="px-3 py-1 text-xs bg-primary text-white font-semibold rounded-lg cursor-pointer"
+                                            >
+                                                Apply Steps
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                                        {newRecipeForm.instructions.map((step, sIdx) => (
+                                            <div key={sIdx} className="flex items-center gap-2">
+                                                <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center shrink-0">
+                                                    {sIdx + 1}
+                                                </span>
+                                                <input
+                                                    type="text"
+                                                    value={step}
+                                                    onChange={(e) =>
+                                                        handleNewRecipeInstructionChange(sIdx, e.target.value)
+                                                    }
+                                                    placeholder={`Step ${sIdx + 1} preparation instructions`}
+                                                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-primary/20"
+                                                />
+                                                {newRecipeForm.instructions.length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemoveNewRecipeInstruction(sIdx)}
+                                                        className="text-gray-400 hover:text-red-500 p-1 cursor-pointer"
+                                                    >
+                                                        <Trash2 size={13} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Dietitian Tip / Clinical Notes */}
+                            <div>
+                                <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                                    Dietitian Clinical Tip &amp; Benefits
+                                </label>
+                                <textarea
+                                    rows={2}
+                                    value={newRecipeForm.dietitian_tip}
+                                    onChange={(e) =>
+                                        setNewRecipeForm((prev) => ({
+                                            ...prev,
+                                            dietitian_tip: e.target.value,
+                                        }))
+                                    }
+                                    placeholder="e.g., High in bioavailable protein and soluble fiber. Ideal for PCOS and maintaining steady morning glucose."
+                                    className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                />
+                            </div>
+
+                            {/* Save to Clinic Recipe Bank Checkbox + Actions */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-gray-100">
+                                <label className="inline-flex items-center gap-2 text-xs font-semibold text-gray-700 cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={saveNewRecipeToBank}
+                                        onChange={(e) => setSaveNewRecipeToBank(e.target.checked)}
+                                        className="w-4 h-4 rounded accent-primary cursor-pointer"
+                                    />
+                                    <span className="inline-flex items-center gap-1">
+                                        <Database size={12} className="text-primary" />
+                                        Also save to Clinic Recipe Bank for future plans
+                                    </span>
+                                </label>
+
+                                <div className="flex items-center justify-end gap-2.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsNewRecipeModalOpen(false)}
+                                        className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition cursor-pointer"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={savingNewRecipe}
+                                        className="px-5 py-2 text-xs font-bold bg-primary text-white rounded-xl hover:bg-primary-hover shadow-md shadow-primary/20 transition cursor-pointer disabled:opacity-60"
+                                    >
+                                        {savingNewRecipe
+                                            ? 'Saving...'
+                                            : saveNewRecipeToBank
+                                                ? 'Save & Attach Recipe'
+                                                : 'Attach to Plan Only'}
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

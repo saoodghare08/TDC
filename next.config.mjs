@@ -8,6 +8,15 @@ const nextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: '/admin/pdf-generator',
+        destination: '/admin/diet-plan-generator',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

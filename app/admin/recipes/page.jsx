@@ -397,10 +397,10 @@ export default function RecipesAdminPage() {
 
                 <div className="flex items-center gap-2.5">
                     <Link
-                        href="/admin/pdf-generator"
+                        href="/admin/diet-plan-generator"
                         className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-gray-200 text-xs font-semibold text-heading hover:bg-gray-50 transition"
                     >
-                        <span>PDF Generator</span>
+                        <span>Diet Plan Generator</span>
                         <ArrowRight size={14} className="text-gray-400" />
                     </Link>
 
