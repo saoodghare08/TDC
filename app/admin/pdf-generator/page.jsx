@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import {
     FileText, Download, Send, Sparkles, Plus, Trash2,
@@ -10,7 +10,7 @@ import {
     Info, Copy, ChefHat, Utensils, Search, X, Palette,
     ShieldAlert, ChevronDown, ChevronUp, Edit3, Undo2,
     Maximize2, Minimize2, Check, ExternalLink, Sliders,
-    Dumbbell, Activity
+    Dumbbell, Activity, Calculator, Ruler, Lock, Unlock, ArrowLeftRight
 } from 'lucide-react';
 import Link from 'next/link';
 import Swal from 'sweetalert2';
@@ -29,6 +29,126 @@ const PDFViewer = dynamic(() => import('@react-pdf/renderer').then(mod => mod.PD
 });
 
 
+
+const DIET_PLAN_DRAFT_STORAGE_KEY = 'tdc_diet_plan_form_draft_v1';
+const AUTO_SAVE_DELAY_MS = 2000;
+
+const DEFAULT_CALC_CONFIG = {
+    heightCm: '',
+    heightInches: '',
+    heightFeet: '',
+    heightRemInches: '',
+    ibwOffset: 105, // 100 (Male) | 105 (Female) | custom in range
+    calMultiplier: 25, // 20-30 kcal per kg IBW (or custom)
+    proteinPct: 20, // 15-25% of calories / 4
+    carbsPct: 60, // 40-60% of calories / 4
+    fatsPct: 20, // 12-20% (or up to 30%) of calories / 9
+    fieldsLocked: false, // Editable by default, optional lock toggle
+    showCalculator: true,
+};
+
+const roundOne = (num) => Math.round(num * 10) / 10;
+
+const parseNumericValue = (val) => {
+    if (val === null || val === undefined || val === '') return NaN;
+    const cleaned = String(val).replace(/,/g, '');
+    const match = cleaned.match(/-?\d+(\.\d+)?/);
+    return match ? parseFloat(match[0]) : NaN;
+};
+
+const computeMacrosFromCalories = (caloriesNum, pPct, cPct, fPct) => {
+    if (!Number.isFinite(caloriesNum) || caloriesNum <= 0) return null;
+    const pNum = Number(pPct) || 0;
+    const cNum = Number(cPct) || 0;
+    const fNum = Number(fPct) || 0;
+    return {
+        protein: `${Math.max(0, Math.round((caloriesNum * (pNum / 100)) / 4))}g`,
+        carbs: `${Math.max(0, Math.round((caloriesNum * (cNum / 100)) / 4))}g`,
+        fats: `${Math.max(0, Math.round((caloriesNum * (fNum / 100)) / 9))}g`,
+    };
+};
+
+const computeChainFromHeightCm = (cmNum, cfg) => {
+    if (!Number.isFinite(cmNum) || cmNum <= 0) return {};
+    const totalIn = roundOne(cmNum / 2.54);
+    const updates = {
+        client_height: `${roundOne(cmNum)} cm (${totalIn} in)`,
+    };
+    const offset = Number(cfg.ibwOffset);
+    if (Number.isFinite(offset)) {
+        const ibw = roundOne(cmNum - offset);
+        if (ibw >= 15) {
+            updates.target_weight = `${ibw} kg`;
+            const mult = Number(cfg.calMultiplier);
+            if (Number.isFinite(mult) && mult > 0) {
+                const cals = Math.round(ibw * mult);
+                updates.calories = String(cals);
+                const macros = computeMacrosFromCalories(
+                    cals,
+                    cfg.proteinPct,
+                    cfg.carbsPct,
+                    cfg.fatsPct
+                );
+                if (macros) {
+                    updates.protein = macros.protein;
+                    updates.carbs = macros.carbs;
+                    updates.fats = macros.fats;
+                }
+            }
+        }
+    }
+    return updates;
+};
+
+const hasDietDraftContent = (data) => {
+    if (!data || typeof data !== 'object') return false;
+    const textFields = [
+        'client_name',
+        'client_age',
+        'start_weight',
+        'client_height',
+        'food_habits',
+        'lifestyle',
+        'medical_conditions',
+        'medication',
+        'health_abuses',
+        'client_phone',
+        'plan_title',
+        'goal',
+        'target_weight',
+        'end_date',
+        'next_review_date',
+        'calories',
+        'protein',
+        'carbs',
+        'fats',
+        'fibre',
+        'water',
+        'steps',
+        'dietitian_note',
+        'special_instructions',
+        'special_instructions_warning',
+    ];
+    if (textFields.some((key) => String(data[key] || '').trim() !== '')) return true;
+    if (
+        String(data?.calc_config?.heightCm || '').trim() !== '' ||
+        String(data?.calc_config?.heightInches || '').trim() !== ''
+    ) {
+        return true;
+    }
+    const arrayFields = [
+        'measurements',
+        'meals',
+        'supplements',
+        'workouts',
+        'guidelines',
+        'donts',
+        'recipes',
+    ];
+    if (arrayFields.some((key) => Array.isArray(data[key]) && data[key].length > 0)) return true;
+    if (data.show_special_instructions || data.pdf_theme === 'senior') return true;
+    return false;
+};
 
 const EMPTY_FORM_STATE = {
     client_name: '',
@@ -71,7 +191,8 @@ const EMPTY_FORM_STATE = {
     special_instructions_style: 'callout',
     special_instructions: '',
     special_instructions_warning: '',
-    special_instructions_verified: true
+    special_instructions_verified: true,
+    calc_config: DEFAULT_CALC_CONFIG,
 };
 
 export default function AdminPdfGeneratorPage() {
@@ -146,6 +267,151 @@ export default function AdminPdfGeneratorPage() {
     const [activeView, setActiveView] = useState('editor'); // 'editor' | 'preview' | 'split'
     const [generating, setGenerating] = useState(false);
     const [previewKey, setPreviewKey] = useState(1);
+
+    // ─── Delayed LocalStorage Auto-Save & Restore ───
+    const isDraftHydratedRef = useRef(false);
+    const pendingHydratedDataRef = useRef(null);
+    const lastSavedDataRef = useRef(EMPTY_FORM_STATE);
+    const latestFormDataRef = useRef(EMPTY_FORM_STATE);
+    const hasPendingSaveRef = useRef(false);
+    const autoSaveTimerRef = useRef(null);
+
+    const [saveStatus, setSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'restored' | 'error'
+    const [lastSavedAt, setLastSavedAt] = useState(null);
+
+    const lastSavedTimeLabel = useMemo(() => {
+        if (!lastSavedAt) return '';
+        const parsedDate = new Date(lastSavedAt);
+        if (Number.isNaN(parsedDate.getTime())) return '';
+        return parsedDate.toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    }, [lastSavedAt]);
+
+    const persistDietDraft = useCallback((dataToSave) => {
+        try {
+            const savedAt = new Date().toISOString();
+            window.localStorage.setItem(
+                DIET_PLAN_DRAFT_STORAGE_KEY,
+                JSON.stringify({
+                    version: 1,
+                    savedAt,
+                    data: dataToSave,
+                })
+            );
+            lastSavedDataRef.current = dataToSave;
+            hasPendingSaveRef.current = false;
+            return { ok: true, savedAt };
+        } catch (err) {
+            console.warn('Unable to auto-save diet plan draft to localStorage:', err);
+            return { ok: false, savedAt: null };
+        }
+    }, []);
+
+    // Load saved diet plan draft on form reopen / page reload, and flush pending edits on unload
+    useEffect(() => {
+        try {
+            const raw = window.localStorage.getItem(DIET_PLAN_DRAFT_STORAGE_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                const draft = parsed?.data && typeof parsed.data === 'object' ? parsed.data : parsed;
+                if (draft && typeof draft === 'object' && hasDietDraftContent(draft)) {
+                    const restored = {
+                        ...EMPTY_FORM_STATE,
+                        ...draft,
+                        measurements: Array.isArray(draft.measurements) ? draft.measurements : [],
+                        meals: Array.isArray(draft.meals) ? draft.meals : [],
+                        supplements: Array.isArray(draft.supplements) ? draft.supplements : [],
+                        workouts: Array.isArray(draft.workouts) ? draft.workouts : [],
+                        guidelines: Array.isArray(draft.guidelines) ? draft.guidelines : [],
+                        donts: Array.isArray(draft.donts) ? draft.donts : [],
+                        recipes: Array.isArray(draft.recipes) ? draft.recipes : [],
+                        calc_config: {
+                            ...DEFAULT_CALC_CONFIG,
+                            ...(draft.calc_config && typeof draft.calc_config === 'object'
+                                ? draft.calc_config
+                                : {}),
+                        },
+                    };
+
+                    lastSavedDataRef.current = restored;
+                    latestFormDataRef.current = restored;
+                    pendingHydratedDataRef.current = restored;
+
+                    setFormData(restored);
+                    setCollapsed((prev) => ({
+                        ...prev,
+                        supplements: restored.supplements.length > 0 ? false : prev.supplements,
+                        special: restored.show_special_instructions ? false : prev.special,
+                        rules:
+                            restored.guidelines.length > 0 || restored.donts.length > 0
+                                ? false
+                                : prev.rules,
+                    }));
+                    setPreviewKey((k) => k + 1);
+                    if (parsed?.savedAt) {
+                        setLastSavedAt(parsed.savedAt);
+                    }
+                    setSaveStatus('restored');
+                }
+            }
+        } catch (err) {
+            console.warn('Failed to restore diet plan draft from localStorage:', err);
+        } finally {
+            isDraftHydratedRef.current = true;
+        }
+
+        const flushPendingSave = () => {
+            if (autoSaveTimerRef.current) {
+                clearTimeout(autoSaveTimerRef.current);
+                autoSaveTimerRef.current = null;
+            }
+            if (hasPendingSaveRef.current) {
+                persistDietDraft(latestFormDataRef.current);
+            }
+        };
+
+        window.addEventListener('beforeunload', flushPendingSave);
+        window.addEventListener('pagehide', flushPendingSave);
+
+        return () => {
+            window.removeEventListener('beforeunload', flushPendingSave);
+            window.removeEventListener('pagehide', flushPendingSave);
+            flushPendingSave();
+        };
+    }, [persistDietDraft]);
+
+    // Save form details with a 2-second time delay between consecutive saves
+    useEffect(() => {
+        if (!isDraftHydratedRef.current) return;
+
+        if (pendingHydratedDataRef.current !== null) {
+            if (formData === pendingHydratedDataRef.current) {
+                pendingHydratedDataRef.current = null;
+            }
+            return;
+        }
+
+        if (formData === lastSavedDataRef.current) return;
+
+        latestFormDataRef.current = formData;
+        hasPendingSaveRef.current = true;
+        setSaveStatus('saving');
+
+        if (!autoSaveTimerRef.current) {
+            autoSaveTimerRef.current = setTimeout(() => {
+                autoSaveTimerRef.current = null;
+                const result = persistDietDraft(latestFormDataRef.current);
+                if (result.ok) {
+                    setLastSavedAt(result.savedAt);
+                    setSaveStatus('saved');
+                } else {
+                    setSaveStatus('error');
+                }
+            }, AUTO_SAVE_DELAY_MS);
+        }
+    }, [formData, persistDietDraft]);
 
     // ─── Fetch Templates from Supabase ───
     const fetchTemplates = useCallback(async () => {
@@ -240,10 +506,420 @@ export default function AdminPdfGeneratorPage() {
             confirmButtonText: 'Yes, clear all'
         }).then((res) => {
             if (res.isConfirmed) {
-                setFormData(EMPTY_FORM_STATE);
+                if (autoSaveTimerRef.current) {
+                    clearTimeout(autoSaveTimerRef.current);
+                    autoSaveTimerRef.current = null;
+                }
+                hasPendingSaveRef.current = false;
+                try {
+                    window.localStorage.removeItem(DIET_PLAN_DRAFT_STORAGE_KEY);
+                } catch {
+                    // Ignore storage removal errors
+                }
+
+                const freshEmpty = {
+                    ...EMPTY_FORM_STATE,
+                    start_date: new Date().toISOString().split('T')[0],
+                };
+                lastSavedDataRef.current = freshEmpty;
+                latestFormDataRef.current = freshEmpty;
+                pendingHydratedDataRef.current = freshEmpty;
+
+                setFormData(freshEmpty);
                 setEditingRecipeId(null);
+                setLastSavedAt(null);
+                setSaveStatus('idle');
                 setPreviewKey(k => k + 1);
             }
+        });
+    };
+
+    // ─── Clinical Auto-Calculation Helpers (Height ↔ Inches → IBW → Calories → Macros) ───
+    const calcConfig = formData.calc_config || DEFAULT_CALC_CONFIG;
+    const fieldsLocked = Boolean(calcConfig.fieldsLocked);
+
+    const activeIbwNum = useMemo(() => {
+        const fromTarget = parseNumericValue(formData.target_weight);
+        if (Number.isFinite(fromTarget) && fromTarget > 0) return fromTarget;
+        const cmNum = parseFloat(calcConfig.heightCm);
+        const offsetNum = parseFloat(calcConfig.ibwOffset);
+        if (Number.isFinite(cmNum) && cmNum > 0 && Number.isFinite(offsetNum)) {
+            const computed = roundOne(cmNum - offsetNum);
+            if (computed > 0) return computed;
+        }
+        return NaN;
+    }, [formData.target_weight, calcConfig.heightCm, calcConfig.ibwOffset]);
+
+    const activeCaloriesNum = useMemo(
+        () => parseNumericValue(formData.calories),
+        [formData.calories]
+    );
+
+    const macroPctSum = useMemo(() => {
+        const p = parseFloat(calcConfig.proteinPct) || 0;
+        const c = parseFloat(calcConfig.carbsPct) || 0;
+        const f = parseFloat(calcConfig.fatsPct) || 0;
+        return roundOne(p + c + f);
+    }, [calcConfig.proteinPct, calcConfig.carbsPct, calcConfig.fatsPct]);
+
+    const proteinPerKgIbw = useMemo(() => {
+        const pGrams = parseNumericValue(formData.protein);
+        if (Number.isFinite(activeIbwNum) && activeIbwNum > 0 && Number.isFinite(pGrams) && pGrams > 0) {
+            return (pGrams / activeIbwNum).toFixed(2);
+        }
+        return null;
+    }, [formData.protein, activeIbwNum]);
+
+    const handleHeightCmChange = (rawCm) => {
+        setFormData((prev) => {
+            const baseCfg = prev.calc_config || DEFAULT_CALC_CONFIG;
+            if (rawCm === '') {
+                return {
+                    ...prev,
+                    client_height: '',
+                    calc_config: {
+                        ...baseCfg,
+                        heightCm: '',
+                        heightInches: '',
+                        heightFeet: '',
+                        heightRemInches: '',
+                    },
+                };
+            }
+            const cmNum = parseFloat(rawCm);
+            if (!Number.isFinite(cmNum) || cmNum <= 0) {
+                return {
+                    ...prev,
+                    calc_config: { ...baseCfg, heightCm: rawCm },
+                };
+            }
+            const totalIn = cmNum / 2.54;
+            const roundedIn = roundOne(totalIn);
+            let feet = Math.floor(totalIn / 12);
+            let remIn = roundOne(totalIn - feet * 12);
+            if (remIn >= 12) {
+                feet += 1;
+                remIn = 0;
+            }
+            const nextCfg = {
+                ...baseCfg,
+                heightCm: rawCm,
+                heightInches: String(roundedIn),
+                heightFeet: String(feet),
+                heightRemInches: String(remIn),
+            };
+            const chainUpdates = computeChainFromHeightCm(cmNum, nextCfg);
+            return {
+                ...prev,
+                ...chainUpdates,
+                calc_config: nextCfg,
+            };
+        });
+    };
+
+    const handleHeightInchesChange = (rawInches) => {
+        setFormData((prev) => {
+            const baseCfg = prev.calc_config || DEFAULT_CALC_CONFIG;
+            if (rawInches === '') {
+                return {
+                    ...prev,
+                    client_height: '',
+                    calc_config: {
+                        ...baseCfg,
+                        heightCm: '',
+                        heightInches: '',
+                        heightFeet: '',
+                        heightRemInches: '',
+                    },
+                };
+            }
+            const inNum = parseFloat(rawInches);
+            if (!Number.isFinite(inNum) || inNum <= 0) {
+                return {
+                    ...prev,
+                    calc_config: { ...baseCfg, heightInches: rawInches },
+                };
+            }
+            const cmNum = roundOne(inNum * 2.54);
+            let feet = Math.floor(inNum / 12);
+            let remIn = roundOne(inNum - feet * 12);
+            if (remIn >= 12) {
+                feet += 1;
+                remIn = 0;
+            }
+            const nextCfg = {
+                ...baseCfg,
+                heightInches: rawInches,
+                heightCm: String(cmNum),
+                heightFeet: String(feet),
+                heightRemInches: String(remIn),
+            };
+            const chainUpdates = computeChainFromHeightCm(cmNum, nextCfg);
+            return {
+                ...prev,
+                ...chainUpdates,
+                client_height: `${cmNum} cm (${roundOne(inNum)} in)`,
+                calc_config: nextCfg,
+            };
+        });
+    };
+
+    const handleHeightFeetInchesChange = (rawFeet, rawRemIn) => {
+        setFormData((prev) => {
+            const baseCfg = prev.calc_config || DEFAULT_CALC_CONFIG;
+            if (rawFeet === '' && rawRemIn === '') {
+                return {
+                    ...prev,
+                    client_height: '',
+                    calc_config: {
+                        ...baseCfg,
+                        heightCm: '',
+                        heightInches: '',
+                        heightFeet: '',
+                        heightRemInches: '',
+                    },
+                };
+            }
+            const ftNum = parseFloat(rawFeet) || 0;
+            const remInNum = parseFloat(rawRemIn) || 0;
+            const totalIn = roundOne(ftNum * 12 + remInNum);
+            if (totalIn <= 0) {
+                return {
+                    ...prev,
+                    calc_config: {
+                        ...baseCfg,
+                        heightFeet: rawFeet,
+                        heightRemInches: rawRemIn,
+                    },
+                };
+            }
+            const cmNum = roundOne(totalIn * 2.54);
+            const nextCfg = {
+                ...baseCfg,
+                heightFeet: rawFeet,
+                heightRemInches: rawRemIn,
+                heightInches: String(totalIn),
+                heightCm: String(cmNum),
+            };
+            const chainUpdates = computeChainFromHeightCm(cmNum, nextCfg);
+            return {
+                ...prev,
+                ...chainUpdates,
+                calc_config: nextCfg,
+            };
+        });
+    };
+
+    const handleIbwOffsetChange = (rawOffset) => {
+        setFormData((prev) => {
+            const baseCfg = prev.calc_config || DEFAULT_CALC_CONFIG;
+            const nextCfg = { ...baseCfg, ibwOffset: rawOffset };
+            const cmNum = parseFloat(nextCfg.heightCm);
+            const offsetNum = parseFloat(rawOffset);
+            if (Number.isFinite(cmNum) && cmNum > 0 && Number.isFinite(offsetNum)) {
+                const chainUpdates = computeChainFromHeightCm(cmNum, nextCfg);
+                return {
+                    ...prev,
+                    ...chainUpdates,
+                    calc_config: nextCfg,
+                };
+            }
+            return {
+                ...prev,
+                calc_config: nextCfg,
+            };
+        });
+    };
+
+    const handleManualIbwChange = (rawVal) => {
+        setFormData((prev) => {
+            const baseCfg = prev.calc_config || DEFAULT_CALC_CONFIG;
+            const updates = { target_weight: rawVal };
+            const ibwNum = parseNumericValue(rawVal);
+            const mult = parseFloat(baseCfg.calMultiplier);
+            if (Number.isFinite(ibwNum) && ibwNum >= 15 && Number.isFinite(mult) && mult > 0) {
+                const cals = Math.round(ibwNum * mult);
+                updates.calories = String(cals);
+                const macros = computeMacrosFromCalories(
+                    cals,
+                    baseCfg.proteinPct,
+                    baseCfg.carbsPct,
+                    baseCfg.fatsPct
+                );
+                if (macros) {
+                    updates.protein = macros.protein;
+                    updates.carbs = macros.carbs;
+                    updates.fats = macros.fats;
+                }
+            }
+            return { ...prev, ...updates };
+        });
+    };
+
+    const handleCalMultiplierChange = (rawMult) => {
+        setFormData((prev) => {
+            const baseCfg = prev.calc_config || DEFAULT_CALC_CONFIG;
+            const nextCfg = { ...baseCfg, calMultiplier: rawMult };
+            const multNum = parseFloat(rawMult);
+            let ibwNum = parseNumericValue(prev.target_weight);
+            if (!Number.isFinite(ibwNum) || ibwNum <= 0) {
+                const cmNum = parseFloat(nextCfg.heightCm);
+                const offsetNum = parseFloat(nextCfg.ibwOffset);
+                if (Number.isFinite(cmNum) && cmNum > 0 && Number.isFinite(offsetNum)) {
+                    ibwNum = roundOne(cmNum - offsetNum);
+                }
+            }
+            if (Number.isFinite(ibwNum) && ibwNum > 0 && Number.isFinite(multNum) && multNum > 0) {
+                const cals = Math.round(ibwNum * multNum);
+                const macros = computeMacrosFromCalories(
+                    cals,
+                    nextCfg.proteinPct,
+                    nextCfg.carbsPct,
+                    nextCfg.fatsPct
+                );
+                return {
+                    ...prev,
+                    calories: String(cals),
+                    ...(macros || {}),
+                    calc_config: nextCfg,
+                };
+            }
+            return {
+                ...prev,
+                calc_config: nextCfg,
+            };
+        });
+    };
+
+    const handleManualCaloriesChange = (rawVal) => {
+        setFormData((prev) => {
+            const baseCfg = prev.calc_config || DEFAULT_CALC_CONFIG;
+            const calsNum = parseNumericValue(rawVal);
+            if (Number.isFinite(calsNum) && calsNum >= 200) {
+                const macros = computeMacrosFromCalories(
+                    calsNum,
+                    baseCfg.proteinPct,
+                    baseCfg.carbsPct,
+                    baseCfg.fatsPct
+                );
+                return {
+                    ...prev,
+                    calories: rawVal,
+                    ...(macros || {}),
+                };
+            }
+            return {
+                ...prev,
+                calories: rawVal,
+            };
+        });
+    };
+
+    const handleMacroPctChange = (pctKey, rawPct) => {
+        setFormData((prev) => {
+            const baseCfg = prev.calc_config || DEFAULT_CALC_CONFIG;
+            const nextCfg = { ...baseCfg, [pctKey]: rawPct };
+            const calsNum = parseNumericValue(prev.calories);
+            if (Number.isFinite(calsNum) && calsNum > 0) {
+                const macros = computeMacrosFromCalories(
+                    calsNum,
+                    nextCfg.proteinPct,
+                    nextCfg.carbsPct,
+                    nextCfg.fatsPct
+                );
+                return {
+                    ...prev,
+                    ...(macros || {}),
+                    calc_config: nextCfg,
+                };
+            }
+            return {
+                ...prev,
+                calc_config: nextCfg,
+            };
+        });
+    };
+
+    const handleApplyMacroPreset = (pPct, cPct, fPct) => {
+        setFormData((prev) => {
+            const baseCfg = prev.calc_config || DEFAULT_CALC_CONFIG;
+            const nextCfg = {
+                ...baseCfg,
+                proteinPct: pPct,
+                carbsPct: cPct,
+                fatsPct: fPct,
+            };
+            const calsNum = parseNumericValue(prev.calories);
+            const macros =
+                Number.isFinite(calsNum) && calsNum > 0
+                    ? computeMacrosFromCalories(calsNum, pPct, cPct, fPct)
+                    : null;
+            return {
+                ...prev,
+                ...(macros || {}),
+                calc_config: nextCfg,
+            };
+        });
+    };
+
+    const handleBalanceMacrosTo100 = () => {
+        setFormData((prev) => {
+            const baseCfg = prev.calc_config || DEFAULT_CALC_CONFIG;
+            const pNum = parseFloat(baseCfg.proteinPct) || 0;
+            let cNum = parseFloat(baseCfg.carbsPct) || 0;
+            let fNum = parseFloat(baseCfg.fatsPct) || 0;
+
+            // Adjust Fats% first if it keeps Fats in a healthy 12-35% range; otherwise adjust Carbs%
+            const candidateFat = roundOne(100 - pNum - cNum);
+            if (candidateFat >= 12 && candidateFat <= 35) {
+                fNum = candidateFat;
+            } else {
+                cNum = Math.max(0, roundOne(100 - pNum - fNum));
+                fNum = Math.max(0, roundOne(100 - pNum - cNum));
+            }
+
+            const nextCfg = {
+                ...baseCfg,
+                proteinPct: pNum,
+                carbsPct: cNum,
+                fatsPct: fNum,
+            };
+            const calsNum = parseNumericValue(prev.calories);
+            const macros =
+                Number.isFinite(calsNum) && calsNum > 0
+                    ? computeMacrosFromCalories(calsNum, pNum, cNum, fNum)
+                    : null;
+            return {
+                ...prev,
+                ...(macros || {}),
+                calc_config: nextCfg,
+            };
+        });
+    };
+
+    const handleToggleLockFields = () => {
+        setFormData((prev) => {
+            const baseCfg = prev.calc_config || DEFAULT_CALC_CONFIG;
+            return {
+                ...prev,
+                calc_config: {
+                    ...baseCfg,
+                    fieldsLocked: !baseCfg.fieldsLocked,
+                },
+            };
+        });
+    };
+
+    const handleToggleCalculatorPanel = () => {
+        setFormData((prev) => {
+            const baseCfg = prev.calc_config || DEFAULT_CALC_CONFIG;
+            return {
+                ...prev,
+                calc_config: {
+                    ...baseCfg,
+                    showCalculator: baseCfg.showCalculator === false ? true : false,
+                },
+            };
         });
     };
 
@@ -996,7 +1672,38 @@ export default function AdminPdfGeneratorPage() {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        {saveStatus === 'saving' && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-50 text-amber-700 border border-amber-200/80 text-[11px] font-semibold">
+                                <RefreshCw size={11} className="animate-spin shrink-0" />
+                                <span>Saving…</span>
+                            </span>
+                        )}
+                        {saveStatus === 'saved' && (
+                            <span
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[11px] font-semibold"
+                                title={lastSavedTimeLabel ? `Auto-saved to browser storage at ${lastSavedTimeLabel}` : 'Auto-saved to browser storage'}
+                            >
+                                <CheckCircle size={11} className="shrink-0" />
+                                <span>Saved{lastSavedTimeLabel ? ` • ${lastSavedTimeLabel}` : ''}</span>
+                            </span>
+                        )}
+                        {saveStatus === 'restored' && (
+                            <span
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[11px] font-semibold"
+                                title="Restored saved draft from browser storage"
+                            >
+                                <CheckCircle size={11} className="shrink-0" />
+                                <span>Draft restored{lastSavedTimeLabel ? ` • ${lastSavedTimeLabel}` : ''}</span>
+                            </span>
+                        )}
+                        {saveStatus === 'error' && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-red-50 text-red-600 border border-red-200 text-[11px] font-semibold">
+                                <AlertCircle size={11} className="shrink-0" />
+                                <span>Storage full</span>
+                            </span>
+                        )}
+
                         {/* Reset Form */}
                         <button
                             type="button"
@@ -1279,26 +1986,221 @@ export default function AdminPdfGeneratorPage() {
 
                                             {/* Height */}
                                             <div>
-                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Height</label>
+                                                <label className="flex items-center justify-between text-xs font-semibold text-gray-700 mb-1">
+                                                    <span>Height</span>
+                                                    {fieldsLocked && (
+                                                        <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-700 font-bold">
+                                                            <Lock size={10} /> Locked
+                                                        </span>
+                                                    )}
+                                                </label>
                                                 <input
                                                     type="text"
                                                     value={formData.client_height}
+                                                    readOnly={fieldsLocked}
                                                     onChange={(e) => setFormData({ ...formData, client_height: e.target.value })}
-                                                    placeholder="e.g., 165 cm or 5'5&quot;"
-                                                    className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                    placeholder="e.g., 165 cm (65 in)"
+                                                    className={`w-full text-xs px-3 py-2 rounded-xl border focus:outline-none ${
+                                                        fieldsLocked
+                                                            ? 'bg-gray-50 border-gray-200 text-gray-600 cursor-not-allowed'
+                                                            : 'border-gray-200 focus:ring-2 focus:ring-primary/20'
+                                                    }`}
                                                 />
                                             </div>
 
-                                            {/* Target Weight */}
+                                            {/* Ideal Body Weight (IBW) */}
                                             <div>
-                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Target Weight (kg)</label>
+                                                <label className="flex items-center justify-between text-xs font-semibold text-gray-700 mb-1">
+                                                    <span>Ideal Body Weight / IBW (kg)</span>
+                                                    {fieldsLocked && (
+                                                        <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-700 font-bold">
+                                                            <Lock size={10} /> Locked
+                                                        </span>
+                                                    )}
+                                                </label>
                                                 <input
                                                     type="text"
                                                     value={formData.target_weight}
-                                                    onChange={(e) => setFormData({ ...formData, target_weight: e.target.value })}
-                                                    placeholder="e.g., 62.0 kg"
-                                                    className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                    readOnly={fieldsLocked}
+                                                    onChange={(e) => handleManualIbwChange(e.target.value)}
+                                                    placeholder="e.g., 60 kg"
+                                                    className={`w-full text-xs font-semibold px-3 py-2 rounded-xl border focus:outline-none ${
+                                                        fieldsLocked
+                                                            ? 'bg-gray-50 border-gray-200 text-emerald-800 cursor-not-allowed'
+                                                            : 'border-gray-200 text-emerald-900 focus:ring-2 focus:ring-primary/20'
+                                                    }`}
                                                 />
+                                            </div>
+
+                                            {/* ── Height (cm ↔ inches) & IBW Auto-Calculator Strip ── */}
+                                            <div className="sm:col-span-2 lg:col-span-3 rounded-xl bg-emerald-50/60 border border-emerald-200/80 p-3 sm:p-3.5 space-y-2.5">
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Ruler size={14} className="text-primary shrink-0" />
+                                                        <span className="text-xs font-bold text-emerald-950">
+                                                            Step 1 &amp; 2: Height Converter (cm ↔ in) &amp; IBW Auto-Calculator
+                                                        </span>
+                                                    </div>
+                                                    {calcConfig.heightFeet !== '' && Number(calcConfig.heightCm) > 0 && (
+                                                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white text-emerald-800 border border-emerald-200">
+                                                            {calcConfig.heightCm} cm = {calcConfig.heightInches} in ≈ {calcConfig.heightFeet}&apos;{calcConfig.heightRemInches}&quot;
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                    {/* Card A: Height Converter (cm <-> inches + ft/in) */}
+                                                    <div className="bg-white rounded-xl border border-emerald-200/70 p-2.5 space-y-2">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-[11px] font-bold text-gray-700">
+                                                                1. Height Conversion
+                                                            </span>
+                                                            <span className="text-[10px] text-gray-400">
+                                                                1 in = 2.54 cm
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <div className="flex-1 min-w-0">
+                                                                <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">
+                                                                    Centimeters (cm)
+                                                                </label>
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    step="0.1"
+                                                                    value={calcConfig.heightCm}
+                                                                    onChange={(e) => handleHeightCmChange(e.target.value)}
+                                                                    placeholder="165"
+                                                                    className="w-full text-xs font-bold text-heading px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                                                />
+                                                            </div>
+                                                            <ArrowLeftRight size={13} className="text-primary shrink-0 mt-4" />
+                                                            <div className="flex-1 min-w-0">
+                                                                <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">
+                                                                    Total Inches (in)
+                                                                </label>
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    step="0.1"
+                                                                    value={calcConfig.heightInches}
+                                                                    onChange={(e) => handleHeightInchesChange(e.target.value)}
+                                                                    placeholder="65"
+                                                                    className="w-full text-xs font-bold text-heading px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5 pt-1 border-t border-gray-100">
+                                                            <span className="text-[10px] font-semibold text-gray-400 shrink-0">
+                                                                Or Feet &amp; In:
+                                                            </span>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                max="8"
+                                                                step="1"
+                                                                value={calcConfig.heightFeet}
+                                                                onChange={(e) =>
+                                                                    handleHeightFeetInchesChange(
+                                                                        e.target.value,
+                                                                        calcConfig.heightRemInches
+                                                                    )
+                                                                }
+                                                                placeholder="5"
+                                                                className="w-14 text-[11px] font-semibold text-heading px-2 py-1 rounded-md border border-gray-200 focus:outline-none focus:border-primary"
+                                                            />
+                                                            <span className="text-[10px] text-gray-500">ft</span>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                max="11.9"
+                                                                step="0.5"
+                                                                value={calcConfig.heightRemInches}
+                                                                onChange={(e) =>
+                                                                    handleHeightFeetInchesChange(
+                                                                        calcConfig.heightFeet,
+                                                                        e.target.value
+                                                                    )
+                                                                }
+                                                                placeholder="5"
+                                                                className="w-16 text-[11px] font-semibold text-heading px-2 py-1 rounded-md border border-gray-200 focus:outline-none focus:border-primary"
+                                                            />
+                                                            <span className="text-[10px] text-gray-500">in</span>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Card B: IBW Auto-Calculator (Height cm - 100 / 105 / custom) */}
+                                                    <div className="bg-white rounded-xl border border-emerald-200/70 p-2.5 space-y-2">
+                                                        <div className="flex items-center justify-between gap-1">
+                                                            <span className="text-[11px] font-bold text-gray-700">
+                                                                2. IBW (Height cm &minus; Offset)
+                                                            </span>
+                                                            <div className="flex items-center gap-1">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleIbwOffsetChange(100)}
+                                                                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition cursor-pointer ${
+                                                                        Number(calcConfig.ibwOffset) === 100
+                                                                            ? 'bg-primary text-white border-primary'
+                                                                            : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-primary/40'
+                                                                    }`}
+                                                                >
+                                                                    Male (-100)
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleIbwOffsetChange(105)}
+                                                                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition cursor-pointer ${
+                                                                        Number(calcConfig.ibwOffset) === 105
+                                                                            ? 'bg-primary text-white border-primary'
+                                                                            : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-primary/40'
+                                                                    }`}
+                                                                >
+                                                                    Female (-105)
+                                                                </button>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex items-center gap-2">
+                                                            <input
+                                                                type="range"
+                                                                min="95"
+                                                                max="115"
+                                                                step="0.5"
+                                                                value={
+                                                                    Number.isFinite(Number(calcConfig.ibwOffset))
+                                                                        ? Math.min(115, Math.max(95, Number(calcConfig.ibwOffset)))
+                                                                        : 105
+                                                                }
+                                                                onChange={(e) => handleIbwOffsetChange(e.target.value)}
+                                                                className="flex-1 accent-primary cursor-pointer h-1.5"
+                                                            />
+                                                            <div className="flex items-center gap-1 shrink-0">
+                                                                <span className="text-[11px] font-bold text-gray-400">&minus;</span>
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.5"
+                                                                    value={calcConfig.ibwOffset}
+                                                                    onChange={(e) => handleIbwOffsetChange(e.target.value)}
+                                                                    className="w-16 text-xs font-bold text-heading text-center px-1.5 py-1 rounded-lg border border-gray-200 focus:outline-none focus:border-primary"
+                                                                />
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex items-center justify-between text-[11px] pt-1 border-t border-gray-100">
+                                                            <span className="text-gray-500">
+                                                                {Number(calcConfig.heightCm) > 0
+                                                                    ? `${calcConfig.heightCm} cm − ${calcConfig.ibwOffset}`
+                                                                    : 'Enter height in cm or inches'}
+                                                            </span>
+                                                            <span className="font-bold text-primary">
+                                                                {Number.isFinite(activeIbwNum)
+                                                                    ? `IBW = ${activeIbwNum} kg`
+                                                                    : 'IBW: —'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
 
                                             {/* Food Habits */}
@@ -1460,46 +2362,449 @@ export default function AdminPdfGeneratorPage() {
                                 </div>
 
                                 {!collapsed.targets && (
-                                    <div className="p-4 sm:p-5">
+                                    <div className="p-4 sm:p-5 space-y-4">
+                                        {/* ── Step 3 & 4: Calories & Macronutrient Auto-Calculator ── */}
+                                        <div className="rounded-xl bg-emerald-50/60 border border-emerald-200/80 p-3 sm:p-3.5 space-y-3">
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Calculator size={14} className="text-primary shrink-0" />
+                                                        <span className="text-xs font-bold text-emerald-950">
+                                                            Step 3 &amp; 4: Calories &amp; Macro Auto-Calculator
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-emerald-800 border border-emerald-200">
+                                                        {Number.isFinite(activeIbwNum)
+                                                            ? `IBW: ${activeIbwNum} kg`
+                                                            : 'Enter Height / IBW in Sec 1'}
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                    {/* Macro % Total Indicator + 1-Click Balance */}
+                                                    <span
+                                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                                            macroPctSum === 100
+                                                                ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                                                : 'bg-amber-100 text-amber-800 border-amber-300'
+                                                        }`}
+                                                        title="Protein% + Carbs% + Fats% should ideally equal 100% of total calories"
+                                                    >
+                                                        Macro Split: {macroPctSum}%
+                                                    </span>
+                                                    {macroPctSum !== 100 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleBalanceMacrosTo100}
+                                                            className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-600 text-white hover:bg-amber-700 transition cursor-pointer"
+                                                            title="Adjust Fats/Carbs % so Protein + Carbs + Fats = 100%"
+                                                        >
+                                                            Balance 100%
+                                                        </button>
+                                                    )}
+
+                                                    {/* Editable vs Locked Toggle */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleToggleLockFields}
+                                                        className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full border transition cursor-pointer ${
+                                                            fieldsLocked
+                                                                ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
+                                                                : 'bg-white text-emerald-800 border-emerald-200 hover:border-primary/50'
+                                                        }`}
+                                                        title={
+                                                            fieldsLocked
+                                                                ? 'Auto-filled fields are locked against accidental edits. Click to unlock for manual clinical overrides.'
+                                                                : 'Auto-filled fields are editable for clinical rounding/overrides. Click to lock them.'
+                                                        }
+                                                    >
+                                                        {fieldsLocked ? (
+                                                            <>
+                                                                <Lock size={10} /> Locked
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Unlock size={10} /> Editable
+                                                            </>
+                                                        )}
+                                                    </button>
+
+                                                    {/* Show / Hide Calculator */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleToggleCalculatorPanel}
+                                                        className="text-[10px] font-semibold text-emerald-800 hover:text-primary px-1.5 py-0.5 cursor-pointer"
+                                                    >
+                                                        {calcConfig.showCalculator === false ? 'Show' : 'Hide'}
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {calcConfig.showCalculator !== false && (
+                                                <>
+                                                    {/* Quick Clinical Macro Split Presets */}
+                                                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                                                        <span className="text-[10px] font-semibold text-emerald-900/70 mr-0.5">
+                                                            Quick Splits:
+                                                        </span>
+                                                        {[
+                                                            { label: 'Balanced (20P / 60C / 20F)', p: 20, c: 60, f: 20 },
+                                                            { label: 'High-Protein (25P / 55C / 20F)', p: 25, c: 55, f: 20 },
+                                                            { label: 'Low-Fat (25P / 60C / 15F)', p: 25, c: 60, f: 15 },
+                                                            { label: 'Mod-Carb (25P / 50C / 25F)', p: 25, c: 50, f: 25 },
+                                                        ].map((preset) => {
+                                                            const isActive =
+                                                                Number(calcConfig.proteinPct) === preset.p &&
+                                                                Number(calcConfig.carbsPct) === preset.c &&
+                                                                Number(calcConfig.fatsPct) === preset.f;
+                                                            return (
+                                                                <button
+                                                                    key={preset.label}
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        handleApplyMacroPreset(preset.p, preset.c, preset.f)
+                                                                    }
+                                                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-md border transition cursor-pointer ${
+                                                                        isActive
+                                                                            ? 'bg-primary text-white border-primary'
+                                                                            : 'bg-white text-gray-600 border-emerald-200/80 hover:border-primary/40'
+                                                                    }`}
+                                                                >
+                                                                    {preset.label}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+
+                                                    {/* 2x2 Responsive Grid for Calories, Protein, Carbs, Fats */}
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                        {/* 3. Calories = IBW * 20-30 */}
+                                                        <div className="bg-white rounded-xl border border-emerald-200/70 p-2.5 space-y-2">
+                                                            <div className="flex items-center justify-between gap-1">
+                                                                <span className="text-[11px] font-bold text-gray-700">
+                                                                    3. Calories (IBW &times; 20&ndash;30)
+                                                                </span>
+                                                                <div className="flex items-center gap-1">
+                                                                    {[20, 22, 25, 28, 30].map((mult) => (
+                                                                        <button
+                                                                            key={mult}
+                                                                            type="button"
+                                                                            onClick={() => handleCalMultiplierChange(mult)}
+                                                                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition cursor-pointer ${
+                                                                                Number(calcConfig.calMultiplier) === mult
+                                                                                    ? 'bg-primary text-white border-primary'
+                                                                                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-primary/40'
+                                                                            }`}
+                                                                        >
+                                                                            &times;{mult}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <input
+                                                                    type="range"
+                                                                    min="20"
+                                                                    max="30"
+                                                                    step="0.5"
+                                                                    value={
+                                                                        Number.isFinite(Number(calcConfig.calMultiplier))
+                                                                            ? Math.min(30, Math.max(20, Number(calcConfig.calMultiplier)))
+                                                                            : 25
+                                                                    }
+                                                                    onChange={(e) => handleCalMultiplierChange(e.target.value)}
+                                                                    className="flex-1 accent-primary cursor-pointer h-1.5"
+                                                                />
+                                                                <div className="flex items-center gap-1 shrink-0">
+                                                                    <span className="text-[10px] font-bold text-gray-400">&times;</span>
+                                                                    <input
+                                                                        type="number"
+                                                                        min="10"
+                                                                        max="50"
+                                                                        step="0.5"
+                                                                        value={calcConfig.calMultiplier}
+                                                                        onChange={(e) => handleCalMultiplierChange(e.target.value)}
+                                                                        className="w-14 text-xs font-bold text-heading text-center px-1.5 py-1 rounded-lg border border-gray-200 focus:outline-none focus:border-primary"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center justify-between text-[11px] pt-1 border-t border-gray-100">
+                                                                <span className="text-gray-500">
+                                                                    {Number.isFinite(activeIbwNum)
+                                                                        ? `${activeIbwNum} kg × ${calcConfig.calMultiplier} kcal/kg`
+                                                                        : 'Requires IBW above'}
+                                                                </span>
+                                                                <span className="font-bold text-emerald-800">
+                                                                    {Number.isFinite(activeCaloriesNum)
+                                                                        ? `${activeCaloriesNum} kcal`
+                                                                        : '—'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* 4a. Protein = 15-25% * Calories / 4 */}
+                                                        <div className="bg-white rounded-xl border border-emerald-200/70 p-2.5 space-y-2">
+                                                            <div className="flex items-center justify-between gap-1">
+                                                                <span className="text-[11px] font-bold text-gray-700">
+                                                                    4a. Protein (15&ndash;25% &divide; 4)
+                                                                </span>
+                                                                <div className="flex items-center gap-1">
+                                                                    {[15, 20, 25].map((pct) => (
+                                                                        <button
+                                                                            key={pct}
+                                                                            type="button"
+                                                                            onClick={() => handleMacroPctChange('proteinPct', pct)}
+                                                                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition cursor-pointer ${
+                                                                                Number(calcConfig.proteinPct) === pct
+                                                                                    ? 'bg-primary text-white border-primary'
+                                                                                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-primary/40'
+                                                                            }`}
+                                                                        >
+                                                                            {pct}%
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <input
+                                                                    type="range"
+                                                                    min="15"
+                                                                    max="25"
+                                                                    step="0.5"
+                                                                    value={
+                                                                        Number.isFinite(Number(calcConfig.proteinPct))
+                                                                            ? Math.min(25, Math.max(15, Number(calcConfig.proteinPct)))
+                                                                            : 20
+                                                                    }
+                                                                    onChange={(e) => handleMacroPctChange('proteinPct', e.target.value)}
+                                                                    className="flex-1 accent-primary cursor-pointer h-1.5"
+                                                                />
+                                                                <div className="flex items-center gap-0.5 shrink-0">
+                                                                    <input
+                                                                        type="number"
+                                                                        min="5"
+                                                                        max="50"
+                                                                        step="0.5"
+                                                                        value={calcConfig.proteinPct}
+                                                                        onChange={(e) => handleMacroPctChange('proteinPct', e.target.value)}
+                                                                        className="w-14 text-xs font-bold text-heading text-center px-1.5 py-1 rounded-lg border border-gray-200 focus:outline-none focus:border-primary"
+                                                                    />
+                                                                    <span className="text-[10px] font-bold text-gray-400">%</span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center justify-between text-[11px] pt-1 border-t border-gray-100">
+                                                                <span className="text-gray-500">
+                                                                    {Number.isFinite(activeCaloriesNum)
+                                                                        ? `${calcConfig.proteinPct}% × ${activeCaloriesNum} ÷ 4`
+                                                                        : '15–25% of kcal ÷ 4'}
+                                                                </span>
+                                                                <span className="font-bold text-primary">
+                                                                    {formData.protein || '—'}
+                                                                    {proteinPerKgIbw ? ` (${proteinPerKgIbw} g/kg)` : ''}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* 4b. Carbs = 40-60% * Calories / 4 */}
+                                                        <div className="bg-white rounded-xl border border-emerald-200/70 p-2.5 space-y-2">
+                                                            <div className="flex items-center justify-between gap-1">
+                                                                <span className="text-[11px] font-bold text-gray-700">
+                                                                    4b. Carbs (40&ndash;60% &divide; 4)
+                                                                </span>
+                                                                <div className="flex items-center gap-1">
+                                                                    {[40, 50, 55, 60].map((pct) => (
+                                                                        <button
+                                                                            key={pct}
+                                                                            type="button"
+                                                                            onClick={() => handleMacroPctChange('carbsPct', pct)}
+                                                                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition cursor-pointer ${
+                                                                                Number(calcConfig.carbsPct) === pct
+                                                                                    ? 'bg-primary text-white border-primary'
+                                                                                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-primary/40'
+                                                                            }`}
+                                                                        >
+                                                                            {pct}%
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <input
+                                                                    type="range"
+                                                                    min="40"
+                                                                    max="60"
+                                                                    step="0.5"
+                                                                    value={
+                                                                        Number.isFinite(Number(calcConfig.carbsPct))
+                                                                            ? Math.min(60, Math.max(40, Number(calcConfig.carbsPct)))
+                                                                            : 60
+                                                                    }
+                                                                    onChange={(e) => handleMacroPctChange('carbsPct', e.target.value)}
+                                                                    className="flex-1 accent-primary cursor-pointer h-1.5"
+                                                                />
+                                                                <div className="flex items-center gap-0.5 shrink-0">
+                                                                    <input
+                                                                        type="number"
+                                                                        min="10"
+                                                                        max="75"
+                                                                        step="0.5"
+                                                                        value={calcConfig.carbsPct}
+                                                                        onChange={(e) => handleMacroPctChange('carbsPct', e.target.value)}
+                                                                        className="w-14 text-xs font-bold text-heading text-center px-1.5 py-1 rounded-lg border border-gray-200 focus:outline-none focus:border-primary"
+                                                                    />
+                                                                    <span className="text-[10px] font-bold text-gray-400">%</span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center justify-between text-[11px] pt-1 border-t border-gray-100">
+                                                                <span className="text-gray-500">
+                                                                    {Number.isFinite(activeCaloriesNum)
+                                                                        ? `${calcConfig.carbsPct}% × ${activeCaloriesNum} ÷ 4`
+                                                                        : '40–60% of kcal ÷ 4'}
+                                                                </span>
+                                                                <span className="font-bold text-primary">
+                                                                    {formData.carbs || '—'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* 4c. Fats = 12-20% (up to 30%) * Calories / 9 */}
+                                                        <div className="bg-white rounded-xl border border-emerald-200/70 p-2.5 space-y-2">
+                                                            <div className="flex items-center justify-between gap-1">
+                                                                <span className="text-[11px] font-bold text-gray-700">
+                                                                    4c. Fats (12&ndash;20% &divide; 9)
+                                                                </span>
+                                                                <div className="flex items-center gap-1">
+                                                                    {[12, 15, 20, 25].map((pct) => (
+                                                                        <button
+                                                                            key={pct}
+                                                                            type="button"
+                                                                            onClick={() => handleMacroPctChange('fatsPct', pct)}
+                                                                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition cursor-pointer ${
+                                                                                Number(calcConfig.fatsPct) === pct
+                                                                                    ? 'bg-primary text-white border-primary'
+                                                                                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-primary/40'
+                                                                            }`}
+                                                                        >
+                                                                            {pct}%
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <input
+                                                                    type="range"
+                                                                    min="12"
+                                                                    max="30"
+                                                                    step="0.5"
+                                                                    value={
+                                                                        Number.isFinite(Number(calcConfig.fatsPct))
+                                                                            ? Math.min(30, Math.max(12, Number(calcConfig.fatsPct)))
+                                                                            : 20
+                                                                    }
+                                                                    onChange={(e) => handleMacroPctChange('fatsPct', e.target.value)}
+                                                                    className="flex-1 accent-primary cursor-pointer h-1.5"
+                                                                />
+                                                                <div className="flex items-center gap-0.5 shrink-0">
+                                                                    <input
+                                                                        type="number"
+                                                                        min="5"
+                                                                        max="50"
+                                                                        step="0.5"
+                                                                        value={calcConfig.fatsPct}
+                                                                        onChange={(e) => handleMacroPctChange('fatsPct', e.target.value)}
+                                                                        className="w-14 text-xs font-bold text-heading text-center px-1.5 py-1 rounded-lg border border-gray-200 focus:outline-none focus:border-primary"
+                                                                    />
+                                                                    <span className="text-[10px] font-bold text-gray-400">%</span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center justify-between text-[11px] pt-1 border-t border-gray-100">
+                                                                <span className="text-gray-500">
+                                                                    {Number.isFinite(activeCaloriesNum)
+                                                                        ? `${calcConfig.fatsPct}% × ${activeCaloriesNum} ÷ 9`
+                                                                        : '12–20% (or up to 30%) ÷ 9'}
+                                                                </span>
+                                                                <span className="font-bold text-primary">
+                                                                    {formData.fats || '—'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+
+                                        {/* Target Input Fields */}
                                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2.5">
                                             <div>
-                                                <label className="block text-[11px] font-semibold text-gray-600 mb-1">Calories (kcal)</label>
+                                                <label className="flex items-center justify-between text-[11px] font-semibold text-gray-600 mb-1">
+                                                    <span>Calories (kcal)</span>
+                                                    {fieldsLocked && <Lock size={10} className="text-amber-600" />}
+                                                </label>
                                                 <input
                                                     type="text"
                                                     value={formData.calories}
-                                                    onChange={(e) => setFormData({ ...formData, calories: e.target.value })}
+                                                    readOnly={fieldsLocked}
+                                                    onChange={(e) => handleManualCaloriesChange(e.target.value)}
                                                     placeholder="e.g. 1500"
-                                                    className="w-full text-xs font-bold text-emerald-800 px-2.5 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20"
+                                                    className={`w-full text-xs font-bold text-emerald-800 px-2.5 py-2 rounded-xl border focus:outline-none ${
+                                                        fieldsLocked
+                                                            ? 'bg-gray-50 border-gray-200 cursor-not-allowed'
+                                                            : 'border-gray-200 focus:ring-2 focus:ring-primary/20'
+                                                    }`}
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-[11px] font-semibold text-gray-600 mb-1">Protein (g)</label>
+                                                <label className="flex items-center justify-between text-[11px] font-semibold text-gray-600 mb-1">
+                                                    <span>Protein (g)</span>
+                                                    {fieldsLocked && <Lock size={10} className="text-amber-600" />}
+                                                </label>
                                                 <input
                                                     type="text"
                                                     value={formData.protein}
+                                                    readOnly={fieldsLocked}
                                                     onChange={(e) => setFormData({ ...formData, protein: e.target.value })}
                                                     placeholder="e.g. 85g"
-                                                    className="w-full text-xs font-semibold px-2.5 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20"
+                                                    className={`w-full text-xs font-semibold px-2.5 py-2 rounded-xl border focus:outline-none ${
+                                                        fieldsLocked
+                                                            ? 'bg-gray-50 border-gray-200 text-gray-600 cursor-not-allowed'
+                                                            : 'border-gray-200 focus:ring-2 focus:ring-primary/20'
+                                                    }`}
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-[11px] font-semibold text-gray-600 mb-1">Carbs (g)</label>
+                                                <label className="flex items-center justify-between text-[11px] font-semibold text-gray-600 mb-1">
+                                                    <span>Carbs (g)</span>
+                                                    {fieldsLocked && <Lock size={10} className="text-amber-600" />}
+                                                </label>
                                                 <input
                                                     type="text"
                                                     value={formData.carbs}
+                                                    readOnly={fieldsLocked}
                                                     onChange={(e) => setFormData({ ...formData, carbs: e.target.value })}
                                                     placeholder="e.g. 145g"
-                                                    className="w-full text-xs font-semibold px-2.5 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20"
+                                                    className={`w-full text-xs font-semibold px-2.5 py-2 rounded-xl border focus:outline-none ${
+                                                        fieldsLocked
+                                                            ? 'bg-gray-50 border-gray-200 text-gray-600 cursor-not-allowed'
+                                                            : 'border-gray-200 focus:ring-2 focus:ring-primary/20'
+                                                    }`}
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-[11px] font-semibold text-gray-600 mb-1">Fats (g)</label>
+                                                <label className="flex items-center justify-between text-[11px] font-semibold text-gray-600 mb-1">
+                                                    <span>Fats (g)</span>
+                                                    {fieldsLocked && <Lock size={10} className="text-amber-600" />}
+                                                </label>
                                                 <input
                                                     type="text"
                                                     value={formData.fats}
+                                                    readOnly={fieldsLocked}
                                                     onChange={(e) => setFormData({ ...formData, fats: e.target.value })}
                                                     placeholder="e.g. 42g"
-                                                    className="w-full text-xs font-semibold px-2.5 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20"
+                                                    className={`w-full text-xs font-semibold px-2.5 py-2 rounded-xl border focus:outline-none ${
+                                                        fieldsLocked
+                                                            ? 'bg-gray-50 border-gray-200 text-gray-600 cursor-not-allowed'
+                                                            : 'border-gray-200 focus:ring-2 focus:ring-primary/20'
+                                                    }`}
                                                 />
                                             </div>
                                             <div>

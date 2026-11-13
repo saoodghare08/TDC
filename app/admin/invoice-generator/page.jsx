@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import Swal from 'sweetalert2';
@@ -12,6 +12,7 @@ import {
     User,
     Target,
     CheckCircle,
+    AlertCircle,
     Clock,
     PieChart,
     QrCode,
@@ -42,6 +43,44 @@ const PDFViewer = dynamic(() => import('@react-pdf/renderer').then((mod) => mod.
 });
 
 const PAYMENT_STORAGE_KEY = 'tdc_invoice_payment_defaults_v1';
+const INVOICE_DRAFT_STORAGE_KEY = 'tdc_invoice_form_draft_v1';
+const AUTO_SAVE_DELAY_MS = 2000;
+
+const EMPTY_INVOICE_STATE = {
+    client_name: '',
+    goal: '',
+    status: 'unpaid', // 'unpaid' | 'partly_paid' | 'paid'
+    amount_paid: '',
+    upi_id: '',
+    qr_image: '',
+    qr_filename: '',
+    items: [{ id: 'initial-row-1', description: '', amount: '' }],
+    invoice_number: 'TDC-INV-001',
+    invoice_date: '',
+};
+
+const hasInvoiceDraftContent = (data, savedPayment) => {
+    if (!data || typeof data !== 'object') return false;
+    if (String(data.client_name || '').trim() !== '') return true;
+    if (String(data.goal || '').trim() !== '') return true;
+    if (data.status && data.status !== 'unpaid') return true;
+    if (String(data.amount_paid || '').trim() !== '') return true;
+    if (
+        Array.isArray(data.items) &&
+        data.items.some(
+            (row) =>
+                String(row?.description || '').trim() !== '' ||
+                String(row?.amount || '').trim() !== ''
+        )
+    ) {
+        return true;
+    }
+    const draftUpi = String(data.upi_id || '').trim();
+    const defaultUpi = String(savedPayment?.upi_id || '').trim();
+    if (draftUpi && draftUpi !== defaultUpi) return true;
+    if (data.qr_image && data.qr_image !== (savedPayment?.qr_image || '')) return true;
+    return false;
+};
 
 const GOAL_SUGGESTIONS = [
     'Weight Loss Regimen',
@@ -116,20 +155,9 @@ export default function AdminInvoiceGeneratorPage() {
     const supabase = createClient();
     const qrInputRef = useRef(null);
 
-    const [formData, setFormData] = useState({
-        client_name: '',
-        goal: '',
-        status: 'unpaid', // 'unpaid' | 'partly_paid' | 'paid'
-        amount_paid: '',
-        upi_id: '',
-        qr_image: '',
-        qr_filename: '',
-        items: [{ id: 'initial-row-1', description: '', amount: '' }],
-        invoice_number: 'TDC-INV-001',
-        invoice_date: '',
-    });
+    const [formData, setFormData] = useState(EMPTY_INVOICE_STATE);
 
-    const [debouncedInvoice, setDebouncedInvoice] = useState(formData);
+    const [debouncedInvoice, setDebouncedInvoice] = useState(EMPTY_INVOICE_STATE);
     const [activeView, setActiveView] = useState('editor'); // 'editor' | 'preview' | 'split'
     const [generating, setGenerating] = useState(false);
     const [isDraggingQr, setIsDraggingQr] = useState(false);
@@ -137,15 +165,72 @@ export default function AdminInvoiceGeneratorPage() {
     const [clientSuggestions, setClientSuggestions] = useState([]);
     const [previewKey, setPreviewKey] = useState(1);
 
-    // Initialize client-side meta (invoice ref, date, responsive split view, saved UPI/QR defaults, client autocomplete)
+    // ─── Delayed LocalStorage Auto-Save & Restore ───
+    const isDraftHydratedRef = useRef(false);
+    const pendingHydratedDataRef = useRef(null);
+    const lastSavedDataRef = useRef(EMPTY_INVOICE_STATE);
+    const latestFormDataRef = useRef(EMPTY_INVOICE_STATE);
+    const hasPendingSaveRef = useRef(false);
+    const autoSaveTimerRef = useRef(null);
+
+    const [saveStatus, setSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'restored' | 'error'
+    const [lastSavedAt, setLastSavedAt] = useState(null);
+
+    const lastSavedTimeLabel = useMemo(() => {
+        if (!lastSavedAt) return '';
+        const parsedDate = new Date(lastSavedAt);
+        if (Number.isNaN(parsedDate.getTime())) return '';
+        return parsedDate.toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    }, [lastSavedAt]);
+
+    const persistInvoiceDraft = useCallback((dataToSave) => {
+        const savedAt = new Date().toISOString();
+        try {
+            window.localStorage.setItem(
+                INVOICE_DRAFT_STORAGE_KEY,
+                JSON.stringify({
+                    version: 1,
+                    savedAt,
+                    data: dataToSave,
+                })
+            );
+            lastSavedDataRef.current = dataToSave;
+            hasPendingSaveRef.current = false;
+            return { ok: true, savedAt };
+        } catch {
+            // Fallback without base64 QR image if browser storage quota is tight
+            try {
+                const lightCopy = { ...dataToSave, qr_image: '', qr_filename: '' };
+                window.localStorage.setItem(
+                    INVOICE_DRAFT_STORAGE_KEY,
+                    JSON.stringify({
+                        version: 1,
+                        savedAt,
+                        data: lightCopy,
+                    })
+                );
+                lastSavedDataRef.current = dataToSave;
+                hasPendingSaveRef.current = false;
+                return { ok: true, savedAt };
+            } catch (err) {
+                console.warn('Unable to auto-save invoice draft to localStorage:', err);
+                return { ok: false, savedAt: null };
+            }
+        }
+    }, []);
+
+    // Load saved invoice draft (or defaults) on reopen / reload, and flush pending edits on unload
     useEffect(() => {
         const meta = generateInvoiceMeta();
         let savedPayment = null;
 
         try {
-            const raw = window.localStorage.getItem(PAYMENT_STORAGE_KEY);
-            if (raw) {
-                savedPayment = JSON.parse(raw);
+            const rawPayment = window.localStorage.getItem(PAYMENT_STORAGE_KEY);
+            if (rawPayment) {
+                savedPayment = JSON.parse(rawPayment);
                 if (savedPayment?.upi_id || savedPayment?.qr_image) {
                     setHasSavedDefaults(true);
                 }
@@ -154,19 +239,86 @@ export default function AdminInvoiceGeneratorPage() {
             // Ignore localStorage access errors
         }
 
-        setFormData((prev) => ({
-            ...prev,
+        let restoredInvoice = null;
+        let restoredTimestamp = null;
+
+        try {
+            const rawDraft = window.localStorage.getItem(INVOICE_DRAFT_STORAGE_KEY);
+            if (rawDraft) {
+                const parsed = JSON.parse(rawDraft);
+                const draft = parsed?.data && typeof parsed.data === 'object' ? parsed.data : parsed;
+                if (draft && typeof draft === 'object' && hasInvoiceDraftContent(draft, savedPayment)) {
+                    restoredInvoice = {
+                        ...EMPTY_INVOICE_STATE,
+                        ...draft,
+                        status: ['unpaid', 'partly_paid', 'paid'].includes(draft.status)
+                            ? draft.status
+                            : 'unpaid',
+                        upi_id: draft.upi_id || savedPayment?.upi_id || '',
+                        qr_image: draft.qr_image || savedPayment?.qr_image || '',
+                        qr_filename: draft.qr_filename || savedPayment?.qr_filename || '',
+                        items: Array.isArray(draft.items)
+                            ? draft.items
+                            : [{ id: 'initial-row-1', description: '', amount: '' }],
+                        invoice_number: draft.invoice_number || meta.invoice_number,
+                        invoice_date: draft.invoice_date || meta.invoice_date,
+                    };
+                    restoredTimestamp = parsed?.savedAt || null;
+                }
+            }
+        } catch (err) {
+            console.warn('Failed to restore invoice draft from localStorage:', err);
+        }
+
+        const initialData = restoredInvoice || {
+            ...EMPTY_INVOICE_STATE,
             ...meta,
-            upi_id: savedPayment?.upi_id || prev.upi_id,
-            qr_image: savedPayment?.qr_image || prev.qr_image,
-            qr_filename: savedPayment?.qr_filename || prev.qr_filename,
-        }));
+            upi_id: savedPayment?.upi_id || '',
+            qr_image: savedPayment?.qr_image || '',
+            qr_filename: savedPayment?.qr_filename || '',
+        };
+
+        lastSavedDataRef.current = initialData;
+        latestFormDataRef.current = initialData;
+        pendingHydratedDataRef.current = initialData;
+        isDraftHydratedRef.current = true;
+
+        setFormData(initialData);
+        setDebouncedInvoice(initialData);
+        if (restoredInvoice) {
+            setPreviewKey((k) => k + 1);
+            if (restoredTimestamp) {
+                setLastSavedAt(restoredTimestamp);
+            }
+            setSaveStatus('restored');
+        }
 
         if (window.innerWidth >= 1024) {
             setActiveView('split');
         }
 
-        // Load client names silently for convenient autocomplete
+        const flushPendingSave = () => {
+            if (autoSaveTimerRef.current) {
+                clearTimeout(autoSaveTimerRef.current);
+                autoSaveTimerRef.current = null;
+            }
+            if (hasPendingSaveRef.current) {
+                persistInvoiceDraft(latestFormDataRef.current);
+            }
+        };
+
+        window.addEventListener('beforeunload', flushPendingSave);
+        window.addEventListener('pagehide', flushPendingSave);
+
+        return () => {
+            window.removeEventListener('beforeunload', flushPendingSave);
+            window.removeEventListener('pagehide', flushPendingSave);
+            flushPendingSave();
+        };
+    }, [persistInvoiceDraft]);
+
+    // Load client names silently for convenient autocomplete
+    useEffect(() => {
         (async () => {
             try {
                 const { data } = await supabase
@@ -185,6 +337,37 @@ export default function AdminInvoiceGeneratorPage() {
             }
         })();
     }, [supabase]);
+
+    // Save invoice details with a 2-second time delay between consecutive saves
+    useEffect(() => {
+        if (!isDraftHydratedRef.current) return;
+
+        if (pendingHydratedDataRef.current !== null) {
+            if (formData === pendingHydratedDataRef.current) {
+                pendingHydratedDataRef.current = null;
+            }
+            return;
+        }
+
+        if (formData === lastSavedDataRef.current) return;
+
+        latestFormDataRef.current = formData;
+        hasPendingSaveRef.current = true;
+        setSaveStatus('saving');
+
+        if (!autoSaveTimerRef.current) {
+            autoSaveTimerRef.current = setTimeout(() => {
+                autoSaveTimerRef.current = null;
+                const result = persistInvoiceDraft(latestFormDataRef.current);
+                if (result.ok) {
+                    setLastSavedAt(result.savedAt);
+                    setSaveStatus('saved');
+                } else {
+                    setSaveStatus('error');
+                }
+            }, AUTO_SAVE_DELAY_MS);
+        }
+    }, [formData, persistInvoiceDraft]);
 
     // Debounce live PDF preview updates so typing stays fast and responsive
     useEffect(() => {
@@ -365,19 +548,41 @@ export default function AdminInvoiceGeneratorPage() {
             confirmButtonText: 'Yes, reset',
         }).then((res) => {
             if (res.isConfirmed) {
+                if (autoSaveTimerRef.current) {
+                    clearTimeout(autoSaveTimerRef.current);
+                    autoSaveTimerRef.current = null;
+                }
+                hasPendingSaveRef.current = false;
+
+                let savedPayment = null;
+                try {
+                    window.localStorage.removeItem(INVOICE_DRAFT_STORAGE_KEY);
+                    const rawPayment = window.localStorage.getItem(PAYMENT_STORAGE_KEY);
+                    if (rawPayment) {
+                        savedPayment = JSON.parse(rawPayment);
+                    }
+                } catch {
+                    // Ignore storage errors
+                }
+
                 const freshMeta = generateInvoiceMeta();
-                setFormData((prev) => ({
-                    ...prev,
+                const freshInvoice = {
+                    ...EMPTY_INVOICE_STATE,
                     ...freshMeta,
-                    client_name: '',
-                    goal: '',
-                    status: 'unpaid',
-                    amount_paid: '',
                     items: [createRow('', '')],
-                    ...(hasSavedDefaults
-                        ? {}
-                        : { upi_id: '', qr_image: '', qr_filename: '' }),
-                }));
+                    upi_id: savedPayment?.upi_id || '',
+                    qr_image: savedPayment?.qr_image || '',
+                    qr_filename: savedPayment?.qr_filename || '',
+                };
+
+                lastSavedDataRef.current = freshInvoice;
+                latestFormDataRef.current = freshInvoice;
+                pendingHydratedDataRef.current = freshInvoice;
+
+                setFormData(freshInvoice);
+                setDebouncedInvoice(freshInvoice);
+                setLastSavedAt(null);
+                setSaveStatus('idle');
                 setPreviewKey((k) => k + 1);
             }
         });
@@ -554,7 +759,38 @@ export default function AdminInvoiceGeneratorPage() {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        {saveStatus === 'saving' && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-50 text-amber-700 border border-amber-200/80 text-[11px] font-semibold">
+                                <RefreshCw size={11} className="animate-spin shrink-0" />
+                                <span>Saving…</span>
+                            </span>
+                        )}
+                        {saveStatus === 'saved' && (
+                            <span
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[11px] font-semibold"
+                                title={lastSavedTimeLabel ? `Auto-saved to browser storage at ${lastSavedTimeLabel}` : 'Auto-saved to browser storage'}
+                            >
+                                <CheckCircle size={11} className="shrink-0" />
+                                <span>Saved{lastSavedTimeLabel ? ` • ${lastSavedTimeLabel}` : ''}</span>
+                            </span>
+                        )}
+                        {saveStatus === 'restored' && (
+                            <span
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[11px] font-semibold"
+                                title="Restored saved draft from browser storage"
+                            >
+                                <CheckCircle size={11} className="shrink-0" />
+                                <span>Draft restored{lastSavedTimeLabel ? ` • ${lastSavedTimeLabel}` : ''}</span>
+                            </span>
+                        )}
+                        {saveStatus === 'error' && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-red-50 text-red-600 border border-red-200 text-[11px] font-semibold">
+                                <AlertCircle size={11} className="shrink-0" />
+                                <span>Storage full</span>
+                            </span>
+                        )}
+
                         <button
                             type="button"
                             onClick={handleResetForm}
