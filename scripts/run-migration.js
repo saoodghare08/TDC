@@ -31,11 +31,28 @@ async function run() {
     try {
         await client.connect();
         console.log('Connected to Postgres successfully!');
-        const sql = fs.readFileSync('supabase/migrations/20261021000000_create_recipes_table.sql', 'utf8');
+        const migrationPath =
+            process.argv[2] ||
+            'supabase/migrations/20261117000000_create_client_plans_and_invoices.sql';
+        console.log(`Executing migration: ${migrationPath}`);
+        const sql = fs.readFileSync(migrationPath, 'utf8');
         await client.query(sql);
-        console.log('Migration executed successfully! Recipes table and seed data created.');
+        console.log(`Migration executed successfully: ${migrationPath}`);
+
+        const check = await client.query(`
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+              AND table_name IN ('clients', 'client_diet_plans', 'client_invoices')
+            ORDER BY table_name;
+        `);
+        console.log(
+            'Verified tables:',
+            check.rows.map((r) => r.table_name).join(', ')
+        );
     } catch (err) {
         console.error('Migration error:', err);
+        process.exitCode = 1;
     } finally {
         await client.end();
     }

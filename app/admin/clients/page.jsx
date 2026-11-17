@@ -1,347 +1,670 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { createClient } from '@/utils/supabase/client';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import Swal from 'sweetalert2';
 import {
-    Users, Plus, Search, Eye, Edit2, ChevronRight,
-    Phone, Instagram, Calendar, Activity, X,
+    Users,
+    Plus,
+    Search,
+    X,
+    FileText,
+    Receipt,
+    Phone,
+    ChevronRight,
+    RefreshCw,
 } from 'lucide-react';
+import { createClient } from '@/utils/supabase/client';
 
 const STATUS_STYLES = {
-    active: { bg: 'bg-green-100', text: 'text-green-700', dot: 'bg-green-500', label: 'Active' },
-    completed: { bg: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-500', label: 'Completed' },
-    paused: { bg: 'bg-yellow-100', text: 'text-yellow-700', dot: 'bg-yellow-500', label: 'Paused' },
-    inactive: { bg: 'bg-gray-100', text: 'text-gray-500', dot: 'bg-gray-400', label: 'Inactive' },
-    pending: { bg: 'bg-orange-100', text: 'text-orange-700', dot: 'bg-orange-400', label: 'Pending' },
+    active: {
+        bg: 'bg-emerald-50',
+        text: 'text-emerald-700',
+        border: 'border-emerald-200',
+        dot: 'bg-emerald-500',
+        label: 'Active',
+    },
+    paused: {
+        bg: 'bg-amber-50',
+        text: 'text-amber-700',
+        border: 'border-amber-200',
+        dot: 'bg-amber-500',
+        label: 'Paused',
+    },
+    completed: {
+        bg: 'bg-blue-50',
+        text: 'text-blue-700',
+        border: 'border-blue-200',
+        dot: 'bg-blue-500',
+        label: 'Completed',
+    },
 };
 
-function StatusBadge({ status }) {
-    const s = STATUS_STYLES[status] || STATUS_STYLES.inactive;
-    return (
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${s.bg} ${s.text}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-            {s.label}
-        </span>
-    );
-}
+const EMPTY_CLIENT_FORM = {
+    full_name: '',
+    phone: '',
+    age: '',
+    height: '',
+    initial_goals: '',
+    status: 'active',
+    notes: '',
+};
 
-function Initials({ name }) {
-    const letters = name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?';
-    return (
-        <div className="w-10 h-10 rounded-xl bg-heading text-white flex items-center justify-center text-sm font-bold shrink-0">
-            {letters}
-        </div>
-    );
-}
+const formatDateShort = (iso) => {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    });
+};
 
-export default function ClientsPage() {
+const getInitials = (name) =>
+    String(name || '?')
+        .trim()
+        .split(/\s+/)
+        .map((w) => w[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase() || '?';
+
+export default function AdminClientsListingPage() {
+    const router = useRouter();
+    const supabase = useMemo(() => createClient(), []);
+
     const [clients, setClients] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [filterStatus, setFilterStatus] = useState('all');
-    const supabase = createClient();
+    const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
 
-    useEffect(() => { fetchClients(); }, []);
+    // Add Client Modal
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [clientForm, setClientForm] = useState(EMPTY_CLIENT_FORM);
 
-    const fetchClients = async () => {
+    const fetchClients = useCallback(async () => {
+        setLoading(true);
         try {
             const { data, error } = await supabase
                 .from('clients')
-                .select('*')
-                .order('created_at', { ascending: false });
+                .select('*, client_diet_plans(count), client_invoices(count)')
+                .order('updated_at', { ascending: false });
+
             if (error) throw error;
             setClients(data || []);
-        } catch (error) {
-            console.error('Error fetching clients:', error);
+        } catch (err) {
+            console.error('Error loading clients:', err);
         } finally {
             setLoading(false);
         }
+    }, [supabase]);
+
+    useEffect(() => {
+        fetchClients();
+    }, [fetchClients]);
+
+    const filteredClients = useMemo(() => {
+        const q = searchQuery.trim().toLowerCase();
+        return clients.filter((c) => {
+            const matchesStatus =
+                statusFilter === 'all' || (c.status || 'active') === statusFilter;
+            if (!matchesStatus) return false;
+            if (!q) return true;
+            return (
+                c.full_name?.toLowerCase().includes(q) ||
+                c.phone?.toLowerCase().includes(q) ||
+                c.initial_goals?.toLowerCase().includes(q)
+            );
+        });
+    }, [clients, searchQuery, statusFilter]);
+
+    const stats = useMemo(() => {
+        let totalPlans = 0;
+        let totalInvoices = 0;
+        let activeCount = 0;
+
+        for (const c of clients) {
+            if ((c.status || 'active') === 'active') activeCount += 1;
+            totalPlans += Number(c.client_diet_plans?.[0]?.count || 0);
+            totalInvoices += Number(c.client_invoices?.[0]?.count || 0);
+        }
+
+        return {
+            totalClients: clients.length,
+            activeCount,
+            totalPlans,
+            totalInvoices,
+        };
+    }, [clients]);
+
+    const handleCreateClient = async (e) => {
+        e.preventDefault();
+        const name = clientForm.full_name.trim();
+        if (!name) return;
+
+        setSaving(true);
+        try {
+            const payload = {
+                full_name: name,
+                phone: clientForm.phone.trim() || '',
+                age: clientForm.age.trim() || null,
+                height: clientForm.height.trim() || null,
+                initial_goals: clientForm.initial_goals.trim() || null,
+                status: clientForm.status || 'active',
+                notes: clientForm.notes.trim() || null,
+                updated_at: new Date().toISOString(),
+            };
+
+            const { data, error } = await supabase
+                .from('clients')
+                .insert([payload])
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            setIsModalOpen(false);
+            setClientForm(EMPTY_CLIENT_FORM);
+            router.push(`/admin/clients/${data.id}`);
+        } catch (err) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Could Not Add Client',
+                text: err.message,
+                confirmButtonColor: '#2d6a4f',
+            });
+        } finally {
+            setSaving(false);
+        }
     };
-
-    const filteredClients = clients.filter(c => {
-        const matchSearch =
-            c.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            c.phone?.includes(searchTerm) ||
-            c.instagram?.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchStatus = filterStatus === 'all' || c.status === filterStatus;
-        return matchSearch && matchStatus;
-    });
-
-    /* ── Summary counts ── */
-    const counts = {
-        total: clients.length,
-        active: clients.filter(c => c.status === 'active').length,
-        completed: clients.filter(c => c.status === 'completed').length,
-        paused: clients.filter(c => c.status === 'paused').length,
-    };
-
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="w-14 h-14 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                    <p className="text-gray-500 font-medium">Loading clients...</p>
-                </div>
-            </div>
-        );
-    }
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+        <div className="max-w-7xl mx-auto px-0.5 sm:px-2 py-1 sm:py-4 space-y-4 sm:space-y-6">
+            {/* ── Header ── */}
+            <div className="space-y-1">
+                <div className="flex items-center justify-between gap-3">
+                    <h1 className="text-xl sm:text-3xl font-bold text-heading flex items-center gap-2.5 sm:gap-3 min-w-0">
+                        <span className="p-2 sm:p-2.5 bg-primary/10 rounded-xl text-primary shrink-0">
+                            <Users size={20} className="sm:w-[22px] sm:h-[22px]" />
+                        </span>
+                        <span className="truncate">Clients</span>
+                    </h1>
 
-                {/* ── Header ── */}
-                <div className="flex items-start sm:items-center justify-between gap-4 mb-6">
-                    <div>
-                        <h1 className="text-2xl sm:text-3xl font-bold text-heading flex items-center gap-3">
-                            <div className="p-2 bg-primary/10 rounded-xl">
-                                <Users size={22} className="text-primary" />
-                            </div>
-                            Clients
-                        </h1>
-                        <p className="text-gray-400 text-sm mt-1 ml-1">Manage all client profiles and plans</p>
-                    </div>
-                    <Link
-                        href="/admin/clients/create"
-                        className="flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 bg-primary text-black font-bold rounded-xl hover:bg-primary-dark transition shadow-sm text-sm shrink-0"
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setClientForm(EMPTY_CLIENT_FORM);
+                            setIsModalOpen(true);
+                        }}
+                        className="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 min-h-[40px] rounded-xl bg-primary hover:bg-primary-hover text-white text-xs sm:text-sm font-bold shadow-xs whitespace-nowrap transition active:scale-[0.98] cursor-pointer shrink-0"
                     >
-                        <Plus size={18} />
-                        <span className="hidden sm:inline">Add Client</span>
-                        <span className="sm:hidden">Add</span>
-                    </Link>
+                        <Plus size={16} />
+                        <span>Add Client</span>
+                    </button>
+                </div>
+                <p className="text-xs sm:text-sm text-gray-500">
+                    Select a client to view their diet plan revisions and invoices, or launch a new plan
+                </p>
+            </div>
+
+            {/* ── Summary Metrics ── */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+                <div className="bg-white rounded-2xl border border-gray-200/80 p-3 sm:p-4 shadow-2xs">
+                    <p className="text-[11px] sm:text-xs font-medium text-gray-500">Total Clients</p>
+                    <p className="text-xl sm:text-2xl font-bold text-heading mt-0.5 sm:mt-1">{stats.totalClients}</p>
+                </div>
+                <div className="bg-white rounded-2xl border border-gray-200/80 p-3 sm:p-4 shadow-2xs">
+                    <p className="text-[11px] sm:text-xs font-medium text-gray-500">Active Clients</p>
+                    <p className="text-xl sm:text-2xl font-bold text-emerald-700 mt-0.5 sm:mt-1">{stats.activeCount}</p>
+                </div>
+                <div className="bg-white rounded-2xl border border-gray-200/80 p-3 sm:p-4 shadow-2xs">
+                    <p className="text-[11px] sm:text-xs font-medium text-gray-500">Saved Diet Plans</p>
+                    <p className="text-xl sm:text-2xl font-bold text-heading mt-0.5 sm:mt-1">{stats.totalPlans}</p>
+                </div>
+                <div className="bg-white rounded-2xl border border-gray-200/80 p-3 sm:p-4 shadow-2xs">
+                    <p className="text-[11px] sm:text-xs font-medium text-gray-500">Saved Invoices</p>
+                    <p className="text-xl sm:text-2xl font-bold text-heading mt-0.5 sm:mt-1">{stats.totalInvoices}</p>
+                </div>
+            </div>
+
+            {/* ── Search & Status Filter Bar ── */}
+            <div className="bg-white rounded-2xl border border-gray-200/80 p-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-2xs">
+                <div className="relative flex-1">
+                    <Search
+                        size={16}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                    />
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search clients by name, phone, or goal..."
+                        className="w-full pl-10 pr-9 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    />
+                    {searchQuery && (
+                        <button
+                            type="button"
+                            onClick={() => setSearchQuery('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                        >
+                            <X size={14} />
+                        </button>
+                    )}
                 </div>
 
-                {/* ── Summary Stats ── */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                <div className="flex items-center gap-1.5 overflow-x-auto">
                     {[
-                        { label: 'Total', value: counts.total, color: 'text-heading', bg: 'bg-white', border: 'border-gray-100', filter: 'all' },
-                        { label: 'Active', value: counts.active, color: 'text-green-600', bg: 'bg-white', border: 'border-green-100', filter: 'active' },
-                        { label: 'Completed', value: counts.completed, color: 'text-blue-600', bg: 'bg-white', border: 'border-blue-100', filter: 'completed' },
-                        { label: 'Paused', value: counts.paused, color: 'text-yellow-600', bg: 'bg-white', border: 'border-yellow-100', filter: 'paused' },
-                    ].map(s => (
+                        { key: 'all', label: 'All' },
+                        { key: 'active', label: 'Active' },
+                        { key: 'paused', label: 'Paused' },
+                        { key: 'completed', label: 'Completed' },
+                    ].map((tab) => (
                         <button
-                            key={s.filter}
-                            onClick={() => setFilterStatus(s.filter)}
-                            className={`${s.bg} rounded-2xl border ${s.border} p-4 text-left shadow-sm hover:shadow transition cursor-pointer ${filterStatus === s.filter ? 'ring-2 ring-primary' : ''}`}
+                            key={tab.key}
+                            type="button"
+                            onClick={() => setStatusFilter(tab.key)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
+                                statusFilter === tab.key
+                                    ? 'bg-primary text-white shadow-2xs'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200/70'
+                            }`}
                         >
-                            <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-                            <p className="text-xs text-gray-400 mt-0.5 font-medium">{s.label}</p>
+                            {tab.label}
                         </button>
                     ))}
                 </div>
+            </div>
 
-                {/* ── Search & Filter Bar ── */}
-                <div className="flex flex-col sm:flex-row gap-3 mb-6">
-                    {/* Search */}
-                    <div className="relative flex-1">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                        <input
-                            type="text"
-                            placeholder="Search by name, phone, or Instagram…"
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                            className="w-full pl-11 pr-10 py-3 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition text-sm shadow-sm"
-                        />
-                        {searchTerm && (
-                            <button
-                                onClick={() => setSearchTerm('')}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded-lg transition"
-                            >
-                                <X size={14} className="text-gray-400" />
-                            </button>
-                        )}
-                    </div>
-
-                    {/* Status filter (mobile-friendly select) */}
-                    <select
-                        value={filterStatus}
-                        onChange={e => setFilterStatus(e.target.value)}
-                        className="sm:w-44 px-4 py-3 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm font-medium text-gray-600 shadow-sm cursor-pointer"
-                    >
-                        <option value="all">All Statuses</option>
-                        <option value="active">Active</option>
-                        <option value="completed">Completed</option>
-                        <option value="paused">Paused</option>
-                        <option value="inactive">Inactive</option>
-                        <option value="pending">Pending</option>
-                    </select>
+            {/* ── Client Directory Table / Cards ── */}
+            {loading ? (
+                <div className="bg-white rounded-2xl border border-gray-200/80 py-16 text-center text-sm text-gray-500">
+                    <RefreshCw size={20} className="animate-spin mx-auto mb-2 text-primary" />
+                    Loading clients...
                 </div>
-
-                {/* ── Results count ── */}
-                {(searchTerm || filterStatus !== 'all') && (
-                    <p className="text-sm text-gray-400 mb-4">
-                        Showing <span className="font-bold text-heading">{filteredClients.length}</span> of {clients.length} clients
-                    </p>
-                )}
-
-                {/* ── Empty State ── */}
-                {filteredClients.length === 0 ? (
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 sm:p-16 text-center">
-                        <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-5">
-                            <Users size={36} className="text-gray-300" />
-                        </div>
-                        <h2 className="text-xl font-bold text-heading mb-2">
-                            {searchTerm || filterStatus !== 'all' ? 'No clients found' : 'No clients yet'}
-                        </h2>
-                        <p className="text-gray-400 mb-6 text-sm">
-                            {searchTerm || filterStatus !== 'all'
-                                ? 'Try adjusting your search or filter'
-                                : 'Start by adding your first client'}
-                        </p>
-                        {!searchTerm && filterStatus === 'all' && (
-                            <Link
-                                href="/admin/clients/create"
-                                className="inline-flex items-center gap-2 px-5 py-3 bg-primary text-black font-bold rounded-xl hover:bg-primary-dark transition"
-                            >
-                                <Plus size={18} /> Add First Client
-                            </Link>
-                        )}
+            ) : filteredClients.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-gray-200/80 py-14 px-6 text-center">
+                    <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-primary flex items-center justify-center mx-auto mb-3">
+                        <Users size={26} />
                     </div>
-                ) : (
-                    <>
-                        {/* ── DESKTOP TABLE (md+) ── */}
-                        <div className="hidden md:block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                            <table className="w-full">
-                                <thead className="bg-gray-50 border-b border-gray-100">
-                                    <tr>
-                                        <th className="text-left px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wide">Client</th>
-                                        <th className="text-left px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wide">Contact</th>
-                                        <th className="text-left px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wide">Plan</th>
-                                        <th className="text-left px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wide">Status</th>
-                                        <th className="text-left px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wide">Start Date</th>
-                                        <th className="text-center px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wide">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-50">
-                                    {filteredClients.map(client => (
-                                        <tr key={client.id} className="hover:bg-gray-50/70 transition group">
-                                            <td className="px-6 py-4">
+                    <h2 className="text-base font-bold text-heading">
+                        {searchQuery || statusFilter !== 'all'
+                            ? 'No matching clients found'
+                            : 'No clients added yet'}
+                    </h2>
+                    <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
+                        {searchQuery || statusFilter !== 'all'
+                            ? 'Try adjusting your search term or status filter.'
+                            : 'Add your first client to start storing diet plan revisions and invoices against their profile.'}
+                    </p>
+                    {!searchQuery && statusFilter === 'all' && (
+                        <button
+                            type="button"
+                            onClick={() => setIsModalOpen(true)}
+                            className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover transition cursor-pointer"
+                        >
+                            <Plus size={15} />
+                            <span>Add First Client</span>
+                        </button>
+                    )}
+                </div>
+            ) : (
+                <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden">
+                    {/* Desktop Table */}
+                    <div className="hidden md:block overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-gray-50/80 border-b border-gray-100 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                                    <th className="py-3.5 px-5">Client</th>
+                                    <th className="py-3.5 px-4">Goal</th>
+                                    <th className="py-3.5 px-4">Status</th>
+                                    <th className="py-3.5 px-4">Records</th>
+                                    <th className="py-3.5 px-4">Last Updated</th>
+                                    <th className="py-3.5 px-5 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 text-sm">
+                                {filteredClients.map((client) => {
+                                    const planCount = Number(
+                                        client.client_diet_plans?.[0]?.count || 0
+                                    );
+                                    const invoiceCount = Number(
+                                        client.client_invoices?.[0]?.count || 0
+                                    );
+                                    const st =
+                                        STATUS_STYLES[client.status] || STATUS_STYLES.active;
+
+                                    return (
+                                        <tr
+                                            key={client.id}
+                                            onClick={() =>
+                                                router.push(`/admin/clients/${client.id}`)
+                                            }
+                                            className="hover:bg-emerald-50/30 transition-colors cursor-pointer group"
+                                        >
+                                            <td className="py-3.5 px-5">
                                                 <div className="flex items-center gap-3">
-                                                    <Initials name={client.full_name} />
-                                                    <div>
-                                                        <p className="font-bold text-heading">{client.full_name}</p>
-                                                        {client.instagram && (
-                                                            <p className="text-xs text-gray-400">@{client.instagram}</p>
+                                                    <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary font-bold text-xs flex items-center justify-center shrink-0">
+                                                        {getInitials(client.full_name)}
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="font-bold text-heading truncate group-hover:text-primary transition-colors">
+                                                            {client.full_name}
+                                                        </p>
+                                                        {client.phone ? (
+                                                            <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                                                                <Phone size={11} />
+                                                                <span>{client.phone}</span>
+                                                            </p>
+                                                        ) : (
+                                                            <p className="text-xs text-gray-400">
+                                                                No phone added
+                                                            </p>
                                                         )}
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4">
-                                                <p className="text-sm text-gray-600 flex items-center gap-1.5">
-                                                    <Phone size={12} className="text-gray-300" />
-                                                    {client.phone}
-                                                </p>
+                                            <td className="py-3.5 px-4 text-xs text-gray-600 max-w-[200px] truncate">
+                                                {client.initial_goals || '—'}
                                             </td>
-                                            <td className="px-6 py-4">
-                                                <span className="text-sm font-medium text-gray-700 bg-gray-50 px-2.5 py-1 rounded-lg border border-gray-100">
-                                                    {client.assigned_plan_type || '—'}
+                                            <td className="py-3.5 px-4">
+                                                <span
+                                                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${st.bg} ${st.text} ${st.border}`}
+                                                >
+                                                    <span
+                                                        className={`w-1.5 h-1.5 rounded-full ${st.dot}`}
+                                                    />
+                                                    {st.label}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4">
-                                                <StatusBadge status={client.status} />
+                                            <td className="py-3.5 px-4">
+                                                <div className="flex items-center gap-2 text-xs">
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 font-semibold">
+                                                        <FileText size={11} />
+                                                        {planCount} {planCount === 1 ? 'Plan' : 'Plans'}
+                                                    </span>
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-gray-100 text-gray-700 font-semibold">
+                                                        <Receipt size={11} />
+                                                        {invoiceCount}
+                                                    </span>
+                                                </div>
                                             </td>
-                                            <td className="px-6 py-4">
-                                                <p className="text-sm text-gray-500 flex items-center gap-1.5">
-                                                    <Calendar size={12} className="text-gray-300" />
-                                                    {client.plan_start_date
-                                                        ? new Date(client.plan_start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                                                        : '—'}
-                                                </p>
+                                            <td className="py-3.5 px-4 text-xs text-gray-500">
+                                                {formatDateShort(
+                                                    client.updated_at || client.created_at
+                                                )}
                                             </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center justify-center gap-1">
+                                            <td
+                                                className="py-3.5 px-5 text-right"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <div className="inline-flex items-center gap-2">
                                                     <Link
-                                                        href={`/admin/clients/${client.id}`}
-                                                        className="p-2 hover:bg-primary/10 rounded-xl transition"
-                                                        title="View Details"
+                                                        href={`/admin/diet-plan-generator?clientId=${client.id}&new=1`}
+                                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-primary border border-emerald-200 text-xs font-bold transition"
+                                                        title="Create a new diet plan for this client"
                                                     >
-                                                        <Eye size={17} className="text-primary" />
+                                                        <Plus size={12} />
+                                                        <span>New Plan</span>
                                                     </Link>
                                                     <Link
-                                                        href={`/admin/clients/${client.id}/edit`}
-                                                        className="p-2 hover:bg-blue-50 rounded-xl transition"
-                                                        title="Edit"
+                                                        href={`/admin/clients/${client.id}`}
+                                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-heading text-xs font-semibold transition"
                                                     >
-                                                        <Edit2 size={17} className="text-blue-500" />
+                                                        <span>Details</span>
+                                                        <ChevronRight size={13} />
                                                     </Link>
                                                 </div>
                                             </td>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
 
-                        {/* ── MOBILE CARDS (< md) ── */}
-                        <div className="md:hidden space-y-3">
-                            {filteredClients.map(client => (
-                                <div key={client.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-                                    {/* Top row */}
-                                    <div className="flex items-start gap-3 mb-3">
-                                        <Initials name={client.full_name} />
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-start justify-between gap-2">
-                                                <div className="min-w-0">
-                                                    <p className="font-bold text-heading truncate">{client.full_name}</p>
-                                                    {client.instagram && (
-                                                        <p className="text-xs text-gray-400">@{client.instagram}</p>
-                                                    )}
-                                                </div>
-                                                <StatusBadge status={client.status} />
+                    {/* Mobile Cards */}
+                    <div className="md:hidden divide-y divide-gray-100">
+                        {filteredClients.map((client) => {
+                            const planCount = Number(client.client_diet_plans?.[0]?.count || 0);
+                            const invoiceCount = Number(client.client_invoices?.[0]?.count || 0);
+                            const st = STATUS_STYLES[client.status] || STATUS_STYLES.active;
+
+                            return (
+                                <div key={client.id} className="p-4 space-y-3">
+                                    <div
+                                        onClick={() => router.push(`/admin/clients/${client.id}`)}
+                                        className="flex items-start justify-between gap-3 cursor-pointer"
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary font-bold text-xs flex items-center justify-center shrink-0">
+                                                {getInitials(client.full_name)}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="font-bold text-sm text-heading truncate">
+                                                    {client.full_name}
+                                                </p>
+                                                <p className="text-xs text-gray-500 truncate">
+                                                    {client.phone || client.initial_goals || 'View profile'}
+                                                </p>
                                             </div>
                                         </div>
+                                        <span
+                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border shrink-0 ${st.bg} ${st.text} ${st.border}`}
+                                        >
+                                            {st.label}
+                                        </span>
                                     </div>
 
-                                    {/* Detail pills */}
-                                    <div className="flex flex-wrap gap-2 mb-4">
-                                        {client.phone && (
-                                            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-50 border border-gray-100 rounded-lg text-xs text-gray-600">
-                                                <Phone size={11} className="text-gray-400" />
-                                                {client.phone}
+                                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-50">
+                                        <div className="flex items-center gap-1.5 text-[11px]">
+                                            <span className="font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md whitespace-nowrap">
+                                                {planCount} {planCount === 1 ? 'Plan' : 'Plans'}
                                             </span>
-                                        )}
-                                        {client.assigned_plan_type && (
-                                            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-primary/5 border border-primary/10 rounded-lg text-xs text-primary font-semibold">
-                                                {client.assigned_plan_type}
+                                            <span className="font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md whitespace-nowrap">
+                                                {invoiceCount} {invoiceCount === 1 ? 'Inv' : 'Invs'}
                                             </span>
-                                        )}
-                                        {client.plan_start_date && (
-                                            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-50 border border-gray-100 rounded-lg text-xs text-gray-500">
-                                                <Calendar size={11} className="text-gray-400" />
-                                                {new Date(client.plan_start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    {/* Action buttons */}
-                                    <div className="flex gap-2">
-                                        <Link
-                                            href={`/admin/clients/${client.id}`}
-                                            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary/10 hover:bg-primary/20 text-primary font-bold rounded-xl transition text-sm"
-                                        >
-                                            <Eye size={15} />
-                                            View
-                                        </Link>
-                                        <Link
-                                            href={`/admin/clients/${client.id}/edit`}
-                                            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold rounded-xl transition text-sm"
-                                        >
-                                            <Edit2 size={15} />
-                                            Edit
-                                        </Link>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            <Link
+                                                href={`/admin/diet-plan-generator?clientId=${client.id}&new=1`}
+                                                className="inline-flex items-center min-h-[36px] px-3 py-1.5 rounded-xl bg-emerald-50 active:bg-emerald-100 text-primary border border-emerald-200/80 text-xs font-bold whitespace-nowrap"
+                                            >
+                                                + Plan
+                                            </Link>
+                                            <Link
+                                                href={`/admin/clients/${client.id}`}
+                                                className="inline-flex items-center min-h-[36px] px-3 py-1.5 rounded-xl bg-gray-100 active:bg-gray-200 text-heading text-xs font-semibold whitespace-nowrap"
+                                            >
+                                                Details →
+                                            </Link>
+                                        </div>
                                     </div>
                                 </div>
-                            ))}
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {/* ── Add Client Modal ── */}
+            {isModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/45 backdrop-blur-xs">
+                    <div
+                        className="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full p-4 sm:p-6 shadow-2xl border border-gray-100 max-h-[92dvh] overflow-y-auto"
+                        style={{ animation: 'modalIn 180ms cubic-bezier(0.23, 1, 0.32, 1)' }}
+                    >
+                        <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-100">
+                            <div>
+                                <h2 className="text-base font-bold text-heading">Add New Client</h2>
+                                <p className="text-xs text-gray-500">
+                                    Create a client profile to organize their diet plans and invoices
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsModalOpen(false)}
+                                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
                         </div>
 
-                        {/* Bottom count */}
-                        <p className="text-xs text-gray-400 text-center mt-5">
-                            {filteredClients.length} {filteredClients.length === 1 ? 'client' : 'clients'} shown
-                        </p>
-                    </>
-                )}
-            </div>
+                        <form onSubmit={handleCreateClient} className="space-y-3.5">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="sm:col-span-2">
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                                        Full Name *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={clientForm.full_name}
+                                        onChange={(e) =>
+                                            setClientForm((prev) => ({
+                                                ...prev,
+                                                full_name: e.target.value,
+                                            }))
+                                        }
+                                        placeholder="e.g., Ananya Sharma"
+                                        className="w-full text-sm px-3.5 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                                        Phone / WhatsApp
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={clientForm.phone}
+                                        onChange={(e) =>
+                                            setClientForm((prev) => ({
+                                                ...prev,
+                                                phone: e.target.value,
+                                            }))
+                                        }
+                                        placeholder="+91 98765 43210"
+                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                                        Status
+                                    </label>
+                                    <select
+                                        value={clientForm.status}
+                                        onChange={(e) =>
+                                            setClientForm((prev) => ({
+                                                ...prev,
+                                                status: e.target.value,
+                                            }))
+                                        }
+                                        className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    >
+                                        <option value="active">Active</option>
+                                        <option value="paused">Paused</option>
+                                        <option value="completed">Completed</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                                        Age
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={clientForm.age}
+                                        onChange={(e) =>
+                                            setClientForm((prev) => ({
+                                                ...prev,
+                                                age: e.target.value,
+                                            }))
+                                        }
+                                        placeholder="e.g., 29 yrs"
+                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                                        Height
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={clientForm.height}
+                                        onChange={(e) =>
+                                            setClientForm((prev) => ({
+                                                ...prev,
+                                                height: e.target.value,
+                                            }))
+                                        }
+                                        placeholder="e.g., 165 cm"
+                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    />
+                                </div>
+
+                                <div className="sm:col-span-2">
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                                        Primary Goal
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={clientForm.initial_goals}
+                                        onChange={(e) =>
+                                            setClientForm((prev) => ({
+                                                ...prev,
+                                                initial_goals: e.target.value,
+                                            }))
+                                        }
+                                        placeholder="e.g., Fat Loss & PCOS Management"
+                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    />
+                                </div>
+
+                                <div className="sm:col-span-2">
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                                        Clinical Notes (Optional)
+                                    </label>
+                                    <textarea
+                                        rows={2}
+                                        value={clientForm.notes}
+                                        onChange={(e) =>
+                                            setClientForm((prev) => ({
+                                                ...prev,
+                                                notes: e.target.value,
+                                            }))
+                                        }
+                                        placeholder="Any allergies, medical context, or consultation notes..."
+                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-2 sm:gap-2.5 pt-3 border-t border-gray-100">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsModalOpen(false)}
+                                    className="w-full sm:w-auto min-h-[40px] px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={saving}
+                                    className="w-full sm:w-auto min-h-[42px] px-5 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold shadow-xs transition cursor-pointer disabled:opacity-50"
+                                >
+                                    {saving ? 'Creating...' : 'Create Client'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
+

@@ -1,16 +1,17 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react';
 import dynamic from 'next/dynamic';
+import { useSearchParams } from 'next/navigation';
 import {
     FileText, Download, Send, Sparkles, Plus, Trash2,
-    Calendar, User, Target, Scale, Droplet, Flame, Eye,
+    User, Target, Scale, Eye,
     CheckCircle, AlertCircle, RefreshCw, ArrowLeft, Clock,
-    Share2, Printer, RotateCcw, BookmarkPlus, Database,
-    Info, Copy, ChefHat, Utensils, Search, X, Palette,
+    RotateCcw, BookmarkPlus, Database, Save,
+    Info, ChefHat, Utensils, Search, X,
     ShieldAlert, ChevronDown, ChevronUp, Edit3, Undo2,
-    Maximize2, Minimize2, Check, ExternalLink, Sliders,
-    Dumbbell, Activity, Calculator, Ruler, Lock, Unlock, ArrowLeftRight
+    Maximize2, Minimize2, Sliders,
+    Dumbbell, Calculator, Ruler, Lock, Unlock, ArrowLeftRight, Users
 } from 'lucide-react';
 import Link from 'next/link';
 import Swal from 'sweetalert2';
@@ -44,7 +45,7 @@ const DEFAULT_CALC_CONFIG = {
     carbsPct: 60, // 40-60% of calories / 4
     fatsPct: 20, // 12-20% (or up to 30%) of calories / 9
     fieldsLocked: false, // Editable by default, optional lock toggle
-    showCalculator: true,
+    showCalculator: false,
 };
 
 const EMPTY_NEW_RECIPE = {
@@ -211,67 +212,57 @@ const EMPTY_FORM_STATE = {
     calc_config: DEFAULT_CALC_CONFIG,
 };
 
-export default function AdminDietPlanGeneratorPage() {
-    const supabase = createClient();
+function AdminDietPlanGeneratorContent() {
+    const supabase = useMemo(() => createClient(), []);
+    const searchParams = useSearchParams();
 
     // Form State (Starts Empty On Load)
     const [formData, setFormData] = useState(EMPTY_FORM_STATE);
 
-    // Collapsible Sections State
+    // Collapsible Sections State (Core sections open; optional sections collapsed until needed)
     const [collapsed, setCollapsed] = useState({
-        presets: false,       // Presets (open by default, collapsible)
-        profile: false,       // 1. Client Profile (open by default)
-        targets: false,       // 2. Targets (open by default)
-        measurements: false,  // 3. Body Measurements (open by default)
-        meals: false,         // 4. Meals (open by default)
-        supplements: true,    // 5. Supplements (collapsed by default)
-        workouts: false,      // 6. Workouts (open by default)
-        special: true,        // 7. Special Directives (collapsed by default)
-        rules: true,          // 8. Rules (collapsed by default)
-        recipes: false        // 9. Recipes (open by default)
+        profile: false,       // 1. Client Profile (open)
+        targets: false,       // 2. Targets (open)
+        measurements: true,   // 3. Body Measurements (optional)
+        meals: false,         // 4. Meals (open)
+        supplements: true,    // 5. Supplements (optional)
+        workouts: true,       // 6. Workouts (optional)
+        special: true,        // 7. Special Directives (optional)
+        rules: true,          // 8. Rules (optional)
+        recipes: true         // 9. Recipes (optional)
     });
+
+    const [allExpanded, setAllExpanded] = useState(false);
+    const [showHeightConverter, setShowHeightConverter] = useState(false);
 
     const toggleSection = (key) => {
         setCollapsed(prev => ({ ...prev, [key]: !prev[key] }));
     };
 
-    const expandAll = () => {
+    const toggleAllSections = () => {
+        const nextOpen = !allExpanded;
+        setAllExpanded(nextOpen);
         setCollapsed({
-            presets: false,
-            profile: false,
-            targets: false,
-            measurements: false,
-            meals: false,
-            supplements: false,
-            workouts: false,
-            special: false,
-            rules: false,
-            recipes: false
-        });
-    };
-
-    const collapseAll = () => {
-        setCollapsed({
-            presets: true,
-            profile: true,
-            targets: true,
-            measurements: true,
-            meals: true,
-            supplements: true,
-            workouts: true,
-            special: true,
-            rules: true,
-            recipes: true
+            profile: !nextOpen,
+            targets: !nextOpen,
+            measurements: !nextOpen,
+            meals: !nextOpen,
+            supplements: !nextOpen,
+            workouts: !nextOpen,
+            special: !nextOpen,
+            rules: !nextOpen,
+            recipes: !nextOpen,
         });
     };
 
     // Soft-Editing State for Attached Recipes
     const [editingRecipeId, setEditingRecipeId] = useState(null);
 
-    // Dynamic Database Templates State
+    // Dynamic Database Templates State + Popover
     const [templates, setTemplates] = useState([]);
     const [loadingTemplates, setLoadingTemplates] = useState(true);
-    const [dbAvailable, setDbAvailable] = useState(true);
+    const [showPresetsPopover, setShowPresetsPopover] = useState(false);
+    const presetsMenuRef = useRef(null);
 
     // Dynamic Recipes State (On-demand Search)
     const [availableRecipes, setAvailableRecipes] = useState([]);
@@ -293,6 +284,36 @@ export default function AdminDietPlanGeneratorPage() {
     const [activeView, setActiveView] = useState('editor'); // 'editor' | 'preview' | 'split'
     const [generating, setGenerating] = useState(false);
     const [previewKey, setPreviewKey] = useState(1);
+
+    // ─── Client 1-to-Many DB State ───
+    const [allClients, setAllClients] = useState([]);
+    const [selectedClient, setSelectedClient] = useState(null);
+    const [loadedPlanRecord, setLoadedPlanRecord] = useState(null);
+    const [savingToClientDb, setSavingToClientDb] = useState(false);
+    const [showSaveMenu, setShowSaveMenu] = useState(false);
+    const saveMenuRef = useRef(null);
+    const mobileSaveMenuRef = useRef(null);
+    const dbMetaRef = useRef({ selectedClient: null, loadedPlanRecord: null });
+
+    useEffect(() => {
+        dbMetaRef.current = { selectedClient, loadedPlanRecord };
+    }, [selectedClient, loadedPlanRecord]);
+
+    // Close popovers on outside click
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (presetsMenuRef.current && !presetsMenuRef.current.contains(e.target)) {
+                setShowPresetsPopover(false);
+            }
+            const inDesktopSave = saveMenuRef.current?.contains(e.target);
+            const inMobileSave = mobileSaveMenuRef.current?.contains(e.target);
+            if (!inDesktopSave && !inMobileSave) {
+                setShowSaveMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     // ─── Delayed LocalStorage Auto-Save & Restore ───
     const isDraftHydratedRef = useRef(false);
@@ -324,6 +345,7 @@ export default function AdminDietPlanGeneratorPage() {
                     version: 1,
                     savedAt,
                     data: dataToSave,
+                    dbMeta: dbMetaRef.current,
                 })
             );
             lastSavedDataRef.current = dataToSave;
@@ -335,58 +357,89 @@ export default function AdminDietPlanGeneratorPage() {
         }
     }, []);
 
-    // Load saved diet plan draft on form reopen / page reload, and flush pending edits on unload
+    // Load saved diet plan draft on form reopen / page reload (unless opening a specific client/plan from URL)
     useEffect(() => {
-        try {
-            const raw = window.localStorage.getItem(DIET_PLAN_DRAFT_STORAGE_KEY);
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                const draft = parsed?.data && typeof parsed.data === 'object' ? parsed.data : parsed;
-                if (draft && typeof draft === 'object' && hasDietDraftContent(draft)) {
-                    const restored = {
-                        ...EMPTY_FORM_STATE,
-                        ...draft,
-                        measurements: Array.isArray(draft.measurements) ? draft.measurements : [],
-                        meals: Array.isArray(draft.meals) ? draft.meals : [],
-                        supplements: Array.isArray(draft.supplements) ? draft.supplements : [],
-                        workouts: Array.isArray(draft.workouts) ? draft.workouts : [],
-                        guidelines: Array.isArray(draft.guidelines) ? draft.guidelines : [],
-                        donts: Array.isArray(draft.donts) ? draft.donts : [],
-                        recipes: Array.isArray(draft.recipes) ? draft.recipes : [],
-                        calc_config: {
-                            ...DEFAULT_CALC_CONFIG,
-                            ...(draft.calc_config && typeof draft.calc_config === 'object'
-                                ? draft.calc_config
-                                : {}),
-                        },
-                    };
+        const hasUrlTarget = Boolean(
+            searchParams?.get('planId') || searchParams?.get('clientId')
+        );
 
-                    lastSavedDataRef.current = restored;
-                    latestFormDataRef.current = restored;
-                    pendingHydratedDataRef.current = restored;
-
-                    setFormData(restored);
-                    setCollapsed((prev) => ({
-                        ...prev,
-                        supplements: restored.supplements.length > 0 ? false : prev.supplements,
-                        special: restored.show_special_instructions ? false : prev.special,
-                        rules:
-                            restored.guidelines.length > 0 || restored.donts.length > 0
-                                ? false
-                                : prev.rules,
-                    }));
-                    setPreviewKey((k) => k + 1);
-                    if (parsed?.savedAt) {
-                        setLastSavedAt(parsed.savedAt);
+        if (!hasUrlTarget) {
+            try {
+                const raw = window.localStorage.getItem(DIET_PLAN_DRAFT_STORAGE_KEY);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    const draft =
+                        parsed?.data && typeof parsed.data === 'object' ? parsed.data : parsed;
+                    if (parsed?.dbMeta && typeof parsed.dbMeta === 'object') {
+                        if (parsed.dbMeta.selectedClient) {
+                            setSelectedClient(parsed.dbMeta.selectedClient);
+                        }
+                        if (parsed.dbMeta.loadedPlanRecord) {
+                            setLoadedPlanRecord(parsed.dbMeta.loadedPlanRecord);
+                        }
                     }
-                    setSaveStatus('restored');
+                    if (draft && typeof draft === 'object' && hasDietDraftContent(draft)) {
+                        const restored = {
+                            ...EMPTY_FORM_STATE,
+                            ...draft,
+                            measurements: Array.isArray(draft.measurements)
+                                ? draft.measurements
+                                : [],
+                            meals: Array.isArray(draft.meals) ? draft.meals : [],
+                            supplements: Array.isArray(draft.supplements)
+                                ? draft.supplements
+                                : [],
+                            workouts: Array.isArray(draft.workouts) ? draft.workouts : [],
+                            guidelines: Array.isArray(draft.guidelines)
+                                ? draft.guidelines
+                                : [],
+                            donts: Array.isArray(draft.donts) ? draft.donts : [],
+                            recipes: Array.isArray(draft.recipes) ? draft.recipes : [],
+                            calc_config: {
+                                ...DEFAULT_CALC_CONFIG,
+                                ...(draft.calc_config &&
+                                typeof draft.calc_config === 'object'
+                                    ? draft.calc_config
+                                    : {}),
+                            },
+                        };
+
+                        lastSavedDataRef.current = restored;
+                        latestFormDataRef.current = restored;
+                        pendingHydratedDataRef.current = restored;
+
+                        setFormData(restored);
+                        setCollapsed((prev) => ({
+                            ...prev,
+                            measurements:
+                                restored.measurements.length > 0 ? false : prev.measurements,
+                            supplements:
+                                restored.supplements.length > 0 ? false : prev.supplements,
+                            workouts:
+                                restored.workouts.length > 0 ? false : prev.workouts,
+                            special: restored.show_special_instructions
+                                ? false
+                                : prev.special,
+                            rules:
+                                restored.guidelines.length > 0 || restored.donts.length > 0
+                                    ? false
+                                    : prev.rules,
+                            recipes:
+                                restored.recipes.length > 0 ? false : prev.recipes,
+                        }));
+                        setPreviewKey((k) => k + 1);
+                        if (parsed?.savedAt) {
+                            setLastSavedAt(parsed.savedAt);
+                        }
+                        setSaveStatus('restored');
+                    }
                 }
+            } catch (err) {
+                console.warn('Failed to restore diet plan draft from localStorage:', err);
             }
-        } catch (err) {
-            console.warn('Failed to restore diet plan draft from localStorage:', err);
-        } finally {
-            isDraftHydratedRef.current = true;
         }
+
+        isDraftHydratedRef.current = true;
 
         const flushPendingSave = () => {
             if (autoSaveTimerRef.current) {
@@ -406,7 +459,7 @@ export default function AdminDietPlanGeneratorPage() {
             window.removeEventListener('pagehide', flushPendingSave);
             flushPendingSave();
         };
-    }, [persistDietDraft]);
+    }, [persistDietDraft, searchParams]);
 
     // Save form details with a 2-second time delay between consecutive saves
     useEffect(() => {
@@ -439,6 +492,152 @@ export default function AdminDietPlanGeneratorPage() {
         }
     }, [formData, persistDietDraft]);
 
+    // ─── Fetch Clients for Autocomplete & Hydrate ?clientId / ?planId from Client Details Page ───
+    useEffect(() => {
+        let active = true;
+        (async () => {
+            try {
+                const { data } = await supabase
+                    .from('clients')
+                    .select('id, full_name, phone, age, height, initial_goals')
+                    .order('updated_at', { ascending: false })
+                    .limit(300);
+                if (active && Array.isArray(data)) {
+                    setAllClients(data);
+                }
+            } catch {
+                // Ignore silently
+            }
+        })();
+        return () => {
+            active = false;
+        };
+    }, [supabase]);
+
+    const applyRecordToForm = useCallback((record, ownerClient) => {
+        const snap =
+            record?.plan_data && typeof record.plan_data === 'object'
+                ? record.plan_data
+                : {};
+        const hydrated = {
+            ...EMPTY_FORM_STATE,
+            ...snap,
+            client_name: snap.client_name || ownerClient?.full_name || '',
+            client_phone: snap.client_phone || ownerClient?.phone || '',
+            plan_title: snap.plan_title || record?.plan_title || '',
+            goal: snap.goal ?? record?.goal ?? '',
+            calories: snap.calories ?? record?.calories ?? '',
+            start_date:
+                snap.start_date ||
+                record?.start_date ||
+                new Date().toISOString().split('T')[0],
+            end_date: snap.end_date || record?.end_date || '',
+            pdf_theme: snap.pdf_theme || record?.pdf_theme || 'clinical',
+            measurements: Array.isArray(snap.measurements)
+                ? JSON.parse(JSON.stringify(snap.measurements))
+                : [],
+            meals: Array.isArray(snap.meals)
+                ? JSON.parse(JSON.stringify(snap.meals))
+                : [],
+            supplements: Array.isArray(snap.supplements)
+                ? JSON.parse(JSON.stringify(snap.supplements))
+                : [],
+            workouts: Array.isArray(snap.workouts)
+                ? JSON.parse(JSON.stringify(snap.workouts))
+                : [],
+            guidelines: Array.isArray(snap.guidelines)
+                ? JSON.parse(JSON.stringify(snap.guidelines))
+                : [],
+            donts: Array.isArray(snap.donts)
+                ? JSON.parse(JSON.stringify(snap.donts))
+                : [],
+            recipes: Array.isArray(snap.recipes)
+                ? JSON.parse(JSON.stringify(snap.recipes))
+                : [],
+            calc_config: {
+                ...DEFAULT_CALC_CONFIG,
+                ...(snap.calc_config && typeof snap.calc_config === 'object'
+                    ? snap.calc_config
+                    : {}),
+            },
+        };
+
+        setFormData(hydrated);
+        setEditingRecipeId(null);
+        setCollapsed({
+            profile: false,
+            targets: false,
+            meals: false,
+            measurements: hydrated.measurements.length === 0,
+            supplements: hydrated.supplements.length === 0,
+            workouts: hydrated.workouts.length === 0,
+            special: !hydrated.show_special_instructions,
+            rules: hydrated.guidelines.length === 0 && hydrated.donts.length === 0,
+            recipes: hydrated.recipes.length === 0,
+        });
+        setPreviewKey((k) => k + 1);
+    }, []);
+
+    useEffect(() => {
+        const urlPlanId = searchParams?.get('planId');
+        const urlClientId = searchParams?.get('clientId');
+        if (!urlPlanId && !urlClientId) return;
+
+        let active = true;
+        (async () => {
+            try {
+                if (urlPlanId) {
+                    const { data: planRow, error } = await supabase
+                        .from('client_diet_plans')
+                        .select('*, clients(*)')
+                        .eq('id', urlPlanId)
+                        .single();
+
+                    if (!active || error || !planRow) return;
+
+                    const owner = planRow.clients || null;
+                    setSelectedClient(owner);
+                    setLoadedPlanRecord(planRow);
+                    applyRecordToForm(planRow, owner);
+                } else if (urlClientId) {
+                    const { data: clientRow, error } = await supabase
+                        .from('clients')
+                        .select('*')
+                        .eq('id', urlClientId)
+                        .single();
+
+                    if (!active || error || !clientRow) return;
+
+                    setSelectedClient(clientRow);
+                    setLoadedPlanRecord(null);
+                    const freshForClient = {
+                        ...EMPTY_FORM_STATE,
+                        client_name: clientRow.full_name || '',
+                        client_phone: clientRow.phone || '',
+                        client_age: clientRow.age || '',
+                        client_height: clientRow.height || '',
+                        goal: clientRow.initial_goals || '',
+                        start_date: new Date().toISOString().split('T')[0],
+                    };
+                    setFormData(freshForClient);
+                    setEditingRecipeId(null);
+                    setPreviewKey((k) => k + 1);
+                }
+
+                // Clean query params so browser reload preserves unsaved draft edits
+                if (typeof window !== 'undefined') {
+                    window.history.replaceState({}, '', '/admin/diet-plan-generator');
+                }
+            } catch (err) {
+                console.warn('Error hydrating diet plan from URL params:', err);
+            }
+        })();
+
+        return () => {
+            active = false;
+        };
+    }, [searchParams, supabase, applyRecordToForm]);
+
     // ─── Fetch Templates from Supabase ───
     const fetchTemplates = useCallback(async () => {
         setLoadingTemplates(true);
@@ -450,15 +649,12 @@ export default function AdminDietPlanGeneratorPage() {
 
             if (error) {
                 console.warn('diet_plan_templates query error:', error.message);
-                setDbAvailable(false);
                 setTemplates([]);
             } else {
-                setDbAvailable(true);
                 setTemplates(data || []);
             }
         } catch (err) {
             console.error('Error connecting to database templates:', err);
-            setDbAvailable(false);
             setTemplates([]);
         } finally {
             setLoadingTemplates(false);
@@ -552,12 +748,311 @@ export default function AdminDietPlanGeneratorPage() {
                 pendingHydratedDataRef.current = freshEmpty;
 
                 setFormData(freshEmpty);
+                setLoadedPlanRecord(null);
                 setEditingRecipeId(null);
                 setLastSavedAt(null);
                 setSaveStatus('idle');
                 setPreviewKey(k => k + 1);
             }
         });
+    };
+
+    // ─── Client Name Autocomplete, Past Recipe History & Single Unified DB Save ───
+    const [clientPastPlans, setClientPastPlans] = useState([]);
+
+    const effectiveClient = useMemo(() => {
+        const typedName = (formData.client_name || '').trim().toLowerCase();
+        const typedPhoneDigits = String(formData.client_phone || '').replace(/\D/g, '');
+
+        if (selectedClient?.id) {
+            const selName = (selectedClient.full_name || '').trim().toLowerCase();
+            const selDigits = String(selectedClient.phone || '').replace(/\D/g, '');
+            if (
+                !typedName ||
+                typedName === selName ||
+                (typedPhoneDigits.length >= 7 &&
+                    selDigits.length >= 7 &&
+                    typedPhoneDigits === selDigits)
+            ) {
+                return selectedClient;
+            }
+        }
+
+        if (typedName || typedPhoneDigits.length >= 7) {
+            const matched = allClients.find((c) => {
+                const cDigits = String(c.phone || '').replace(/\D/g, '');
+                if (
+                    typedPhoneDigits.length >= 7 &&
+                    cDigits.length >= 7 &&
+                    cDigits === typedPhoneDigits
+                ) {
+                    return true;
+                }
+                return Boolean(typedName && c.full_name?.trim().toLowerCase() === typedName);
+            });
+            if (matched) return matched;
+        }
+
+        return null;
+    }, [selectedClient, formData.client_name, formData.client_phone, allClients]);
+
+    const fetchClientPastPlans = useCallback(
+        async (targetClientId) => {
+            if (!targetClientId) {
+                setClientPastPlans([]);
+                return;
+            }
+            try {
+                const { data, error } = await supabase
+                    .from('client_diet_plans')
+                    .select(
+                        'id, client_id, revision_number, plan_title, start_date, end_date, updated_at, plan_data'
+                    )
+                    .eq('client_id', targetClientId)
+                    .order('revision_number', { ascending: false });
+
+                if (!error && Array.isArray(data)) {
+                    setClientPastPlans(data);
+                } else {
+                    setClientPastPlans([]);
+                }
+            } catch (err) {
+                console.warn('Error loading client past plans for recipe check:', err);
+                setClientPastPlans([]);
+            }
+        },
+        [supabase]
+    );
+
+    useEffect(() => {
+        fetchClientPastPlans(effectiveClient?.id || null);
+    }, [effectiveClient?.id, fetchClientPastPlans]);
+
+    const handleClientNameChange = (typedVal) => {
+        const matched = allClients.find(
+            (c) => c.full_name?.trim().toLowerCase() === typedVal.trim().toLowerCase()
+        );
+        if (matched) {
+            if (loadedPlanRecord && loadedPlanRecord.client_id !== matched.id) {
+                setLoadedPlanRecord(null);
+            }
+            setSelectedClient(matched);
+            setFormData((prev) => ({
+                ...prev,
+                client_name: typedVal,
+                client_phone: prev.client_phone?.trim() ? prev.client_phone : matched.phone || '',
+                client_age: prev.client_age?.trim() ? prev.client_age : matched.age || '',
+                client_height: prev.client_height?.trim() ? prev.client_height : matched.height || '',
+                goal: prev.goal?.trim() ? prev.goal : matched.initial_goals || '',
+            }));
+        } else {
+            setFormData((prev) => ({ ...prev, client_name: typedVal }));
+        }
+    };
+
+    const handleSavePlanToDb = async (requestedAction = 'auto') => {
+        setShowSaveMenu(false);
+        const action =
+            requestedAction === 'auto'
+                ? loadedPlanRecord?.id
+                    ? 'update'
+                    : 'create'
+                : requestedAction;
+
+        const typedName = (formData.client_name || '').trim();
+        const typedPhone = (formData.client_phone || '').trim();
+        const phoneDigits = typedPhone.replace(/\D/g, '');
+
+        if (!typedName && !selectedClient) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Missing Client Name',
+                text: 'Please enter the Client Full Name in Section 1 before saving.',
+                confirmButtonColor: '#2d6a4f',
+            });
+            return;
+        }
+
+        setSavingToClientDb(true);
+        try {
+            let targetClient = selectedClient;
+
+            // If a client is selected AND user typed a different name, ask which client owns this plan
+            if (
+                targetClient &&
+                typedName &&
+                targetClient.full_name?.trim().toLowerCase() !== typedName.toLowerCase()
+            ) {
+                const choice = await Swal.fire({
+                    icon: 'question',
+                    title: 'Different Client Name Entered',
+                    html: `Save under <strong>${typedName}</strong> or keep under <strong>${targetClient.full_name}</strong>?`,
+                    showDenyButton: true,
+                    showCancelButton: true,
+                    confirmButtonText: `Save under "${typedName}"`,
+                    denyButtonText: `Keep "${targetClient.full_name}"`,
+                    confirmButtonColor: '#2d6a4f',
+                    denyButtonColor: '#0f766e',
+                });
+                if (choice.isDismissed) {
+                    setSavingToClientDb(false);
+                    return;
+                }
+                if (choice.isConfirmed) {
+                    targetClient = null;
+                }
+            }
+
+            if (!targetClient) {
+                const existing = allClients.find((c) => {
+                    const cDigits = String(c.phone || '').replace(/\D/g, '');
+                    if (phoneDigits.length >= 7 && cDigits.length >= 7 && cDigits === phoneDigits) {
+                        return true;
+                    }
+                    return c.full_name?.trim().toLowerCase() === typedName.toLowerCase();
+                });
+
+                if (existing) {
+                    targetClient = existing;
+                } else {
+                    const { data: createdClient, error: createErr } = await supabase
+                        .from('clients')
+                        .insert([
+                            {
+                                full_name: typedName,
+                                phone: typedPhone || '',
+                                age: formData.client_age?.trim() || null,
+                                height: formData.client_height?.trim() || null,
+                                initial_goals: formData.goal?.trim() || null,
+                                status: 'active',
+                                updated_at: new Date().toISOString(),
+                            },
+                        ])
+                        .select()
+                        .single();
+
+                    if (createErr) throw createErr;
+                    targetClient = createdClient;
+                    setAllClients((prev) => [
+                        createdClient,
+                        ...prev.filter((c) => c.id !== createdClient.id),
+                    ]);
+                }
+            }
+
+            // Update parent client timestamp & profile metadata
+            const clientPatch = { updated_at: new Date().toISOString() };
+            if (typedPhone) clientPatch.phone = typedPhone;
+            if (formData.client_age?.trim()) clientPatch.age = formData.client_age.trim();
+            if (formData.client_height?.trim()) clientPatch.height = formData.client_height.trim();
+            if (formData.goal?.trim()) clientPatch.initial_goals = formData.goal.trim();
+            await supabase.from('clients').update(clientPatch).eq('id', targetClient.id);
+
+            const cleanSnapshot = {
+                ...formData,
+                client_name: typedName || targetClient.full_name,
+            };
+
+            if (action === 'update' && loadedPlanRecord?.id && loadedPlanRecord.client_id === targetClient.id) {
+                const resolvedTitle =
+                    formData.plan_title?.trim() ||
+                    loadedPlanRecord.plan_title ||
+                    `Phase ${loadedPlanRecord.revision_number || 1} Diet Plan`;
+
+                const { data: updatedPlan, error: updErr } = await supabase
+                    .from('client_diet_plans')
+                    .update({
+                        plan_title: resolvedTitle,
+                        goal: formData.goal?.trim() || null,
+                        calories: formData.calories?.trim() || null,
+                        start_date: formData.start_date || null,
+                        end_date: formData.end_date || null,
+                        pdf_theme: formData.pdf_theme || 'clinical',
+                        plan_data: { ...cleanSnapshot, plan_title: resolvedTitle },
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq('id', loadedPlanRecord.id)
+                    .select()
+                    .single();
+
+                if (updErr) throw updErr;
+
+                setSelectedClient(targetClient);
+                setLoadedPlanRecord(updatedPlan);
+                fetchClientPastPlans(targetClient.id);
+
+                Swal.fire({
+                    icon: 'success',
+                    title: `Updated Rev ${updatedPlan.revision_number}`,
+                    text: `Saved changes for ${targetClient.full_name}.`,
+                    timer: 1600,
+                    showConfirmButton: false,
+                });
+            } else {
+                const { data: latestRows, error: revErr } = await supabase
+                    .from('client_diet_plans')
+                    .select('revision_number')
+                    .eq('client_id', targetClient.id)
+                    .order('revision_number', { ascending: false })
+                    .limit(1);
+
+                if (revErr) throw revErr;
+
+                const maxRev =
+                    Array.isArray(latestRows) && latestRows.length > 0
+                        ? Number(latestRows[0].revision_number) || 0
+                        : 0;
+                const nextRev = maxRev + 1;
+                const resolvedTitle =
+                    formData.plan_title?.trim() || `Phase ${nextRev} Diet Plan`;
+
+                const { data: insertedPlan, error: insErr } = await supabase
+                    .from('client_diet_plans')
+                    .insert([
+                        {
+                            client_id: targetClient.id,
+                            revision_number: nextRev,
+                            plan_title: resolvedTitle,
+                            goal: formData.goal?.trim() || null,
+                            calories: formData.calories?.trim() || null,
+                            start_date: formData.start_date || null,
+                            end_date: formData.end_date || null,
+                            pdf_theme: formData.pdf_theme || 'clinical',
+                            plan_data: { ...cleanSnapshot, plan_title: resolvedTitle },
+                            updated_at: new Date().toISOString(),
+                        },
+                    ])
+                    .select()
+                    .single();
+
+                if (insErr) throw insErr;
+
+                setSelectedClient(targetClient);
+                setLoadedPlanRecord(insertedPlan);
+                fetchClientPastPlans(targetClient.id);
+                if (!formData.plan_title?.trim()) {
+                    setFormData((prev) => ({ ...prev, plan_title: resolvedTitle }));
+                }
+
+                Swal.fire({
+                    icon: 'success',
+                    title: `Saved Rev ${nextRev}`,
+                    text: `"${resolvedTitle}" saved under ${targetClient.full_name}.`,
+                    timer: 1700,
+                    showConfirmButton: false,
+                });
+            }
+        } catch (err) {
+            console.error('Error saving diet plan:', err);
+            Swal.fire({
+                icon: 'error',
+                title: 'Save Failed',
+                text: err.message || 'Unable to save diet plan.',
+                confirmButtonColor: '#2d6a4f',
+            });
+        } finally {
+            setSavingToClientDb(false);
+        }
     };
 
     // ─── Clinical Auto-Calculation Helpers (Height ↔ Inches → IBW → Calories → Macros) ───
@@ -1504,18 +1999,180 @@ export default function AdminDietPlanGeneratorPage() {
         }));
     };
 
-    // ─── Attached Recipes Helpers ───
-    const handleToggleRecipe = (recipe) => {
+    // ─── Attached Recipes Helpers & Past-Plan Repeat Detection ───
+    const escapeHtmlText = (str) =>
+        String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+
+    const { previousRecipeById, previousRecipeByName, pastPlansCheckedCount } = useMemo(() => {
+        const byId = new Map();
+        const byName = new Map();
+        let checkedCount = 0;
+
+        for (const plan of clientPastPlans) {
+            if (!plan) continue;
+            // Exclude the plan currently being edited so revising a plan doesn't warn against itself
+            if (loadedPlanRecord?.id && plan.id === loadedPlanRecord.id) continue;
+
+            checkedCount += 1;
+            const pastRecipes = Array.isArray(plan.plan_data?.recipes)
+                ? plan.plan_data.recipes
+                : [];
+
+            const usageMeta = {
+                planId: plan.id,
+                revisionNumber: plan.revision_number,
+                planTitle: plan.plan_title || `Revision ${plan.revision_number || ''}`.trim(),
+                startDate: plan.start_date || null,
+            };
+
+            for (const r of pastRecipes) {
+                if (!r) continue;
+                const rawId = r.id !== undefined && r.id !== null ? String(r.id).trim() : '';
+                const normName = String(r.name || '').trim().toLowerCase();
+
+                if (rawId && !rawId.startsWith('custom_')) {
+                    const list = byId.get(rawId) || [];
+                    if (!list.some((u) => u.planId === plan.id)) {
+                        list.push(usageMeta);
+                        byId.set(rawId, list);
+                    }
+                }
+
+                if (normName) {
+                    const list = byName.get(normName) || [];
+                    if (!list.some((u) => u.planId === plan.id)) {
+                        list.push(usageMeta);
+                        byName.set(normName, list);
+                    }
+                }
+            }
+        }
+
+        return {
+            previousRecipeById: byId,
+            previousRecipeByName: byName,
+            pastPlansCheckedCount: checkedCount,
+        };
+    }, [clientPastPlans, loadedPlanRecord?.id]);
+
+    const getPreviousRecipeUsages = useCallback(
+        (recipe) => {
+            if (!recipe) return [];
+            const rawId =
+                recipe.id !== undefined && recipe.id !== null ? String(recipe.id).trim() : '';
+            const normName = String(recipe.name || '').trim().toLowerCase();
+
+            const merged = new Map();
+            if (rawId && previousRecipeById.has(rawId)) {
+                for (const u of previousRecipeById.get(rawId)) {
+                    merged.set(u.planId, u);
+                }
+            }
+            if (normName && previousRecipeByName.has(normName)) {
+                for (const u of previousRecipeByName.get(normName)) {
+                    merged.set(u.planId, u);
+                }
+            }
+
+            return Array.from(merged.values()).sort(
+                (a, b) => (Number(b.revisionNumber) || 0) - (Number(a.revisionNumber) || 0)
+            );
+        },
+        [previousRecipeById, previousRecipeByName]
+    );
+
+    const formatPastUsageBadge = (usages) => {
+        if (!Array.isArray(usages) || usages.length === 0) return '';
+        const revLabels = usages
+            .slice(0, 2)
+            .map((u) => (u.revisionNumber ? `Rev ${u.revisionNumber}` : u.planTitle));
+        const extra = usages.length > 2 ? ` +${usages.length - 2}` : '';
+        return `Used in ${revLabels.join(', ')}${extra}`;
+    };
+
+    const formatPastUsageTooltip = (usages) => {
+        if (!Array.isArray(usages) || usages.length === 0) return '';
+        return usages
+            .map(
+                (u) =>
+                    `Rev ${u.revisionNumber || '—'}: ${u.planTitle}${
+                        u.startDate ? ` (${u.startDate})` : ''
+                    }`
+            )
+            .join(' • ');
+    };
+
+    const repeatedAttachedCount = useMemo(() => {
+        return (formData.recipes || []).filter((r) => getPreviousRecipeUsages(r).length > 0)
+            .length;
+    }, [formData.recipes, getPreviousRecipeUsages]);
+
+    const confirmRepeatRecipeAttachment = async (recipeName, pastUsages) => {
+        const clientLabel = escapeHtmlText(
+            effectiveClient?.full_name || formData.client_name || 'this client'
+        );
+        const safeDish = escapeHtmlText(recipeName || 'This recipe');
+        const itemsHtml = pastUsages
+            .map((u) => {
+                const revTag = u.revisionNumber ? `Rev ${escapeHtmlText(u.revisionNumber)}` : 'Plan';
+                const titleTag = escapeHtmlText(u.planTitle || 'Saved Diet Plan');
+                const dateTag = u.startDate ? ` <span style="color:#6b7280;">(${escapeHtmlText(u.startDate)})</span>` : '';
+                return `<li style="margin:4px 0;"><strong>${revTag}</strong> &mdash; ${titleTag}${dateTag}</li>`;
+            })
+            .join('');
+
+        const res = await Swal.fire({
+            icon: 'warning',
+            title: 'Used in Previous Diet Plan',
+            html: `<div style="text-align:left;font-size:13px;line-height:1.5;color:#374151;">
+                <p style="margin-bottom:8px;"><strong>&ldquo;${safeDish}&rdquo;</strong> was already prescribed to <strong>${clientLabel}</strong> in:</p>
+                <ul style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:8px 12px 8px 26px;margin:0 0 10px 0;color:#92400e;">${itemsHtml}</ul>
+                <p style="margin:0;color:#6b7280;font-size:12px;">Do you want to attach this recipe again anyway?</p>
+            </div>`,
+            showCancelButton: true,
+            confirmButtonText: 'Attach Anyway',
+            cancelButtonText: 'Choose Another',
+            confirmButtonColor: '#d97706',
+            reverseButtons: true,
+        });
+
+        return Boolean(res.isConfirmed);
+    };
+
+    const handleToggleRecipe = async (recipe) => {
         const currentRecipes = formData.recipes || [];
         const exists = currentRecipes.some(r => r.id === recipe.id);
-        const updated = exists
-            ? currentRecipes.filter(r => r.id !== recipe.id)
-            : [...currentRecipes, JSON.parse(JSON.stringify(recipe))];
 
-        setFormData(prev => ({ ...prev, recipes: updated }));
-        if (exists && editingRecipeId === recipe.id) {
-            setEditingRecipeId(null);
+        if (exists) {
+            setFormData(prev => ({
+                ...prev,
+                recipes: (prev.recipes || []).filter(r => r.id !== recipe.id)
+            }));
+            if (editingRecipeId === recipe.id) {
+                setEditingRecipeId(null);
+            }
+            return;
         }
+
+        const pastUsages = getPreviousRecipeUsages(recipe);
+        if (pastUsages.length > 0) {
+            const proceed = await confirmRepeatRecipeAttachment(recipe.name, pastUsages);
+            if (!proceed) return;
+        }
+
+        setFormData(prev => {
+            const latest = prev.recipes || [];
+            if (latest.some(r => r.id === recipe.id)) return prev;
+            return {
+                ...prev,
+                recipes: [...latest, JSON.parse(JSON.stringify(recipe))]
+            };
+        });
     };
 
     const handleRemoveSelectedRecipe = (recipeId) => {
@@ -1711,6 +2368,15 @@ export default function AdminDietPlanGeneratorPage() {
             return;
         }
 
+        const pastUsages = getPreviousRecipeUsages({ name: newRecipeForm.name.trim() });
+        if (pastUsages.length > 0) {
+            const proceed = await confirmRepeatRecipeAttachment(
+                newRecipeForm.name.trim(),
+                pastUsages
+            );
+            if (!proceed) return;
+        }
+
         setSavingNewRecipe(true);
         try {
             const payload = {
@@ -1831,282 +2497,374 @@ export default function AdminDietPlanGeneratorPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-20 font-sans text-heading">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+        <div className="bg-gray-50 pb-24 md:pb-16 font-sans text-heading">
+            <div className="max-w-7xl mx-auto px-0.5 sm:px-2 py-1 sm:py-4">
 
-                {/* ── Header (Styled like Clients page) ── */}
-                <div className="flex items-start sm:items-center justify-between gap-4 mb-6">
-                    <div>
-                        <h1 className="text-2xl sm:text-3xl font-bold text-heading flex items-center gap-3">
-                            <div className="p-2 bg-primary/10 rounded-xl">
-                                <FileText size={22} className="text-primary" />
-                            </div>
+                {/* ── Clean Contextual Page Header ── */}
+                <div className="mb-3 sm:mb-4 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 text-xs text-gray-500 min-w-0">
+                            <Link
+                                href={selectedClient ? `/admin/clients/${selectedClient.id}` : '/admin/clients'}
+                                className="inline-flex items-center gap-1 font-semibold text-gray-500 hover:text-primary transition min-w-0"
+                            >
+                                <ArrowLeft size={13} className="shrink-0" />
+                                <span className="truncate max-w-[170px] sm:max-w-xs">
+                                    {selectedClient ? selectedClient.full_name : 'All Clients'}
+                                </span>
+                            </Link>
+                            {loadedPlanRecord && (
+                                <>
+                                    <span className="text-gray-300 shrink-0">/</span>
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-[10px] sm:text-[11px] shrink-0">
+                                        Rev {loadedPlanRecord.revision_number}
+                                    </span>
+                                </>
+                            )}
+                        </div>
+
+                        <Link
+                            href="/admin/clients"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-white border border-gray-200 hover:bg-gray-50 text-[11px] sm:text-xs font-semibold text-heading transition shrink-0"
+                        >
+                            <Users size={13} className="text-primary shrink-0" />
+                            <span className="sm:hidden">Clients</span>
+                            <span className="hidden sm:inline">Client Directory</span>
+                        </Link>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2">
+                        <h1 className="text-lg sm:text-2xl font-bold text-heading truncate leading-tight">
                             Diet Plan Generator
                         </h1>
-                        <p className="text-gray-400 text-sm mt-1 ml-1">Create clinical diet plans with live vector PDF export</p>
+
+                        {/* Subtle Mobile/Tablet Draft Indicator */}
+                        <span className="text-[11px] text-gray-400 xl:hidden inline-flex items-center gap-1 shrink-0">
+                            {saveStatus === 'saving' && (
+                                <>
+                                    <RefreshCw size={10} className="animate-spin text-amber-600" />
+                                    <span>Saving…</span>
+                                </>
+                            )}
+                            {(saveStatus === 'saved' || saveStatus === 'restored') && (
+                                <>
+                                    <CheckCircle size={11} className="text-emerald-600" />
+                                    <span>Saved{lastSavedTimeLabel ? ` ${lastSavedTimeLabel}` : ''}</span>
+                                </>
+                            )}
+                            {saveStatus === 'error' && (
+                                <>
+                                    <AlertCircle size={11} className="text-red-500" />
+                                    <span className="text-red-500">Storage full</span>
+                                </>
+                            )}
+                        </span>
                     </div>
-                    <Link
-                        href="/admin"
-                        className="flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 bg-white border border-gray-200 text-heading font-bold rounded-xl hover:bg-gray-100 transition shadow-xs text-xs sm:text-sm shrink-0"
-                    >
-                        <ArrowLeft size={16} />
-                        <span className="hidden sm:inline">Back to Dashboard</span>
-                        <span className="sm:hidden">Dashboard</span>
-                    </Link>
                 </div>
 
-                {/* ════════════════ TOP ACTION TOOLBAR ════════════════ */}
-                <div className="bg-white rounded-2xl p-2.5 sm:p-3 mb-4 border border-gray-200/80 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-                    {/* Mode switcher tabs */}
-                    <div className="bg-gray-100 p-1 rounded-xl flex items-center w-full sm:w-auto">
+                {/* ════════════════ SINGLE UNIFIED STICKY WORKSPACE BAR ════════════════ */}
+                <div className="sticky top-[3.75rem] md:top-2 z-30 bg-white/95 backdrop-blur-md rounded-2xl p-2 sm:p-2.5 mb-4 sm:mb-5 border border-gray-200/90 shadow-sm flex flex-wrap items-center gap-x-2 gap-y-2">
+                    {/* 1. View Switcher (Mobile Row 1 Left | Desktop Left) */}
+                    <div className="order-1 bg-gray-100 p-0.5 rounded-xl flex items-center">
                         <button
                             type="button"
                             onClick={() => setActiveView('editor')}
-                            className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${activeView === 'editor' ? 'bg-white text-heading shadow-xs font-bold' : 'text-gray-500 hover:text-heading'
-                                }`}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                                activeView === 'editor'
+                                    ? 'bg-white text-heading shadow-2xs font-bold'
+                                    : 'text-gray-500 hover:text-heading'
+                            }`}
                         >
                             <FileText size={13} />
-                            <span>Edit Form</span>
+                            <span>Form</span>
                         </button>
                         <button
                             type="button"
-                            onClick={() => { setActiveView('preview'); setPreviewKey(k => k + 1); }}
-                            className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${activeView === 'preview' ? 'bg-white text-heading shadow-xs font-bold' : 'text-gray-500 hover:text-heading'
-                                }`}
-                        >
-                            <Eye size={13} className="text-primary" />
-                            <span>Preview</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => { setActiveView('split'); setPreviewKey(k => k + 1); }}
-                            className={`hidden lg:flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${activeView === 'split' ? 'bg-white text-heading shadow-xs font-bold' : 'text-gray-500 hover:text-heading'
-                                }`}
+                            onClick={() => {
+                                setActiveView('split');
+                                setPreviewKey((k) => k + 1);
+                            }}
+                            className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                                activeView === 'split'
+                                    ? 'bg-white text-heading shadow-2xs font-bold'
+                                    : 'text-gray-500 hover:text-heading'
+                            }`}
                         >
                             <Sliders size={13} />
-                            <span>Split View</span>
+                            <span>Split</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setActiveView('preview');
+                                setPreviewKey((k) => k + 1);
+                            }}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                                activeView === 'preview'
+                                    ? 'bg-white text-heading shadow-2xs font-bold'
+                                    : 'text-gray-500 hover:text-heading'
+                            }`}
+                        >
+                            <Eye size={13} />
+                            <span>Preview</span>
                         </button>
                     </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex flex-wrap items-center gap-2">
+                    {/* 2. Compact Print Theme Switch (Mobile Row 2 Left | Desktop Left) */}
+                    <div
+                        className="order-4 md:order-2 bg-gray-100 p-0.5 rounded-xl flex items-center"
+                        title="PDF Typography & Print Layout Theme"
+                    >
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setFormData((prev) => ({ ...prev, pdf_theme: 'clinical' }));
+                                setPreviewKey((k) => k + 1);
+                            }}
+                            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition cursor-pointer ${
+                                formData.pdf_theme !== 'senior'
+                                    ? 'bg-white text-emerald-900 shadow-2xs font-bold'
+                                    : 'text-gray-500 hover:text-heading'
+                            }`}
+                        >
+                            Clinical
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setFormData((prev) => ({ ...prev, pdf_theme: 'senior' }));
+                                setPreviewKey((k) => k + 1);
+                            }}
+                            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition cursor-pointer ${
+                                formData.pdf_theme === 'senior'
+                                    ? 'bg-white text-amber-900 shadow-2xs font-bold'
+                                    : 'text-gray-500 hover:text-heading'
+                            }`}
+                        >
+                            <span className="sm:hidden">Senior</span>
+                            <span className="hidden sm:inline">Senior Print</span>
+                        </button>
+                    </div>
+
+                    {/* 3. Subtle Draft Status Text (Wide Desktop) */}
+                    <span className="order-3 text-[11px] text-gray-400 hidden xl:inline-flex items-center gap-1 pl-1">
                         {saveStatus === 'saving' && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-50 text-amber-700 border border-amber-200/80 text-[11px] font-semibold">
-                                <RefreshCw size={11} className="animate-spin shrink-0" />
-                                <span>Saving…</span>
-                            </span>
+                            <>
+                                <RefreshCw size={10} className="animate-spin text-amber-600" />
+                                <span>Saving draft…</span>
+                            </>
                         )}
-                        {saveStatus === 'saved' && (
-                            <span
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[11px] font-semibold"
-                                title={lastSavedTimeLabel ? `Auto-saved to browser storage at ${lastSavedTimeLabel}` : 'Auto-saved to browser storage'}
-                            >
-                                <CheckCircle size={11} className="shrink-0" />
-                                <span>Saved{lastSavedTimeLabel ? ` • ${lastSavedTimeLabel}` : ''}</span>
-                            </span>
-                        )}
-                        {saveStatus === 'restored' && (
-                            <span
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[11px] font-semibold"
-                                title="Restored saved draft from browser storage"
-                            >
-                                <CheckCircle size={11} className="shrink-0" />
-                                <span>Draft restored{lastSavedTimeLabel ? ` • ${lastSavedTimeLabel}` : ''}</span>
-                            </span>
+                        {(saveStatus === 'saved' || saveStatus === 'restored') && (
+                            <>
+                                <CheckCircle size={11} className="text-emerald-600" />
+                                <span>
+                                    Draft saved{lastSavedTimeLabel ? ` ${lastSavedTimeLabel}` : ''}
+                                </span>
+                            </>
                         )}
                         {saveStatus === 'error' && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-red-50 text-red-600 border border-red-200 text-[11px] font-semibold">
-                                <AlertCircle size={11} className="shrink-0" />
-                                <span>Storage full</span>
-                            </span>
+                            <>
+                                <AlertCircle size={11} className="text-red-500" />
+                                <span className="text-red-500">Local draft full</span>
+                            </>
                         )}
+                    </span>
 
-                        {/* Reset Form */}
+                    {/* Mobile Row Divider between Row 1 and Row 2 */}
+                    <div className="order-3 w-full border-t border-gray-100 md:hidden" />
+
+                    {/* 4. Presets Popover Menu (Mobile Row 2 Right | Desktop Right) */}
+                    <div className="order-5 md:order-4 relative ml-auto" ref={presetsMenuRef}>
                         <button
                             type="button"
-                            onClick={handleClearForm}
-                            className="flex items-center justify-center gap-1 px-3 py-2 bg-white border border-gray-200 hover:border-red-300 hover:bg-red-50 text-gray-600 hover:text-red-600 font-semibold text-xs rounded-xl shadow-2xs transition active:scale-95 cursor-pointer shrink-0"
-                            title="Reset all fields"
+                            onClick={() => setShowPresetsPopover((o) => !o)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl bg-white hover:bg-gray-50 text-heading border border-gray-200 text-xs font-semibold whitespace-nowrap transition cursor-pointer"
                         >
-                            <RotateCcw size={12} />
-                            <span>Reset</span>
+                            <Sparkles size={13} className="text-amber-500 shrink-0" />
+                            <span>Presets</span>
+                            <ChevronDown size={13} className="text-gray-400 shrink-0" />
                         </button>
 
-                        {/* WhatsApp Quick Share */}
-                        <button
-                            type="button"
-                            onClick={handleOpenWhatsApp}
-                            className="flex items-center justify-center gap-1 px-3 py-2 bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 font-semibold text-xs rounded-xl transition active:scale-95 cursor-pointer shrink-0"
-                            title="Share on WhatsApp"
-                        >
-                            <Send size={12} />
-                            <span>WhatsApp</span>
-                        </button>
-
-                        {/* Download PDF */}
-                        <button
-                            type="button"
-                            onClick={handleDownloadPdf}
-                            disabled={generating}
-                            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 sm:px-5 py-2 bg-primary hover:bg-primary-hover text-white font-bold text-xs rounded-xl shadow-xs shadow-primary/20 transition active:scale-95 disabled:opacity-50 cursor-pointer min-w-0"
-                        >
-                            {generating ? <RefreshCw size={13} className="animate-spin text-white shrink-0" /> : <Download size={13} className="text-white shrink-0" />}
-                            <span className="truncate">Download PDF</span>
-                        </button>
-                    </div>
-                </div>
-
-                {/* ════════════════ THEME & PRESETS ════════════════ */}
-                <div className="bg-white rounded-2xl p-4 sm:p-4.5 mb-5 border border-gray-200/80 shadow-xs">
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5 sm:gap-4 items-start">
-
-                        {/* Theme Picker */}
-                        <div className="md:col-span-4 space-y-2">
-                            <div className="flex items-center justify-between">
-                                <label className="text-xs font-bold text-heading uppercase tracking-wider flex items-center gap-1.5">
-                                    <Palette size={13} className="text-primary" />
-                                    <span>Theme</span>
-                                </label>
-                                <span className="text-[10px] text-gray-400 font-medium">
-                                    {formData.pdf_theme === 'senior' ? 'Senior Large-Print' : 'Clinical Precision'}
-                                </span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setFormData(prev => ({ ...prev, pdf_theme: 'clinical' }));
-                                        setPreviewKey(k => k + 1);
-                                    }}
-                                    className={`py-2 px-3 rounded-xl border text-xs font-bold text-center transition cursor-pointer flex items-center justify-center gap-1.5 ${formData.pdf_theme !== 'senior'
-                                        ? 'border-emerald-600 bg-emerald-50 text-emerald-900 ring-1 ring-emerald-600/30 shadow-2xs'
-                                        : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50 bg-white'
-                                        }`}
-                                >
-                                    <span className={`w-2 h-2 rounded-full ${formData.pdf_theme !== 'senior' ? 'bg-emerald-600' : 'bg-gray-300'}`} />
-                                    <span>Clinical</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setFormData(prev => ({ ...prev, pdf_theme: 'senior' }));
-                                        setPreviewKey(k => k + 1);
-                                    }}
-                                    className={`py-2 px-3 rounded-xl border text-xs font-bold text-center transition cursor-pointer flex items-center justify-center gap-1.5 ${formData.pdf_theme === 'senior'
-                                        ? 'border-amber-500 bg-amber-50 text-amber-900 ring-1 ring-amber-400 shadow-2xs'
-                                        : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50 bg-white'
-                                        }`}
-                                >
-                                    <span className={`w-2 h-2 rounded-full ${formData.pdf_theme === 'senior' ? 'bg-amber-500' : 'bg-gray-300'}`} />
-                                    <span>Senior</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Presets: Vertical scroll & Collapsible */}
-                        <div className="md:col-span-8 space-y-2">
-                            <div
-                                onClick={() => toggleSection('presets')}
-                                className="flex items-center justify-between cursor-pointer select-none"
-                            >
-                                <div className="flex items-center gap-1.5">
-                                    <Sparkles size={14} className="text-accent" />
-                                    <span className="text-xs font-bold text-heading uppercase tracking-wider">Presets</span>
-                                    <span className="text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold px-2 py-0.2 rounded-full">
-                                        {templates.length}
+                        {showPresetsPopover && (
+                            <div className="absolute right-0 mt-2 w-[min(18rem,calc(100vw-2rem))] bg-white rounded-2xl shadow-xl border border-gray-200 p-2.5 z-50 space-y-2">
+                                <div className="flex items-center justify-between px-1 pb-1.5 border-b border-gray-100">
+                                    <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                                        Clinical Templates ({templates.length})
                                     </span>
-                                </div>
-                                <div className="flex items-center gap-2">
                                     <button
                                         type="button"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
+                                        onClick={() => {
+                                            setShowPresetsPopover(false);
                                             handleSaveCurrentAsTemplate();
                                         }}
-                                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary text-white font-bold text-[11px] rounded-lg hover:bg-primary-hover shadow-2xs transition cursor-pointer active:scale-95"
-                                        title="Save current form values as a new preset"
+                                        className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline cursor-pointer"
                                     >
-                                        <BookmarkPlus size={11} />
-                                        <span>Save As Preset</span>
+                                        <BookmarkPlus size={12} />
+                                        <span>Save Current</span>
                                     </button>
-                                    <span className="text-gray-400">
-                                        {collapsed.presets ? <ChevronDown size={17} /> : <ChevronUp size={17} />}
-                                    </span>
                                 </div>
-                            </div>
 
-                            {!collapsed.presets && (
-                                <div className="p-2 rounded-xl bg-gray-50/80 border border-gray-200/80">
-                                    {loadingTemplates ? (
-                                        <div className="flex items-center justify-center gap-2 text-xs text-gray-500 py-3">
-                                            <RefreshCw size={12} className="animate-spin text-primary" />
-                                            <span>Loading presets...</span>
-                                        </div>
-                                    ) : templates.length === 0 ? (
-                                        <p className="text-xs text-gray-400 italic text-center py-2.5">
-                                            No presets saved yet. Build a plan below and click Save As Preset.
-                                        </p>
-                                    ) : (
-                                        <div className="overflow-y-auto max-h-48 space-y-1.5 pr-1">
-                                            {templates.map((preset) => (
-                                                <div
-                                                    key={preset.id || preset.label}
-                                                    className="flex items-center justify-between p-2 rounded-lg bg-white border border-gray-200 hover:border-primary/40 hover:bg-emerald-50/40 transition shadow-2xs"
+                                {loadingTemplates ? (
+                                    <div className="py-4 text-center text-xs text-gray-400">
+                                        <RefreshCw size={13} className="animate-spin inline mr-1 text-primary" />
+                                        Loading...
+                                    </div>
+                                ) : templates.length === 0 ? (
+                                    <p className="py-3 text-center text-xs text-gray-400">
+                                        No templates saved yet.
+                                    </p>
+                                ) : (
+                                    <div className="max-h-56 overflow-y-auto space-y-1">
+                                        {templates.map((preset) => (
+                                            <div
+                                                key={preset.id || preset.label}
+                                                className="flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-emerald-50/60 transition group"
+                                            >
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setShowPresetsPopover(false);
+                                                        handleApplyTemplate(preset);
+                                                    }}
+                                                    className="flex-1 text-left min-w-0 cursor-pointer"
                                                 >
+                                                    <p className="text-xs font-semibold text-heading truncate">
+                                                        {preset.label}
+                                                    </p>
+                                                    <p className="text-[10px] text-emerald-700 font-medium">
+                                                        {preset.badge ||
+                                                            (preset.calories
+                                                                ? `${preset.calories} kcal`
+                                                                : 'Template')}
+                                                    </p>
+                                                </button>
+                                                {preset.id && !preset.is_preset && (
                                                     <button
                                                         type="button"
-                                                        onClick={() => handleApplyTemplate(preset)}
-                                                        className="flex items-center gap-2 text-left flex-1 min-w-0 cursor-pointer"
-                                                        title={`Click to load: ${preset.label}`}
+                                                        onClick={(e) =>
+                                                            handleDeleteTemplate(
+                                                                preset.id,
+                                                                preset.label,
+                                                                e
+                                                            )
+                                                        }
+                                                        className="p-1.5 text-gray-400 hover:text-red-500 rounded cursor-pointer"
+                                                        title="Delete preset"
                                                     >
-                                                        <span className="font-semibold text-xs text-heading truncate">{preset.label}</span>
-                                                        <span className="bg-primary/10 text-primary text-[10px] font-bold px-1.5 py-0.2 rounded shrink-0">
-                                                            {preset.badge || (preset.calories ? `${preset.calories} kcal` : 'Preset')}
-                                                        </span>
+                                                        <Trash2 size={13} />
                                                     </button>
-                                                    {preset.id && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => handleDeleteTemplate(preset.id, preset.label, e)}
-                                                            className="p-1 text-gray-400 hover:text-red-500 rounded transition ml-2 cursor-pointer"
-                                                            title="Delete preset"
-                                                        >
-                                                            <Trash2 size={12} />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 5. Desktop Primary Actions: Save Plan + Download PDF (Hidden on < md, moved to Mobile Bottom Thumb Bar) */}
+                    <div className="hidden md:flex md:order-5 items-center gap-2">
+                        <div className="relative inline-flex items-center" ref={saveMenuRef}>
+                            <button
+                                type="button"
+                                disabled={savingToClientDb}
+                                onClick={() => handleSavePlanToDb('auto')}
+                                className={`inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-primary border border-emerald-200 font-bold text-xs whitespace-nowrap transition active:scale-[0.98] cursor-pointer disabled:opacity-50 ${
+                                    loadedPlanRecord ? 'rounded-l-xl border-r-0' : 'rounded-xl'
+                                }`}
+                            >
+                                {savingToClientDb ? (
+                                    <RefreshCw size={13} className="animate-spin shrink-0" />
+                                ) : (
+                                    <Save size={13} className="shrink-0" />
+                                )}
+                                <span>
+                                    {loadedPlanRecord
+                                        ? `Update Rev ${loadedPlanRecord.revision_number}`
+                                        : 'Save Plan'}
+                                </span>
+                            </button>
+
+                            {loadedPlanRecord && (
+                                <button
+                                    type="button"
+                                    disabled={savingToClientDb}
+                                    onClick={() => setShowSaveMenu((o) => !o)}
+                                    className="px-2 py-2 bg-emerald-50 hover:bg-emerald-100 text-primary border border-emerald-200 rounded-r-xl transition cursor-pointer disabled:opacity-50"
+                                    title="More save options"
+                                >
+                                    <ChevronDown size={13} />
+                                </button>
+                            )}
+
+                            {loadedPlanRecord && showSaveMenu && (
+                                <div className="absolute right-0 top-full mt-1.5 w-56 bg-white rounded-xl shadow-xl border border-gray-200 py-1.5 z-50 text-xs">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSavePlanToDb('create')}
+                                        className="w-full px-3.5 py-2 text-left font-semibold text-heading hover:bg-emerald-50 hover:text-primary flex items-center gap-2 cursor-pointer"
+                                    >
+                                        <Plus size={13} className="text-primary" />
+                                        <span>Save as New Revision</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setLoadedPlanRecord(null);
+                                            setShowSaveMenu(false);
+                                        }}
+                                        className="w-full px-3.5 py-2 text-left text-gray-500 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
+                                    >
+                                        <X size={13} />
+                                        <span>Detach from Rev {loadedPlanRecord.revision_number}</span>
+                                    </button>
                                 </div>
                             )}
                         </div>
 
-                    </div>
-                </div>
-
-                {/* ════════════════ GLOBAL COLLAPSE / EXPAND TOGGLE ════════════════ */}
-                <div className="flex items-center justify-between mb-3 text-xs">
-                    <div className="flex items-center gap-2">
-                        <span className="font-bold text-heading text-sm">Form Blueprint Sections</span>
-                        <span className="text-para text-[11px] hidden sm:inline">Tap any section to expand or collapse</span>
-                    </div>
-                    <div className="flex items-center gap-2">
                         <button
                             type="button"
-                            onClick={expandAll}
-                            className="inline-flex items-center gap-1 text-[11px] text-gray-600 hover:text-primary font-semibold px-2 py-1 rounded-md bg-white border border-gray-200 shadow-2xs transition cursor-pointer"
+                            onClick={handleDownloadPdf}
+                            disabled={generating}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary-hover text-white font-bold text-xs rounded-xl shadow-xs whitespace-nowrap transition active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                         >
-                            <Maximize2 size={11} />
-                            <span>Expand All</span>
+                            {generating ? (
+                                <RefreshCw size={13} className="animate-spin shrink-0" />
+                            ) : (
+                                <Download size={13} className="shrink-0" />
+                            )}
+                            <span>Download PDF</span>
+                        </button>
+                    </div>
+
+                    {/* 6. Quiet Secondary Icon Actions: WhatsApp, Expand/Collapse, Reset (Mobile Row 1 Right | Desktop Far Right) */}
+                    <div className="order-2 md:order-6 flex items-center gap-0.5 sm:gap-1 ml-auto md:ml-0 md:pl-1 md:border-l md:border-gray-200 shrink-0">
+                        <button
+                            type="button"
+                            onClick={handleOpenWhatsApp}
+                            className="p-2 rounded-xl text-gray-500 hover:text-emerald-700 hover:bg-emerald-50 transition cursor-pointer"
+                            title="Share summary on WhatsApp"
+                            aria-label="Share summary on WhatsApp"
+                        >
+                            <Send size={15} />
                         </button>
                         <button
                             type="button"
-                            onClick={collapseAll}
-                            className="inline-flex items-center gap-1 text-[11px] text-gray-600 hover:text-primary font-semibold px-2 py-1 rounded-md bg-white border border-gray-200 shadow-2xs transition cursor-pointer"
+                            onClick={toggleAllSections}
+                            className="p-2 rounded-xl text-gray-500 hover:text-heading hover:bg-gray-100 transition cursor-pointer"
+                            title={allExpanded ? 'Collapse all sections' : 'Expand all sections'}
+                            aria-label={allExpanded ? 'Collapse all sections' : 'Expand all sections'}
                         >
-                            <Minimize2 size={11} />
-                            <span>Collapse All</span>
+                            {allExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleClearForm}
+                            className="p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
+                            title="Reset form"
+                            aria-label="Reset form"
+                        >
+                            <RotateCcw size={15} />
                         </button>
                     </div>
                 </div>
@@ -2122,29 +2880,29 @@ export default function AdminDietPlanGeneratorPage() {
                             <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden transition">
                                 <div
                                     onClick={() => toggleSection('profile')}
-                                    className="p-4 sm:p-4.5 flex items-center justify-between cursor-pointer hover:bg-gray-50/60 select-none border-b border-gray-100"
+                                    className="p-3.5 sm:p-4.5 flex items-center justify-between gap-2 cursor-pointer hover:bg-gray-50/60 select-none border-b border-gray-100"
                                 >
-                                    <div className="flex items-center gap-2.5">
-                                        <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
                                             <User size={15} />
                                         </div>
-                                        <div>
-                                            <h3 className="font-bold text-xs sm:text-sm text-heading flex items-center gap-2">
-                                                <span>1. Client Information & Timeline</span>
+                                        <div className="min-w-0">
+                                            <h3 className="font-bold text-xs sm:text-sm text-heading flex items-center gap-1.5 min-w-0">
+                                                <span className="truncate">1. Client Information &amp; Timeline</span>
                                                 {formData.client_name && (
-                                                    <span className="text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.2 rounded-full font-bold">
+                                                    <span className="text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.2 rounded-full font-bold max-w-[110px] sm:max-w-[180px] truncate shrink-0">
                                                         {formData.client_name}
                                                     </span>
                                                 )}
                                             </h3>
-                                            <p className="text-[11px] text-para line-clamp-1">
+                                            <p className="text-[11px] text-para truncate">
                                                 {formData.client_name
                                                     ? `${formData.client_name} • ${formData.client_age || 'Age —'} • ${formData.start_weight || '—'} → ${formData.target_weight || '—'}`
                                                     : 'Client demographics, measurements, habits and dates'}
                                             </p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2 text-gray-400">
+                                    <div className="flex items-center gap-2 text-gray-400 shrink-0">
                                         {collapsed.profile ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
                                     </div>
                                 </div>
@@ -2154,15 +2912,31 @@ export default function AdminDietPlanGeneratorPage() {
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                             {/* Client Name */}
                                             <div>
-                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Client Full Name *</label>
+                                                <label className="flex items-center justify-between text-xs font-semibold text-gray-700 mb-1">
+                                                    <span>Client Full Name *</span>
+                                                    {selectedClient && (
+                                                        <Link
+                                                            href={`/admin/clients/${selectedClient.id}`}
+                                                            className="text-[10px] font-bold text-primary hover:underline"
+                                                        >
+                                                            View Profile →
+                                                        </Link>
+                                                    )}
+                                                </label>
                                                 <input
                                                     type="text"
+                                                    list="admin-clients-datalist"
                                                     value={formData.client_name}
-                                                    onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
+                                                    onChange={(e) => handleClientNameChange(e.target.value)}
                                                     placeholder="e.g., Fatima Al-Zahra"
                                                     className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
                                                     required
                                                 />
+                                                <datalist id="admin-clients-datalist">
+                                                    {allClients.map((c) => (
+                                                        <option key={c.id} value={c.full_name} />
+                                                    ))}
+                                                </datalist>
                                             </div>
 
                                             {/* Age */}
@@ -2205,11 +2979,16 @@ export default function AdminDietPlanGeneratorPage() {
                                             <div>
                                                 <label className="flex items-center justify-between text-xs font-semibold text-gray-700 mb-1">
                                                     <span>Height</span>
-                                                    {fieldsLocked && (
-                                                        <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-700 font-bold">
-                                                            <Lock size={10} /> Locked
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowHeightConverter((o) => !o)}
+                                                        className="inline-flex items-center gap-1 text-[10px] font-bold text-primary hover:underline cursor-pointer"
+                                                    >
+                                                        <Ruler size={10} />
+                                                        <span>
+                                                            {showHeightConverter ? 'Hide Calc' : 'cm ↔ in & IBW'}
                                                         </span>
-                                                    )}
+                                                    </button>
                                                 </label>
                                                 <input
                                                     type="text"
@@ -2249,151 +3028,121 @@ export default function AdminDietPlanGeneratorPage() {
                                                 />
                                             </div>
 
-                                            {/* ── Height (cm ↔ inches) & IBW Auto-Calculator Strip ── */}
-                                            <div className="sm:col-span-2 lg:col-span-3 rounded-xl bg-emerald-50/60 border border-emerald-200/80 p-3 sm:p-3.5 space-y-2.5">
-                                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <Ruler size={14} className="text-primary shrink-0" />
-                                                        <span className="text-xs font-bold text-emerald-950">
-                                                            Step 1 &amp; 2: Height Converter (cm ↔ in) &amp; IBW Auto-Calculator
-                                                        </span>
-                                                    </div>
-                                                    {calcConfig.heightFeet !== '' && Number(calcConfig.heightCm) > 0 && (
-                                                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white text-emerald-800 border border-emerald-200">
-                                                            {calcConfig.heightCm} cm = {calcConfig.heightInches} in ≈ {calcConfig.heightFeet}&apos;{calcConfig.heightRemInches}&quot;
-                                                        </span>
-                                                    )}
-                                                </div>
-
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                    {/* Card A: Height Converter (cm <-> inches + ft/in) */}
-                                                    <div className="bg-white rounded-xl border border-emerald-200/70 p-2.5 space-y-2">
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="text-[11px] font-bold text-gray-700">
-                                                                1. Height Conversion
-                                                            </span>
-                                                            <span className="text-[10px] text-gray-400">
-                                                                1 in = 2.54 cm
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex items-center gap-1.5">
-                                                            <div className="flex-1 min-w-0">
-                                                                <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">
-                                                                    Centimeters (cm)
-                                                                </label>
+                                            {/* ── Collapsible Height (cm ↔ inches) & IBW Auto-Calculator ── */}
+                                            {showHeightConverter && (
+                                                <div className="sm:col-span-2 lg:col-span-3 rounded-xl bg-gray-50/90 border border-gray-200 p-3 space-y-2.5">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                        {/* Height Converter (cm <-> inches + ft/in) */}
+                                                        <div className="bg-white rounded-xl border border-gray-200/80 p-2.5 space-y-2">
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-[11px] font-bold text-gray-700">
+                                                                    Height Converter (cm ↔ in)
+                                                                </span>
+                                                                {calcConfig.heightFeet !== '' && Number(calcConfig.heightCm) > 0 && (
+                                                                    <span className="text-[10px] font-semibold text-primary">
+                                                                        ≈ {calcConfig.heightFeet}&apos;{calcConfig.heightRemInches}&quot;
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex items-center gap-1.5">
                                                                 <input
                                                                     type="number"
                                                                     min="0"
                                                                     step="0.1"
                                                                     value={calcConfig.heightCm}
                                                                     onChange={(e) => handleHeightCmChange(e.target.value)}
-                                                                    placeholder="165"
-                                                                    className="w-full text-xs font-bold text-heading px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                                                    placeholder="cm (165)"
+                                                                    className="flex-1 min-w-0 text-xs font-semibold text-heading px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:border-primary"
                                                                 />
-                                                            </div>
-                                                            <ArrowLeftRight size={13} className="text-primary shrink-0 mt-4" />
-                                                            <div className="flex-1 min-w-0">
-                                                                <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">
-                                                                    Total Inches (in)
-                                                                </label>
+                                                                <ArrowLeftRight size={12} className="text-gray-400 shrink-0" />
                                                                 <input
                                                                     type="number"
                                                                     min="0"
                                                                     step="0.1"
                                                                     value={calcConfig.heightInches}
                                                                     onChange={(e) => handleHeightInchesChange(e.target.value)}
-                                                                    placeholder="65"
-                                                                    className="w-full text-xs font-bold text-heading px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                                                    placeholder="in (65)"
+                                                                    className="flex-1 min-w-0 text-xs font-semibold text-heading px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:border-primary"
                                                                 />
                                                             </div>
-                                                        </div>
-                                                        <div className="flex items-center gap-1.5 pt-1 border-t border-gray-100">
-                                                            <span className="text-[10px] font-semibold text-gray-400 shrink-0">
-                                                                Or Feet &amp; In:
-                                                            </span>
-                                                            <input
-                                                                type="number"
-                                                                min="0"
-                                                                max="8"
-                                                                step="1"
-                                                                value={calcConfig.heightFeet}
-                                                                onChange={(e) =>
-                                                                    handleHeightFeetInchesChange(
-                                                                        e.target.value,
-                                                                        calcConfig.heightRemInches
-                                                                    )
-                                                                }
-                                                                placeholder="5"
-                                                                className="w-14 text-[11px] font-semibold text-heading px-2 py-1 rounded-md border border-gray-200 focus:outline-none focus:border-primary"
-                                                            />
-                                                            <span className="text-[10px] text-gray-500">ft</span>
-                                                            <input
-                                                                type="number"
-                                                                min="0"
-                                                                max="11.9"
-                                                                step="0.5"
-                                                                value={calcConfig.heightRemInches}
-                                                                onChange={(e) =>
-                                                                    handleHeightFeetInchesChange(
-                                                                        calcConfig.heightFeet,
-                                                                        e.target.value
-                                                                    )
-                                                                }
-                                                                placeholder="5"
-                                                                className="w-16 text-[11px] font-semibold text-heading px-2 py-1 rounded-md border border-gray-200 focus:outline-none focus:border-primary"
-                                                            />
-                                                            <span className="text-[10px] text-gray-500">in</span>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Card B: IBW Auto-Calculator (Height cm - 100 / 105 / custom) */}
-                                                    <div className="bg-white rounded-xl border border-emerald-200/70 p-2.5 space-y-2">
-                                                        <div className="flex items-center justify-between gap-1">
-                                                            <span className="text-[11px] font-bold text-gray-700">
-                                                                2. IBW (Height cm &minus; Offset)
-                                                            </span>
-                                                            <div className="flex items-center gap-1">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleIbwOffsetChange(100)}
-                                                                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition cursor-pointer ${
-                                                                        Number(calcConfig.ibwOffset) === 100
-                                                                            ? 'bg-primary text-white border-primary'
-                                                                            : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-primary/40'
-                                                                    }`}
-                                                                >
-                                                                    Male (-100)
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleIbwOffsetChange(105)}
-                                                                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition cursor-pointer ${
-                                                                        Number(calcConfig.ibwOffset) === 105
-                                                                            ? 'bg-primary text-white border-primary'
-                                                                            : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-primary/40'
-                                                                    }`}
-                                                                >
-                                                                    Female (-105)
-                                                                </button>
+                                                            <div className="flex items-center gap-1.5 pt-1 border-t border-gray-100">
+                                                                <span className="text-[10px] text-gray-400">Feet &amp; In:</span>
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    max="8"
+                                                                    step="1"
+                                                                    value={calcConfig.heightFeet}
+                                                                    onChange={(e) =>
+                                                                        handleHeightFeetInchesChange(
+                                                                            e.target.value,
+                                                                            calcConfig.heightRemInches
+                                                                        )
+                                                                    }
+                                                                    placeholder="5"
+                                                                    className="w-12 text-[11px] font-semibold text-heading px-2 py-1 rounded-md border border-gray-200 focus:outline-none focus:border-primary"
+                                                                />
+                                                                <span className="text-[10px] text-gray-500">ft</span>
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    max="11.9"
+                                                                    step="0.5"
+                                                                    value={calcConfig.heightRemInches}
+                                                                    onChange={(e) =>
+                                                                        handleHeightFeetInchesChange(
+                                                                            calcConfig.heightFeet,
+                                                                            e.target.value
+                                                                        )
+                                                                    }
+                                                                    placeholder="5"
+                                                                    className="w-14 text-[11px] font-semibold text-heading px-2 py-1 rounded-md border border-gray-200 focus:outline-none focus:border-primary"
+                                                                />
+                                                                <span className="text-[10px] text-gray-500">in</span>
                                                             </div>
                                                         </div>
 
-                                                        <div className="flex items-center gap-2">
-                                                            <input
-                                                                type="range"
-                                                                min="95"
-                                                                max="115"
-                                                                step="0.5"
-                                                                value={
-                                                                    Number.isFinite(Number(calcConfig.ibwOffset))
-                                                                        ? Math.min(115, Math.max(95, Number(calcConfig.ibwOffset)))
-                                                                        : 105
-                                                                }
-                                                                onChange={(e) => handleIbwOffsetChange(e.target.value)}
-                                                                className="flex-1 accent-primary cursor-pointer h-1.5"
-                                                            />
-                                                            <div className="flex items-center gap-1 shrink-0">
-                                                                <span className="text-[11px] font-bold text-gray-400">&minus;</span>
+                                                        {/* IBW Auto-Calculator */}
+                                                        <div className="bg-white rounded-xl border border-gray-200/80 p-2.5 space-y-2">
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <span className="text-[11px] font-bold text-gray-700">
+                                                                    IBW (Height cm &minus; Offset)
+                                                                </span>
+                                                                <select
+                                                                    value={
+                                                                        Number(calcConfig.ibwOffset) === 100
+                                                                            ? '100'
+                                                                            : Number(calcConfig.ibwOffset) === 105
+                                                                                ? '105'
+                                                                                : 'custom'
+                                                                    }
+                                                                    onChange={(e) => {
+                                                                        if (e.target.value !== 'custom') {
+                                                                            handleIbwOffsetChange(Number(e.target.value));
+                                                                        }
+                                                                    }}
+                                                                    className="text-[11px] font-semibold px-2 py-0.5 rounded-lg border border-gray-200 bg-gray-50 text-heading focus:outline-none"
+                                                                >
+                                                                    <option value="100">Male (−100)</option>
+                                                                    <option value="105">Female (−105)</option>
+                                                                    <option value="custom">Custom Offset</option>
+                                                                </select>
+                                                            </div>
+
+                                                            <div className="flex items-center gap-2">
+                                                                <input
+                                                                    type="range"
+                                                                    min="95"
+                                                                    max="115"
+                                                                    step="0.5"
+                                                                    value={
+                                                                        Number.isFinite(Number(calcConfig.ibwOffset))
+                                                                            ? Math.min(115, Math.max(95, Number(calcConfig.ibwOffset)))
+                                                                            : 105
+                                                                    }
+                                                                    onChange={(e) => handleIbwOffsetChange(e.target.value)}
+                                                                    className="flex-1 accent-primary cursor-pointer h-1.5"
+                                                                />
                                                                 <input
                                                                     type="number"
                                                                     step="0.5"
@@ -2402,23 +3151,23 @@ export default function AdminDietPlanGeneratorPage() {
                                                                     className="w-16 text-xs font-bold text-heading text-center px-1.5 py-1 rounded-lg border border-gray-200 focus:outline-none focus:border-primary"
                                                                 />
                                                             </div>
-                                                        </div>
 
-                                                        <div className="flex items-center justify-between text-[11px] pt-1 border-t border-gray-100">
-                                                            <span className="text-gray-500">
-                                                                {Number(calcConfig.heightCm) > 0
-                                                                    ? `${calcConfig.heightCm} cm − ${calcConfig.ibwOffset}`
-                                                                    : 'Enter height in cm or inches'}
-                                                            </span>
-                                                            <span className="font-bold text-primary">
-                                                                {Number.isFinite(activeIbwNum)
-                                                                    ? `IBW = ${activeIbwNum} kg`
-                                                                    : 'IBW: —'}
-                                                            </span>
+                                                            <div className="flex items-center justify-between text-[11px] pt-1 border-t border-gray-100">
+                                                                <span className="text-gray-500">
+                                                                    {Number(calcConfig.heightCm) > 0
+                                                                        ? `${calcConfig.heightCm} cm − ${calcConfig.ibwOffset}`
+                                                                        : 'Enter height on left'}
+                                                                </span>
+                                                                <span className="font-bold text-primary">
+                                                                    {Number.isFinite(activeIbwNum)
+                                                                        ? `IBW = ${activeIbwNum} kg`
+                                                                        : '—'}
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </div>
+                                            )}
 
                                             {/* Food Habits */}
                                             <div>
@@ -2551,406 +3300,36 @@ export default function AdminDietPlanGeneratorPage() {
                             <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden transition">
                                 <div
                                     onClick={() => toggleSection('targets')}
-                                    className="p-4 sm:p-4.5 flex items-center justify-between cursor-pointer hover:bg-gray-50/60 select-none border-b border-gray-100"
+                                    className="p-3.5 sm:p-4.5 flex items-center justify-between gap-2 cursor-pointer hover:bg-gray-50/60 select-none border-b border-gray-100"
                                 >
-                                    <div className="flex items-center gap-2.5">
-                                        <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xs">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xs shrink-0">
                                             <Target size={15} />
                                         </div>
-                                        <div>
-                                            <h3 className="font-bold text-xs sm:text-sm text-heading flex items-center gap-2">
-                                                <span>2. Nutritional Targets & Daily Quotas</span>
+                                        <div className="min-w-0">
+                                            <h3 className="font-bold text-xs sm:text-sm text-heading flex items-center gap-1.5 min-w-0">
+                                                <span className="truncate">2. Nutritional Targets &amp; Daily Quotas</span>
                                                 {formData.calories && (
-                                                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.2 rounded-full">
+                                                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.2 rounded-full shrink-0">
                                                         {formData.calories} kcal
                                                     </span>
                                                 )}
                                             </h3>
-                                            <p className="text-[11px] text-para line-clamp-1">
+                                            <p className="text-[11px] text-para truncate">
                                                 {formData.calories
                                                     ? `${formData.calories} kcal • P: ${formData.protein || '—'} • C: ${formData.carbs || '—'} • F: ${formData.fats || '—'}${formData.fibre ? ` • Fib: ${formData.fibre}` : ''} • ${formData.water || '—'}L Water`
                                                     : 'Calories, Protein, Carbs, Fats, Fibre, Water and Step goals'}
                                             </p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2 text-gray-400">
+                                    <div className="flex items-center gap-2 text-gray-400 shrink-0">
                                         {collapsed.targets ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
                                     </div>
                                 </div>
 
                                 {!collapsed.targets && (
-                                    <div className="p-4 sm:p-5 space-y-4">
-                                        {/* ── Step 3 & 4: Calories & Macronutrient Auto-Calculator ── */}
-                                        <div className="rounded-xl bg-emerald-50/60 border border-emerald-200/80 p-3 sm:p-3.5 space-y-3">
-                                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <Calculator size={14} className="text-primary shrink-0" />
-                                                        <span className="text-xs font-bold text-emerald-950">
-                                                            Step 3 &amp; 4: Calories &amp; Macro Auto-Calculator
-                                                        </span>
-                                                    </div>
-                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-emerald-800 border border-emerald-200">
-                                                        {Number.isFinite(activeIbwNum)
-                                                            ? `IBW: ${activeIbwNum} kg`
-                                                            : 'Enter Height / IBW in Sec 1'}
-                                                    </span>
-                                                </div>
-
-                                                <div className="flex flex-wrap items-center gap-1.5">
-                                                    {/* Macro % Total Indicator + 1-Click Balance */}
-                                                    <span
-                                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                                                            macroPctSum === 100
-                                                                ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                                                                : 'bg-amber-100 text-amber-800 border-amber-300'
-                                                        }`}
-                                                        title="Protein% + Carbs% + Fats% should ideally equal 100% of total calories"
-                                                    >
-                                                        Macro Split: {macroPctSum}%
-                                                    </span>
-                                                    {macroPctSum !== 100 && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={handleBalanceMacrosTo100}
-                                                            className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-600 text-white hover:bg-amber-700 transition cursor-pointer"
-                                                            title="Adjust Fats/Carbs % so Protein + Carbs + Fats = 100%"
-                                                        >
-                                                            Balance 100%
-                                                        </button>
-                                                    )}
-
-                                                    {/* Editable vs Locked Toggle */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={handleToggleLockFields}
-                                                        className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full border transition cursor-pointer ${
-                                                            fieldsLocked
-                                                                ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
-                                                                : 'bg-white text-emerald-800 border-emerald-200 hover:border-primary/50'
-                                                        }`}
-                                                        title={
-                                                            fieldsLocked
-                                                                ? 'Auto-filled fields are locked against accidental edits. Click to unlock for manual clinical overrides.'
-                                                                : 'Auto-filled fields are editable for clinical rounding/overrides. Click to lock them.'
-                                                        }
-                                                    >
-                                                        {fieldsLocked ? (
-                                                            <>
-                                                                <Lock size={10} /> Locked
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <Unlock size={10} /> Editable
-                                                            </>
-                                                        )}
-                                                    </button>
-
-                                                    {/* Show / Hide Calculator */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={handleToggleCalculatorPanel}
-                                                        className="text-[10px] font-semibold text-emerald-800 hover:text-primary px-1.5 py-0.5 cursor-pointer"
-                                                    >
-                                                        {calcConfig.showCalculator === false ? 'Show' : 'Hide'}
-                                                    </button>
-                                                </div>
-                                            </div>
-
-                                            {calcConfig.showCalculator !== false && (
-                                                <>
-                                                    {/* Quick Clinical Macro Split Presets */}
-                                                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                                                        <span className="text-[10px] font-semibold text-emerald-900/70 mr-0.5">
-                                                            Quick Splits:
-                                                        </span>
-                                                        {[
-                                                            { label: 'Balanced (20P / 60C / 20F)', p: 20, c: 60, f: 20 },
-                                                            { label: 'High-Protein (25P / 55C / 20F)', p: 25, c: 55, f: 20 },
-                                                            { label: 'Low-Fat (25P / 60C / 15F)', p: 25, c: 60, f: 15 },
-                                                            { label: 'Mod-Carb (25P / 50C / 25F)', p: 25, c: 50, f: 25 },
-                                                        ].map((preset) => {
-                                                            const isActive =
-                                                                Number(calcConfig.proteinPct) === preset.p &&
-                                                                Number(calcConfig.carbsPct) === preset.c &&
-                                                                Number(calcConfig.fatsPct) === preset.f;
-                                                            return (
-                                                                <button
-                                                                    key={preset.label}
-                                                                    type="button"
-                                                                    onClick={() =>
-                                                                        handleApplyMacroPreset(preset.p, preset.c, preset.f)
-                                                                    }
-                                                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-md border transition cursor-pointer ${
-                                                                        isActive
-                                                                            ? 'bg-primary text-white border-primary'
-                                                                            : 'bg-white text-gray-600 border-emerald-200/80 hover:border-primary/40'
-                                                                    }`}
-                                                                >
-                                                                    {preset.label}
-                                                                </button>
-                                                            );
-                                                        })}
-                                                    </div>
-
-                                                    {/* 2x2 Responsive Grid for Calories, Protein, Carbs, Fats */}
-                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                        {/* 3. Calories = IBW * 20-30 */}
-                                                        <div className="bg-white rounded-xl border border-emerald-200/70 p-2.5 space-y-2">
-                                                            <div className="flex items-center justify-between gap-1">
-                                                                <span className="text-[11px] font-bold text-gray-700">
-                                                                    3. Calories (IBW &times; 20&ndash;30)
-                                                                </span>
-                                                                <div className="flex items-center gap-1">
-                                                                    {[20, 22, 25, 28, 30].map((mult) => (
-                                                                        <button
-                                                                            key={mult}
-                                                                            type="button"
-                                                                            onClick={() => handleCalMultiplierChange(mult)}
-                                                                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition cursor-pointer ${
-                                                                                Number(calcConfig.calMultiplier) === mult
-                                                                                    ? 'bg-primary text-white border-primary'
-                                                                                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-primary/40'
-                                                                            }`}
-                                                                        >
-                                                                            &times;{mult}
-                                                                        </button>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <input
-                                                                    type="range"
-                                                                    min="20"
-                                                                    max="30"
-                                                                    step="0.5"
-                                                                    value={
-                                                                        Number.isFinite(Number(calcConfig.calMultiplier))
-                                                                            ? Math.min(30, Math.max(20, Number(calcConfig.calMultiplier)))
-                                                                            : 25
-                                                                    }
-                                                                    onChange={(e) => handleCalMultiplierChange(e.target.value)}
-                                                                    className="flex-1 accent-primary cursor-pointer h-1.5"
-                                                                />
-                                                                <div className="flex items-center gap-1 shrink-0">
-                                                                    <span className="text-[10px] font-bold text-gray-400">&times;</span>
-                                                                    <input
-                                                                        type="number"
-                                                                        min="10"
-                                                                        max="50"
-                                                                        step="0.5"
-                                                                        value={calcConfig.calMultiplier}
-                                                                        onChange={(e) => handleCalMultiplierChange(e.target.value)}
-                                                                        className="w-14 text-xs font-bold text-heading text-center px-1.5 py-1 rounded-lg border border-gray-200 focus:outline-none focus:border-primary"
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center justify-between text-[11px] pt-1 border-t border-gray-100">
-                                                                <span className="text-gray-500">
-                                                                    {Number.isFinite(activeIbwNum)
-                                                                        ? `${activeIbwNum} kg × ${calcConfig.calMultiplier} kcal/kg`
-                                                                        : 'Requires IBW above'}
-                                                                </span>
-                                                                <span className="font-bold text-emerald-800">
-                                                                    {Number.isFinite(activeCaloriesNum)
-                                                                        ? `${activeCaloriesNum} kcal`
-                                                                        : '—'}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* 4a. Protein = 15-25% * Calories / 4 */}
-                                                        <div className="bg-white rounded-xl border border-emerald-200/70 p-2.5 space-y-2">
-                                                            <div className="flex items-center justify-between gap-1">
-                                                                <span className="text-[11px] font-bold text-gray-700">
-                                                                    4a. Protein (15&ndash;25% &divide; 4)
-                                                                </span>
-                                                                <div className="flex items-center gap-1">
-                                                                    {[15, 20, 25].map((pct) => (
-                                                                        <button
-                                                                            key={pct}
-                                                                            type="button"
-                                                                            onClick={() => handleMacroPctChange('proteinPct', pct)}
-                                                                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition cursor-pointer ${
-                                                                                Number(calcConfig.proteinPct) === pct
-                                                                                    ? 'bg-primary text-white border-primary'
-                                                                                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-primary/40'
-                                                                            }`}
-                                                                        >
-                                                                            {pct}%
-                                                                        </button>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <input
-                                                                    type="range"
-                                                                    min="15"
-                                                                    max="25"
-                                                                    step="0.5"
-                                                                    value={
-                                                                        Number.isFinite(Number(calcConfig.proteinPct))
-                                                                            ? Math.min(25, Math.max(15, Number(calcConfig.proteinPct)))
-                                                                            : 20
-                                                                    }
-                                                                    onChange={(e) => handleMacroPctChange('proteinPct', e.target.value)}
-                                                                    className="flex-1 accent-primary cursor-pointer h-1.5"
-                                                                />
-                                                                <div className="flex items-center gap-0.5 shrink-0">
-                                                                    <input
-                                                                        type="number"
-                                                                        min="5"
-                                                                        max="50"
-                                                                        step="0.5"
-                                                                        value={calcConfig.proteinPct}
-                                                                        onChange={(e) => handleMacroPctChange('proteinPct', e.target.value)}
-                                                                        className="w-14 text-xs font-bold text-heading text-center px-1.5 py-1 rounded-lg border border-gray-200 focus:outline-none focus:border-primary"
-                                                                    />
-                                                                    <span className="text-[10px] font-bold text-gray-400">%</span>
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center justify-between text-[11px] pt-1 border-t border-gray-100">
-                                                                <span className="text-gray-500">
-                                                                    {Number.isFinite(activeCaloriesNum)
-                                                                        ? `${calcConfig.proteinPct}% × ${activeCaloriesNum} ÷ 4`
-                                                                        : '15–25% of kcal ÷ 4'}
-                                                                </span>
-                                                                <span className="font-bold text-primary">
-                                                                    {formData.protein || '—'}
-                                                                    {proteinPerKgIbw ? ` (${proteinPerKgIbw} g/kg)` : ''}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* 4b. Carbs = 40-60% * Calories / 4 */}
-                                                        <div className="bg-white rounded-xl border border-emerald-200/70 p-2.5 space-y-2">
-                                                            <div className="flex items-center justify-between gap-1">
-                                                                <span className="text-[11px] font-bold text-gray-700">
-                                                                    4b. Carbs (40&ndash;60% &divide; 4)
-                                                                </span>
-                                                                <div className="flex items-center gap-1">
-                                                                    {[40, 50, 55, 60].map((pct) => (
-                                                                        <button
-                                                                            key={pct}
-                                                                            type="button"
-                                                                            onClick={() => handleMacroPctChange('carbsPct', pct)}
-                                                                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition cursor-pointer ${
-                                                                                Number(calcConfig.carbsPct) === pct
-                                                                                    ? 'bg-primary text-white border-primary'
-                                                                                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-primary/40'
-                                                                            }`}
-                                                                        >
-                                                                            {pct}%
-                                                                        </button>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <input
-                                                                    type="range"
-                                                                    min="40"
-                                                                    max="60"
-                                                                    step="0.5"
-                                                                    value={
-                                                                        Number.isFinite(Number(calcConfig.carbsPct))
-                                                                            ? Math.min(60, Math.max(40, Number(calcConfig.carbsPct)))
-                                                                            : 60
-                                                                    }
-                                                                    onChange={(e) => handleMacroPctChange('carbsPct', e.target.value)}
-                                                                    className="flex-1 accent-primary cursor-pointer h-1.5"
-                                                                />
-                                                                <div className="flex items-center gap-0.5 shrink-0">
-                                                                    <input
-                                                                        type="number"
-                                                                        min="10"
-                                                                        max="75"
-                                                                        step="0.5"
-                                                                        value={calcConfig.carbsPct}
-                                                                        onChange={(e) => handleMacroPctChange('carbsPct', e.target.value)}
-                                                                        className="w-14 text-xs font-bold text-heading text-center px-1.5 py-1 rounded-lg border border-gray-200 focus:outline-none focus:border-primary"
-                                                                    />
-                                                                    <span className="text-[10px] font-bold text-gray-400">%</span>
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center justify-between text-[11px] pt-1 border-t border-gray-100">
-                                                                <span className="text-gray-500">
-                                                                    {Number.isFinite(activeCaloriesNum)
-                                                                        ? `${calcConfig.carbsPct}% × ${activeCaloriesNum} ÷ 4`
-                                                                        : '40–60% of kcal ÷ 4'}
-                                                                </span>
-                                                                <span className="font-bold text-primary">
-                                                                    {formData.carbs || '—'}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* 4c. Fats = 12-20% (up to 30%) * Calories / 9 */}
-                                                        <div className="bg-white rounded-xl border border-emerald-200/70 p-2.5 space-y-2">
-                                                            <div className="flex items-center justify-between gap-1">
-                                                                <span className="text-[11px] font-bold text-gray-700">
-                                                                    4c. Fats (12&ndash;20% &divide; 9)
-                                                                </span>
-                                                                <div className="flex items-center gap-1">
-                                                                    {[12, 15, 20, 25].map((pct) => (
-                                                                        <button
-                                                                            key={pct}
-                                                                            type="button"
-                                                                            onClick={() => handleMacroPctChange('fatsPct', pct)}
-                                                                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition cursor-pointer ${
-                                                                                Number(calcConfig.fatsPct) === pct
-                                                                                    ? 'bg-primary text-white border-primary'
-                                                                                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-primary/40'
-                                                                            }`}
-                                                                        >
-                                                                            {pct}%
-                                                                        </button>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <input
-                                                                    type="range"
-                                                                    min="12"
-                                                                    max="30"
-                                                                    step="0.5"
-                                                                    value={
-                                                                        Number.isFinite(Number(calcConfig.fatsPct))
-                                                                            ? Math.min(30, Math.max(12, Number(calcConfig.fatsPct)))
-                                                                            : 20
-                                                                    }
-                                                                    onChange={(e) => handleMacroPctChange('fatsPct', e.target.value)}
-                                                                    className="flex-1 accent-primary cursor-pointer h-1.5"
-                                                                />
-                                                                <div className="flex items-center gap-0.5 shrink-0">
-                                                                    <input
-                                                                        type="number"
-                                                                        min="5"
-                                                                        max="50"
-                                                                        step="0.5"
-                                                                        value={calcConfig.fatsPct}
-                                                                        onChange={(e) => handleMacroPctChange('fatsPct', e.target.value)}
-                                                                        className="w-14 text-xs font-bold text-heading text-center px-1.5 py-1 rounded-lg border border-gray-200 focus:outline-none focus:border-primary"
-                                                                    />
-                                                                    <span className="text-[10px] font-bold text-gray-400">%</span>
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center justify-between text-[11px] pt-1 border-t border-gray-100">
-                                                                <span className="text-gray-500">
-                                                                    {Number.isFinite(activeCaloriesNum)
-                                                                        ? `${calcConfig.fatsPct}% × ${activeCaloriesNum} ÷ 9`
-                                                                        : '12–20% (or up to 30%) ÷ 9'}
-                                                                </span>
-                                                                <span className="font-bold text-primary">
-                                                                    {formData.fats || '—'}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </>
-                                            )}
-                                        </div>
-
-                                        {/* Target Input Fields */}
+                                    <div className="p-4 sm:p-5 space-y-3.5">
+                                        {/* 7 Clean Target Input Fields FIRST */}
                                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2.5">
                                             <div>
                                                 <label className="flex items-center justify-between text-[11px] font-semibold text-gray-600 mb-1">
@@ -3044,7 +3423,7 @@ export default function AdminDietPlanGeneratorPage() {
                                                     className="w-full text-xs font-semibold px-2.5 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20"
                                                 />
                                             </div>
-                                            <div>
+                                            <div className="col-span-2 sm:col-span-1">
                                                 <label className="block text-[11px] font-semibold text-gray-600 mb-1">Steps Target</label>
                                                 <input
                                                     type="text"
@@ -3054,6 +3433,253 @@ export default function AdminDietPlanGeneratorPage() {
                                                     className="w-full text-xs font-semibold px-2.5 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20"
                                                 />
                                             </div>
+                                        </div>
+
+                                        {/* Streamlined Collapsible Auto-Calculator Tray (Zero button clutter) */}
+                                        <div className="rounded-xl bg-gray-50/90 border border-gray-200/90 overflow-hidden">
+                                            <div className="px-3 py-2 flex flex-wrap items-center justify-between gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleToggleCalculatorPanel}
+                                                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-700 hover:text-primary transition cursor-pointer text-left min-w-0"
+                                                >
+                                                    <Calculator size={13} className="text-primary shrink-0" />
+                                                    <span className="sm:hidden">Auto-Calc from IBW</span>
+                                                    <span className="hidden sm:inline">Auto-Calculate Calories &amp; Macros from IBW</span>
+                                                    {Number.isFinite(activeIbwNum) && (
+                                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 shrink-0">
+                                                            IBW: {activeIbwNum} kg
+                                                        </span>
+                                                    )}
+                                                    {calcConfig.showCalculator ? (
+                                                        <ChevronUp size={14} className="text-gray-400 shrink-0" />
+                                                    ) : (
+                                                        <ChevronDown size={14} className="text-gray-400 shrink-0" />
+                                                    )}
+                                                </button>
+
+                                                <div className="flex items-center gap-2">
+                                                    {calcConfig.showCalculator && macroPctSum !== 100 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleBalanceMacrosTo100}
+                                                            className="text-[10px] font-bold text-amber-700 hover:underline cursor-pointer"
+                                                        >
+                                                            Split {macroPctSum}% → Balance 100%
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleToggleLockFields}
+                                                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-gray-600 hover:text-heading cursor-pointer"
+                                                        title={
+                                                            fieldsLocked
+                                                                ? 'Unlock auto-filled target fields'
+                                                                : 'Lock auto-filled target fields'
+                                                        }
+                                                    >
+                                                        {fieldsLocked ? (
+                                                            <>
+                                                                <Lock size={11} className="text-amber-600" />
+                                                                <span>Locked</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Unlock size={11} className="text-gray-400" />
+                                                                <span>Editable</span>
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {calcConfig.showCalculator && (
+                                                <div className="p-3 pt-2 border-t border-gray-200/70 space-y-3 bg-white">
+                                                    {/* Single Clean Macro Split Dropdown */}
+                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2 text-xs">
+                                                        <span className="text-[11px] text-gray-500">
+                                                            Macro Ratio Preset:
+                                                        </span>
+                                                        <select
+                                                            value={`${calcConfig.proteinPct}/${calcConfig.carbsPct}/${calcConfig.fatsPct}`}
+                                                            onChange={(e) => {
+                                                                if (e.target.value === 'custom') return;
+                                                                const [p, c, f] = e.target.value
+                                                                    .split('/')
+                                                                    .map(Number);
+                                                                handleApplyMacroPreset(p, c, f);
+                                                            }}
+                                                            className="w-full sm:w-auto text-xs font-semibold px-2.5 py-1.5 sm:py-1 rounded-lg border border-gray-200 bg-gray-50 text-heading focus:outline-none"
+                                                        >
+                                                            <option value="20/60/20">
+                                                                Balanced (20% P / 60% C / 20% F)
+                                                            </option>
+                                                            <option value="25/55/20">
+                                                                High-Protein (25% P / 55% C / 20% F)
+                                                            </option>
+                                                            <option value="25/60/15">
+                                                                Low-Fat (25% P / 60% C / 15% F)
+                                                            </option>
+                                                            <option value="25/50/25">
+                                                                Moderate-Carb (25% P / 50% C / 25% F)
+                                                            </option>
+                                                            <option value="custom">
+                                                                Custom ({calcConfig.proteinPct}% / {calcConfig.carbsPct}% / {calcConfig.fatsPct}%)
+                                                            </option>
+                                                        </select>
+                                                    </div>
+
+                                                    {/* 2x2 Clean Sliders + Direct Inputs */}
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                                        {/* Calories */}
+                                                        <div className="p-2.5 rounded-xl border border-gray-200/80 space-y-1.5">
+                                                            <div className="flex items-center justify-between text-[11px]">
+                                                                <span className="font-bold text-gray-700">
+                                                                    Calories (IBW &times; 20&ndash;30)
+                                                                </span>
+                                                                <span className="font-bold text-emerald-800">
+                                                                    {Number.isFinite(activeCaloriesNum)
+                                                                        ? `${activeCaloriesNum} kcal`
+                                                                        : '—'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <input
+                                                                    type="range"
+                                                                    min="20"
+                                                                    max="30"
+                                                                    step="0.5"
+                                                                    value={
+                                                                        Number.isFinite(Number(calcConfig.calMultiplier))
+                                                                            ? Math.min(30, Math.max(20, Number(calcConfig.calMultiplier)))
+                                                                            : 25
+                                                                    }
+                                                                    onChange={(e) => handleCalMultiplierChange(e.target.value)}
+                                                                    className="flex-1 accent-primary cursor-pointer h-1.5"
+                                                                />
+                                                                <input
+                                                                    type="number"
+                                                                    min="10"
+                                                                    max="50"
+                                                                    step="0.5"
+                                                                    value={calcConfig.calMultiplier}
+                                                                    onChange={(e) => handleCalMultiplierChange(e.target.value)}
+                                                                    className="w-14 text-xs font-bold text-heading text-center px-1.5 py-1 rounded-lg border border-gray-200 focus:outline-none focus:border-primary"
+                                                                />
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Protein */}
+                                                        <div className="p-2.5 rounded-xl border border-gray-200/80 space-y-1.5">
+                                                            <div className="flex items-center justify-between text-[11px]">
+                                                                <span className="font-bold text-gray-700">
+                                                                    Protein % (15&ndash;25% &divide; 4)
+                                                                </span>
+                                                                <span className="font-bold text-primary">
+                                                                    {formData.protein || '—'}
+                                                                    {proteinPerKgIbw ? ` (${proteinPerKgIbw} g/kg)` : ''}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <input
+                                                                    type="range"
+                                                                    min="15"
+                                                                    max="25"
+                                                                    step="0.5"
+                                                                    value={
+                                                                        Number.isFinite(Number(calcConfig.proteinPct))
+                                                                            ? Math.min(25, Math.max(15, Number(calcConfig.proteinPct)))
+                                                                            : 20
+                                                                    }
+                                                                    onChange={(e) => handleMacroPctChange('proteinPct', e.target.value)}
+                                                                    className="flex-1 accent-primary cursor-pointer h-1.5"
+                                                                />
+                                                                <input
+                                                                    type="number"
+                                                                    min="5"
+                                                                    max="50"
+                                                                    step="0.5"
+                                                                    value={calcConfig.proteinPct}
+                                                                    onChange={(e) => handleMacroPctChange('proteinPct', e.target.value)}
+                                                                    className="w-14 text-xs font-bold text-heading text-center px-1.5 py-1 rounded-lg border border-gray-200 focus:outline-none focus:border-primary"
+                                                                />
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Carbs */}
+                                                        <div className="p-2.5 rounded-xl border border-gray-200/80 space-y-1.5">
+                                                            <div className="flex items-center justify-between text-[11px]">
+                                                                <span className="font-bold text-gray-700">
+                                                                    Carbs % (40&ndash;60% &divide; 4)
+                                                                </span>
+                                                                <span className="font-bold text-primary">
+                                                                    {formData.carbs || '—'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <input
+                                                                    type="range"
+                                                                    min="40"
+                                                                    max="60"
+                                                                    step="0.5"
+                                                                    value={
+                                                                        Number.isFinite(Number(calcConfig.carbsPct))
+                                                                            ? Math.min(60, Math.max(40, Number(calcConfig.carbsPct)))
+                                                                            : 60
+                                                                    }
+                                                                    onChange={(e) => handleMacroPctChange('carbsPct', e.target.value)}
+                                                                    className="flex-1 accent-primary cursor-pointer h-1.5"
+                                                                />
+                                                                <input
+                                                                    type="number"
+                                                                    min="10"
+                                                                    max="75"
+                                                                    step="0.5"
+                                                                    value={calcConfig.carbsPct}
+                                                                    onChange={(e) => handleMacroPctChange('carbsPct', e.target.value)}
+                                                                    className="w-14 text-xs font-bold text-heading text-center px-1.5 py-1 rounded-lg border border-gray-200 focus:outline-none focus:border-primary"
+                                                                />
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Fats */}
+                                                        <div className="p-2.5 rounded-xl border border-gray-200/80 space-y-1.5">
+                                                            <div className="flex items-center justify-between text-[11px]">
+                                                                <span className="font-bold text-gray-700">
+                                                                    Fats % (12&ndash;20% &divide; 9)
+                                                                </span>
+                                                                <span className="font-bold text-primary">
+                                                                    {formData.fats || '—'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <input
+                                                                    type="range"
+                                                                    min="12"
+                                                                    max="30"
+                                                                    step="0.5"
+                                                                    value={
+                                                                        Number.isFinite(Number(calcConfig.fatsPct))
+                                                                            ? Math.min(30, Math.max(12, Number(calcConfig.fatsPct)))
+                                                                            : 20
+                                                                    }
+                                                                    onChange={(e) => handleMacroPctChange('fatsPct', e.target.value)}
+                                                                    className="flex-1 accent-primary cursor-pointer h-1.5"
+                                                                />
+                                                                <input
+                                                                    type="number"
+                                                                    min="5"
+                                                                    max="50"
+                                                                    step="0.5"
+                                                                    value={calcConfig.fatsPct}
+                                                                    onChange={(e) => handleMacroPctChange('fatsPct', e.target.value)}
+                                                                    className="w-14 text-xs font-bold text-heading text-center px-1.5 py-1 rounded-lg border border-gray-200 focus:outline-none focus:border-primary"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -3292,27 +3918,27 @@ export default function AdminDietPlanGeneratorPage() {
                             <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden transition">
                                 <div
                                     onClick={() => toggleSection('meals')}
-                                    className="p-4 sm:p-4.5 flex items-center justify-between cursor-pointer hover:bg-gray-50/60 select-none border-b border-gray-100"
+                                    className="p-3.5 sm:p-4.5 flex items-center justify-between gap-2 cursor-pointer hover:bg-gray-50/60 select-none border-b border-gray-100"
                                 >
-                                    <div className="flex items-center gap-2.5">
-                                        <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center font-bold text-xs">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center font-bold text-xs shrink-0">
                                             <Clock size={15} />
                                         </div>
-                                        <div>
-                                            <h3 className="font-bold text-xs sm:text-sm text-heading flex items-center gap-2">
-                                                <span>4. Daily Meal Schedule Blueprint</span>
-                                                <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.2 rounded-full">
+                                        <div className="min-w-0">
+                                            <h3 className="font-bold text-xs sm:text-sm text-heading flex items-center gap-1.5 min-w-0">
+                                                <span className="truncate">4. Daily Meal Schedule Blueprint</span>
+                                                <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.2 rounded-full shrink-0">
                                                     {formData.meals.length} Slots
                                                 </span>
                                             </h3>
-                                            <p className="text-[11px] text-para line-clamp-1">
+                                            <p className="text-[11px] text-para truncate">
                                                 {formData.meals.length > 0
                                                     ? formData.meals.map(m => m.name).join(' → ')
                                                     : 'Meal timings, options, and chef cooking notes'}
                                             </p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                                         <button
                                             type="button"
                                             onClick={(e) => {
@@ -3427,7 +4053,7 @@ export default function AdminDietPlanGeneratorPage() {
                                                                 <div className="flex items-center justify-between mb-0.5">
                                                                     <label className="text-[10px] font-bold uppercase text-purple-700 flex items-center gap-1">
                                                                         <span>Optional Dish (Add-on)</span>
-                                                                        <span className="text-[9px] font-normal text-gray-400 normal-case">(client can choose to have or skip in addition to options)</span>
+                                                                        <span className="hidden sm:inline text-[9px] font-normal text-gray-400 normal-case">(client can choose to have or skip in addition to options)</span>
                                                                     </label>
                                                                     {meal.optional && (
                                                                         <button
@@ -3617,35 +4243,29 @@ export default function AdminDietPlanGeneratorPage() {
 
                                 {!collapsed.workouts && (
                                     <div className="p-3.5 sm:p-5 space-y-3">
-                                        {/* Quick Presets Bar */}
-                                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-gray-100">
-                                            <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-                                                Quick Presets:
+                                        {/* Workout Preset Dropdown */}
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2 pb-2 border-b border-gray-100">
+                                            <span className="text-[11px] font-semibold text-gray-500">
+                                                Routine Template:
                                             </span>
-                                            <div className="flex flex-wrap items-center gap-1.5">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleApplyWorkoutPreset('3day')}
-                                                    className="px-2 py-0.5 text-[11px] bg-gray-100 hover:bg-emerald-50 hover:text-emerald-700 text-gray-700 rounded-md font-medium transition cursor-pointer"
+                                            <div className="flex items-center gap-2">
+                                                <select
+                                                    defaultValue=""
+                                                    onChange={(e) => {
+                                                        if (e.target.value) {
+                                                            handleApplyWorkoutPreset(e.target.value);
+                                                            e.target.value = '';
+                                                        }
+                                                    }}
+                                                    className="w-full sm:w-auto text-xs font-semibold px-2.5 py-1.5 sm:py-1 rounded-lg border border-gray-200 bg-gray-50 text-heading focus:outline-none"
                                                 >
-                                                    3-Day Split
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleApplyWorkoutPreset('cardio')}
-                                                    className="px-2 py-0.5 text-[11px] bg-gray-100 hover:bg-emerald-50 hover:text-emerald-700 text-gray-700 rounded-md font-medium transition cursor-pointer"
-                                                >
-                                                    Cardio & Steps
-                                                </button>
-                                                {formData.workouts && formData.workouts.length > 0 && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleApplyWorkoutPreset('clear')}
-                                                        className="px-2 py-0.5 text-[11px] bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-md font-medium transition cursor-pointer"
-                                                    >
-                                                        Clear
-                                                    </button>
-                                                )}
+                                                    <option value="">Load Workout Preset…</option>
+                                                    <option value="3day">3-Day Full Body &amp; Strength Split</option>
+                                                    <option value="cardio">Zone-2 Cardio &amp; Daily Steps</option>
+                                                    {formData.workouts?.length > 0 && (
+                                                        <option value="clear">Clear Workout Days</option>
+                                                    )}
+                                                </select>
                                             </div>
                                         </div>
 
@@ -3669,15 +4289,23 @@ export default function AdminDietPlanGeneratorPage() {
                                                     className="p-3 sm:p-3.5 rounded-xl border border-gray-200/90 bg-gray-50/40 hover:bg-white hover:border-emerald-200 transition space-y-2.5 shadow-2xs"
                                                 >
                                                     {/* Header: Day/Split + Focus + Remove */}
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-1/3 min-w-[120px]">
+                                                    <div className="space-y-2 sm:space-y-0 sm:flex sm:items-center sm:gap-2">
+                                                        <div className="flex items-center gap-2 sm:w-1/3 sm:min-w-[130px]">
                                                             <input
                                                                 type="text"
                                                                 value={workout.day}
                                                                 onChange={(e) => handleWorkoutChange(wIdx, 'day', e.target.value)}
                                                                 placeholder="Day (e.g. Day 1 (Mon))"
-                                                                className="w-full text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-gray-200 focus:ring-1 focus:ring-primary/20 bg-white"
+                                                                className="w-full text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-gray-200 focus:ring-1 focus:ring-primary/20 bg-white min-w-0"
                                                             />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRemoveWorkout(wIdx)}
+                                                                className="sm:hidden text-gray-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg cursor-pointer transition shrink-0"
+                                                                title="Delete Workout Day"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
                                                         </div>
                                                         <div className="flex-1 min-w-0">
                                                             <input
@@ -3691,7 +4319,7 @@ export default function AdminDietPlanGeneratorPage() {
                                                         <button
                                                             type="button"
                                                             onClick={() => handleRemoveWorkout(wIdx)}
-                                                            className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg cursor-pointer transition shrink-0"
+                                                            className="hidden sm:block text-gray-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg cursor-pointer transition shrink-0"
                                                             title="Delete Workout Day"
                                                         >
                                                             <Trash2 size={14} />
@@ -3777,63 +4405,31 @@ export default function AdminDietPlanGeneratorPage() {
 
                                 {!collapsed.special && (
                                     <div className="p-3.5 sm:p-5 space-y-4">
-                                        {/* Clinical Condition Quick Presets Bar */}
-                                        <div className="p-3 bg-linear-to-r from-teal-50/80 via-emerald-50/60 to-indigo-50/60 rounded-xl border border-teal-200/80 space-y-2">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-[11px] font-bold text-teal-900 flex items-center gap-1.5 uppercase tracking-wider">
-                                                    <Sparkles size={13} className="text-teal-700" />
-                                                    Clinical Condition Presets:
-                                                </span>
-                                                <span className="text-[10px] text-teal-700/80 font-medium hidden sm:inline">
-                                                    1-click evidence-based protocols
-                                                </span>
-                                            </div>
-                                            <div className="flex flex-wrap items-center gap-1.5">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleApplySpecialPreset('diabetes')}
-                                                    className="px-2.5 py-1 text-[11px] bg-white hover:bg-emerald-100/80 hover:text-emerald-900 text-emerald-800 border border-emerald-300 rounded-lg font-semibold transition cursor-pointer shadow-2xs"
-                                                >
-                                                    🩺 Type 2 Diabetes
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleApplySpecialPreset('cardiac')}
-                                                    className="px-2.5 py-1 text-[11px] bg-white hover:bg-amber-100/80 hover:text-amber-900 text-amber-800 border border-amber-300 rounded-lg font-semibold transition cursor-pointer shadow-2xs"
-                                                >
-                                                    ❤️ Cardiac & Low-Sodium
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleApplySpecialPreset('gerd')}
-                                                    className="px-2.5 py-1 text-[11px] bg-white hover:bg-orange-100/80 hover:text-orange-900 text-orange-800 border border-orange-300 rounded-lg font-semibold transition cursor-pointer shadow-2xs"
-                                                >
-                                                    🛡️ GERD & Gut Healing
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleApplySpecialPreset('fatty_liver')}
-                                                    className="px-2.5 py-1 text-[11px] bg-white hover:bg-teal-100/80 hover:text-teal-900 text-teal-800 border border-teal-300 rounded-lg font-semibold transition cursor-pointer shadow-2xs"
-                                                >
-                                                    🥗 Fatty Liver & Lipids
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleApplySpecialPreset('pcos')}
-                                                    className="px-2.5 py-1 text-[11px] bg-white hover:bg-rose-100/80 hover:text-rose-900 text-rose-800 border border-rose-300 rounded-lg font-semibold transition cursor-pointer shadow-2xs"
-                                                >
-                                                    🌸 PCOS & Hormonal
-                                                </button>
+                                        {/* Clinical Condition Preset Dropdown */}
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2 pb-2 border-b border-gray-100">
+                                            <span className="text-[11px] font-semibold text-gray-500">
+                                                Clinical Condition Protocol:
+                                            </span>
+                                            <select
+                                                defaultValue=""
+                                                onChange={(e) => {
+                                                    if (e.target.value) {
+                                                        handleApplySpecialPreset(e.target.value);
+                                                        e.target.value = '';
+                                                    }
+                                                }}
+                                                className="w-full sm:w-auto text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 text-heading focus:outline-none"
+                                            >
+                                                <option value="">Load Condition Protocol…</option>
+                                                <option value="diabetes">Type 2 Diabetes &amp; Glycemic Control</option>
+                                                <option value="cardiac">Cardiac &amp; Low-Sodium Protocol</option>
+                                                <option value="gerd">GERD &amp; Gut Mucosa Healing</option>
+                                                <option value="fatty_liver">Fatty Liver (NAFLD) &amp; Lipids</option>
+                                                <option value="pcos">PCOS &amp; Hormonal Balance</option>
                                                 {formData.show_special_instructions && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleApplySpecialPreset('clear')}
-                                                        className="px-2.5 py-1 text-[11px] bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg font-semibold transition cursor-pointer"
-                                                    >
-                                                        Clear
-                                                    </button>
+                                                    <option value="clear">Clear &amp; Disable Directives</option>
                                                 )}
-                                            </div>
+                                            </select>
                                         </div>
 
                                         {!formData.show_special_instructions ? (
@@ -4078,11 +4674,16 @@ export default function AdminDietPlanGeneratorPage() {
                                             <ChefHat size={15} />
                                         </div>
                                         <div className="min-w-0">
-                                            <h3 className="font-bold text-xs sm:text-sm text-heading flex items-center gap-2 truncate">
+                                            <h3 className="font-bold text-xs sm:text-sm text-heading flex items-center gap-1.5 sm:gap-2 truncate">
                                                 <span className="truncate">9. Attached Recipes</span>
                                                 <span className="text-[10px] bg-primary/10 text-primary font-bold px-2 py-0.2 rounded-full shrink-0">
                                                     {formData.recipes?.length || 0} Attached
                                                 </span>
+                                                {repeatedAttachedCount > 0 && (
+                                                    <span className="text-[10px] bg-amber-100 text-amber-900 border border-amber-300 font-bold px-2 py-0.2 rounded-full shrink-0">
+                                                        {repeatedAttachedCount} Repeat
+                                                    </span>
+                                                )}
                                             </h3>
                                             <p className="text-[11px] text-para truncate">
                                                 {formData.recipes?.length > 0
@@ -4122,13 +4723,16 @@ export default function AdminDietPlanGeneratorPage() {
                                                     {formData.recipes.map((recipe, rIdx) => {
                                                         const isEditing = editingRecipeId === recipe.id;
                                                         const hasEdits = Boolean(recipe.is_soft_edited);
+                                                        const pastUsages = getPreviousRecipeUsages(recipe);
 
                                                         return (
                                                             <div
                                                                 key={recipe.id || rIdx}
                                                                 className={`rounded-xl border transition ${isEditing
                                                                     ? 'bg-white border-primary shadow-sm ring-2 ring-primary/10'
-                                                                    : 'bg-white border-emerald-200/80 hover:border-primary/40'
+                                                                    : pastUsages.length > 0
+                                                                        ? 'bg-white border-amber-300/90 hover:border-amber-400'
+                                                                        : 'bg-white border-emerald-200/80 hover:border-primary/40'
                                                                     }`}
                                                             >
                                                                 {/* Summary Strip */}
@@ -4138,13 +4742,22 @@ export default function AdminDietPlanGeneratorPage() {
                                                                             {rIdx + 1}
                                                                         </span>
                                                                         <div>
-                                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                                                                                 <h4 className="font-bold text-xs sm:text-sm text-heading">
                                                                                     {recipe.name}
                                                                                 </h4>
                                                                                 <span className="text-[10px] font-semibold bg-gray-100 text-gray-700 px-2 py-0.2 rounded-md">
                                                                                     {recipe.category || 'General'}
                                                                                 </span>
+                                                                                {pastUsages.length > 0 && (
+                                                                                    <span
+                                                                                        className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 px-2 py-0.2 rounded-md"
+                                                                                        title={formatPastUsageTooltip(pastUsages)}
+                                                                                    >
+                                                                                        <AlertCircle size={10} className="shrink-0" />
+                                                                                        <span>{formatPastUsageBadge(pastUsages)}</span>
+                                                                                    </span>
+                                                                                )}
                                                                                 {hasEdits && (
                                                                                     <span className="text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.2 rounded-md">
                                                                                         Customized for Client
@@ -4382,11 +4995,12 @@ export default function AdminDietPlanGeneratorPage() {
                                                     <button
                                                         type="button"
                                                         onClick={handleOpenNewRecipeModal}
-                                                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-primary border border-emerald-200 text-xs font-bold whitespace-nowrap transition cursor-pointer shrink-0"
+                                                        className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-primary border border-emerald-200 text-xs font-bold whitespace-nowrap transition cursor-pointer shrink-0"
                                                         title="Create a new clinical recipe and attach it directly to this plan"
                                                     >
                                                         <Plus size={14} />
-                                                        <span>Add New Recipe</span>
+                                                        <span className="sm:hidden">New</span>
+                                                        <span className="hidden sm:inline">Add New Recipe</span>
                                                     </button>
                                                 </div>
 
@@ -4406,6 +5020,22 @@ export default function AdminDietPlanGeneratorPage() {
                                                         </button>
                                                     ))}
                                                 </div>
+
+                                                {effectiveClient && pastPlansCheckedCount > 0 && (
+                                                    <p className="text-[11px] text-gray-500 flex items-center gap-1.5 px-0.5">
+                                                        <Info size={12} className="text-amber-600 shrink-0" />
+                                                        <span>
+                                                            Repeat check active across{' '}
+                                                            <strong className="text-heading">
+                                                                {pastPlansCheckedCount}
+                                                            </strong>{' '}
+                                                            previous {pastPlansCheckedCount === 1 ? 'plan' : 'plans'} for{' '}
+                                                            <strong className="text-heading">
+                                                                {effectiveClient.full_name}
+                                                            </strong>
+                                                        </span>
+                                                    </p>
+                                                )}
                                             </div>
 
                                             {/* Dish Cards Grid */}
@@ -4467,20 +5097,34 @@ export default function AdminDietPlanGeneratorPage() {
                                                 ) : (
                                                     availableRecipes.map(recipe => {
                                                         const isSelected = (formData.recipes || []).some(r => r.id === recipe.id);
+                                                        const pastUsages = getPreviousRecipeUsages(recipe);
+                                                        const wasUsedPreviously = pastUsages.length > 0;
+
                                                         return (
                                                             <div
                                                                 key={recipe.id}
                                                                 onClick={() => handleToggleRecipe(recipe)}
+                                                                title={wasUsedPreviously ? formatPastUsageTooltip(pastUsages) : undefined}
                                                                 className={`p-2.5 rounded-xl border transition cursor-pointer flex flex-col justify-between select-none ${isSelected
                                                                     ? 'bg-emerald-50/90 border-emerald-400 ring-1 ring-emerald-300 shadow-2xs'
-                                                                    : 'bg-white border-gray-200/80 hover:border-primary/40 hover:bg-gray-50/50'
+                                                                    : wasUsedPreviously
+                                                                        ? 'bg-amber-50/30 border-amber-300/90 hover:border-amber-400 hover:bg-amber-50/50'
+                                                                        : 'bg-white border-gray-200/80 hover:border-primary/40 hover:bg-gray-50/50'
                                                                     }`}
                                                             >
                                                                 <div className="flex items-start justify-between gap-1.5 mb-1">
-                                                                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">
-                                                                        {recipe.category || 'General'}
-                                                                    </span>
-                                                                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${isSelected ? 'bg-primary text-white' : 'border border-gray-300 text-transparent'
+                                                                    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                                                                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">
+                                                                            {recipe.category || 'General'}
+                                                                        </span>
+                                                                        {wasUsedPreviously && (
+                                                                            <span className="inline-flex items-center gap-0.5 text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.2 rounded-md">
+                                                                                <AlertCircle size={9} className="shrink-0" />
+                                                                                <span>{formatPastUsageBadge(pastUsages)}</span>
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${isSelected ? 'bg-primary text-white' : 'border border-gray-300 text-transparent'
                                                                         }`}>
                                                                         ✓
                                                                     </span>
@@ -4510,16 +5154,16 @@ export default function AdminDietPlanGeneratorPage() {
 
                     {/* ════════════════ LIVE PDF PREVIEW COLUMN ════════════════ */}
                     {(activeView === 'preview' || activeView === 'split') && (
-                        <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-gray-200/80 shadow-xs flex flex-col h-full sticky top-20">
-                            <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <Eye size={16} className="text-primary" />
+                        <div className="bg-white rounded-2xl p-3 sm:p-4 border border-gray-200/80 shadow-xs flex flex-col h-full lg:sticky lg:top-16">
+                            <div className="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-gray-100">
+                                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
+                                    <Eye size={15} className="text-primary shrink-0" />
                                     <h3 className="font-heading font-bold text-heading text-xs sm:text-sm">
-                                        Live Vector PDF Preview
+                                        Live PDF Preview
                                     </h3>
                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${formData.pdf_theme === 'senior' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
                                         }`}>
-                                        {formData.pdf_theme === 'senior' ? '🎨 Senior Large-Print' : '🌿 Clinical Standard'}
+                                        {formData.pdf_theme === 'senior' ? 'Senior Print' : 'Clinical'}
                                     </span>
                                     <span className="text-[10px] bg-gray-100 text-gray-700 font-bold px-2 py-0.5 rounded-full">
                                         {formData.pdf_theme === 'senior'
@@ -4529,23 +5173,36 @@ export default function AdminDietPlanGeneratorPage() {
                                 </div>
                                 <button
                                     onClick={() => setPreviewKey(k => k + 1)}
-                                    className="p-1.5 text-gray-500 hover:text-primary hover:bg-gray-100 rounded-lg text-xs flex items-center gap-1 transition cursor-pointer"
+                                    className="p-1.5 text-gray-500 hover:text-primary hover:bg-gray-100 rounded-lg text-xs flex items-center gap-1 transition cursor-pointer shrink-0"
                                     title="Refresh Preview"
                                 >
                                     <RefreshCw size={13} />
-                                    <span>Refresh</span>
+                                    <span className="hidden sm:inline">Refresh</span>
                                 </button>
                             </div>
 
-                            <div className="flex-1 w-full min-h-[580px] sm:min-h-[680px] rounded-xl overflow-hidden border border-gray-200">
+                            {/* Mobile Browser PDF Helper Banner */}
+                            <div className="md:hidden mb-2.5 px-3 py-2 rounded-xl bg-emerald-50/70 border border-emerald-200/80 flex items-center justify-between gap-2 text-[11px] text-emerald-900">
+                                <span>Some mobile browsers open PDFs externally.</span>
+                                <button
+                                    type="button"
+                                    onClick={handleDownloadPdf}
+                                    disabled={generating}
+                                    className="font-bold text-primary underline shrink-0 cursor-pointer"
+                                >
+                                    {generating ? 'Generating…' : 'Open / Download PDF'}
+                                </button>
+                            </div>
+
+                            <div className="flex-1 w-full min-h-[460px] sm:min-h-[680px] rounded-xl overflow-hidden border border-gray-200">
                                 <PDFViewer key={previewKey} width="100%" height="100%" showToolbar={true}>
                                     <DietPlanPdfDocument plan={formData} />
                                 </PDFViewer>
                             </div>
 
                             <div className="mt-2.5 flex items-center justify-between text-[11px] text-gray-400">
-                                <span>The Diet Cascade Engine • {formData.pdf_theme === 'senior' ? 'Large Print Theme' : 'Clinical Precision Theme'}</span>
-                                <span>{formData.pdf_theme === 'senior' ? '3-4 Pages' : '2-3 Pages'}</span>
+                                <span className="truncate">The Diet Cascade • {formData.pdf_theme === 'senior' ? 'Large Print' : 'Clinical Theme'}</span>
+                                <span className="shrink-0">{formData.pdf_theme === 'senior' ? '3-4 Pages' : '2-3 Pages'}</span>
                             </div>
                         </div>
                     )}
@@ -4553,10 +5210,90 @@ export default function AdminDietPlanGeneratorPage() {
                 </div>
             </div>
 
+            {/* ═══════════════ MOBILE THUMB-ZONE ACTION BAR (< md) ═══════════════ */}
+            <div className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur-md border-t border-gray-200 px-3.5 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
+                <div className="flex items-center gap-2.5 max-w-lg mx-auto">
+                    {/* Mobile Save / Split Update Button */}
+                    <div className="relative flex-1 flex items-stretch" ref={mobileSaveMenuRef}>
+                        <button
+                            type="button"
+                            disabled={savingToClientDb}
+                            onClick={() => handleSavePlanToDb('auto')}
+                            className={`flex-1 min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3 bg-emerald-50 active:bg-emerald-100 text-primary border border-emerald-200 font-bold text-xs whitespace-nowrap transition active:scale-[0.98] cursor-pointer disabled:opacity-50 ${
+                                loadedPlanRecord ? 'rounded-l-xl border-r-0' : 'rounded-xl'
+                            }`}
+                        >
+                            {savingToClientDb ? (
+                                <RefreshCw size={14} className="animate-spin shrink-0" />
+                            ) : (
+                                <Save size={14} className="shrink-0" />
+                            )}
+                            <span className="truncate">
+                                {loadedPlanRecord
+                                    ? `Update Rev ${loadedPlanRecord.revision_number}`
+                                    : 'Save Plan'}
+                            </span>
+                        </button>
+
+                        {loadedPlanRecord && (
+                            <button
+                                type="button"
+                                disabled={savingToClientDb}
+                                onClick={() => setShowSaveMenu((o) => !o)}
+                                className="min-h-[44px] px-2.5 bg-emerald-50 active:bg-emerald-100 text-primary border border-emerald-200 rounded-r-xl flex items-center justify-center transition cursor-pointer disabled:opacity-50"
+                                title="More save options"
+                                aria-label="More save options"
+                            >
+                                <ChevronUp size={14} />
+                            </button>
+                        )}
+
+                        {loadedPlanRecord && showSaveMenu && (
+                            <div className="absolute left-0 bottom-full mb-2 w-56 bg-white rounded-xl shadow-xl border border-gray-200 py-1.5 z-50 text-xs">
+                                <button
+                                    type="button"
+                                    onClick={() => handleSavePlanToDb('create')}
+                                    className="w-full px-3.5 py-2.5 text-left font-semibold text-heading hover:bg-emerald-50 hover:text-primary flex items-center gap-2 cursor-pointer"
+                                >
+                                    <Plus size={14} className="text-primary" />
+                                    <span>Save as New Revision</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setLoadedPlanRecord(null);
+                                        setShowSaveMenu(false);
+                                    }}
+                                    className="w-full px-3.5 py-2.5 text-left text-gray-500 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
+                                >
+                                    <X size={14} />
+                                    <span>Detach from Rev {loadedPlanRecord.revision_number}</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Mobile Primary Download PDF Button */}
+                    <button
+                        type="button"
+                        onClick={handleDownloadPdf}
+                        disabled={generating}
+                        className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3 bg-primary hover:bg-primary-hover text-white font-bold text-xs rounded-xl shadow-xs whitespace-nowrap transition active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                    >
+                        {generating ? (
+                            <RefreshCw size={14} className="animate-spin shrink-0" />
+                        ) : (
+                            <Download size={14} className="shrink-0" />
+                        )}
+                        <span>{generating ? 'Generating…' : 'Download PDF'}</span>
+                    </button>
+                </div>
+            </div>
+
             {/* ═══════════════ CREATE & ATTACH NEW RECIPE MODAL ═══════════════ */}
             {isNewRecipeModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs overflow-y-auto">
-                    <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-gray-100 my-8 max-h-[90vh] overflow-y-auto">
+                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-xs">
+                    <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-2xl w-full p-4 sm:p-6 shadow-2xl border border-gray-100 max-h-[92dvh] sm:max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-5">
                             <div className="flex items-center gap-2.5">
                                 <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
@@ -4928,18 +5665,18 @@ export default function AdminDietPlanGeneratorPage() {
                                     </span>
                                 </label>
 
-                                <div className="flex items-center justify-end gap-2.5">
+                                <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-2 sm:gap-2.5">
                                     <button
                                         type="button"
                                         onClick={() => setIsNewRecipeModalOpen(false)}
-                                        className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition cursor-pointer"
+                                        className="w-full sm:w-auto min-h-[40px] px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition cursor-pointer"
                                     >
                                         Cancel
                                     </button>
                                     <button
                                         type="submit"
                                         disabled={savingNewRecipe}
-                                        className="px-5 py-2 text-xs font-bold bg-primary text-white rounded-xl hover:bg-primary-hover shadow-md shadow-primary/20 transition cursor-pointer disabled:opacity-60"
+                                        className="w-full sm:w-auto min-h-[42px] px-5 py-2 text-xs font-bold bg-primary text-white rounded-xl hover:bg-primary-hover shadow-md shadow-primary/20 transition cursor-pointer disabled:opacity-60"
                                     >
                                         {savingNewRecipe
                                             ? 'Saving...'
@@ -4954,5 +5691,20 @@ export default function AdminDietPlanGeneratorPage() {
                 </div>
             )}
         </div>
+    );
+}
+
+export default function AdminDietPlanGeneratorPage() {
+    return (
+        <Suspense
+            fallback={
+                <div className="min-h-screen flex items-center justify-center text-sm text-gray-500">
+                    <RefreshCw size={18} className="animate-spin mr-2 text-primary" />
+                    Loading Diet Plan Generator...
+                </div>
+            }
+        >
+            <AdminDietPlanGeneratorContent />
+        </Suspense>
     );
 }

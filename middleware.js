@@ -63,8 +63,9 @@ export async function middleware(request) {
         // 2. Check for Admin Email (if configured)
         const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
         if (adminEmail && user.email !== adminEmail) {
-            // Logged in user is NOT the authorized admin -> redirect to client portal
-            return NextResponse.redirect(new URL('/portal/dashboard', request.url))
+            // Logged in user is NOT the authorized admin -> redirect home while client portal (_portal) is disabled
+            // return NextResponse.redirect(new URL('/portal/dashboard', request.url))
+            return NextResponse.redirect(new URL('/', request.url))
         }
     }
 
@@ -76,7 +77,7 @@ export async function middleware(request) {
         }
     }
 
-    // CLIENT PORTAL ROUTES PROTECTION
+    /* CLIENT PORTAL ROUTES PROTECTION (Disabled while app/_portal is inactive)
     if (request.nextUrl.pathname.startsWith('/portal') && !request.nextUrl.pathname.startsWith('/portal/login')) {
         if (!user) {
             // Not authenticated, redirect to client login
@@ -88,6 +89,7 @@ export async function middleware(request) {
     if (request.nextUrl.pathname === '/portal/login' && user) {
         return NextResponse.redirect(new URL('/portal/dashboard', request.url))
     }
+    */
 
     return supabaseResponse
 }

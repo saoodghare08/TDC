@@ -3,6 +3,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { X, Send, ChevronDown, ChevronUp, Link2, Instagram, Linkedin, Code, ChevronLeft, ChevronRight } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { motion, AnimatePresence } from 'motion/react';
@@ -68,6 +69,7 @@ const fallbackFAQs = [
 ];
 
 export default function WhatsAppWidget() {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [faqs, setFaqs] = useState(fallbackFAQs);
   const [messages, setMessages] = useState([
@@ -360,6 +362,11 @@ export default function WhatsAppWidget() {
       );
     });
   };
+
+  // Hide public customer-facing inquiry chatbot on Admin workspace pages (except Chatbot FAQs editor)
+  if (pathname?.startsWith('/admin') && pathname !== '/admin/chatbot') {
+    return null;
+  }
 
   const presetFAQs = faqs.filter(faq => faq.is_preset);
   const whatsappUrl = `https://api.whatsapp.com/send?phone=919004491160&text=Hi%20Dt.%20Sabah,%20I'm%20interested%20in%20your%20diet%20plans!`;

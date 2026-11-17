@@ -1,839 +1,830 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { createClient } from '@/utils/supabase/client';
-import { useParams, useRouter } from 'next/navigation';
-import {
-    ArrowLeft, Calendar, Phone, Instagram, FileText, Upload,
-    TrendingUp, User, Edit2, Trash2, Image as ImageIcon, X,
-    ZoomIn, ExternalLink, Download, Scale, Ruler, Activity,
-    ChevronDown, ChevronUp, Plus, Loader2, CheckCircle, AlertTriangle,
-    Clock, Target,
-} from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
 import Swal from 'sweetalert2';
-import { Line } from 'react-chartjs-2';
 import {
-    Chart as ChartJS,
-    CategoryScale,
-    LinearScale,
-    PointElement,
-    LineElement,
-    Title,
-    Tooltip,
-    Legend,
-    Filler,
-} from 'chart.js';
-
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
-
-const METRICS = [
-    { key: 'weight_kg', label: 'Weight', unit: 'kg', color: '#fdbc00', bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200', icon: Scale },
-    { key: 'chest_cm', label: 'Chest', unit: 'cm', color: '#3b82f6', bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200', icon: Ruler },
-    { key: 'waist_cm', label: 'Waist', unit: 'cm', color: '#ef4444', bg: 'bg-red-50', text: 'text-red-500', border: 'border-red-200', icon: Ruler },
-    { key: 'hips_cm', label: 'Hips', unit: 'cm', color: '#a855f7', bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-200', icon: Ruler },
-];
+    ArrowLeft,
+    Plus,
+    FileText,
+    Receipt,
+    Phone,
+    Target,
+    Edit3,
+    Trash2,
+    ArrowRight,
+    Calendar,
+    RefreshCw,
+    X,
+    MessageCircle,
+} from 'lucide-react';
+import { createClient } from '@/utils/supabase/client';
 
 const STATUS_STYLES = {
-    active: { bg: 'bg-green-100', text: 'text-green-700', dot: 'bg-green-500', label: 'Active' },
-    completed: { bg: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-500', label: 'Completed' },
-    inactive: { bg: 'bg-gray-100', text: 'text-gray-600', dot: 'bg-gray-400', label: 'Inactive' },
-    pending: { bg: 'bg-yellow-100', text: 'text-yellow-700', dot: 'bg-yellow-500', label: 'Pending' },
+    active: {
+        bg: 'bg-emerald-50',
+        text: 'text-emerald-700',
+        border: 'border-emerald-200',
+        dot: 'bg-emerald-500',
+        label: 'Active',
+    },
+    paused: {
+        bg: 'bg-amber-50',
+        text: 'text-amber-700',
+        border: 'border-amber-200',
+        dot: 'bg-amber-500',
+        label: 'Paused',
+    },
+    completed: {
+        bg: 'bg-blue-50',
+        text: 'text-blue-700',
+        border: 'border-blue-200',
+        dot: 'bg-blue-500',
+        label: 'Completed',
+    },
 };
 
-export default function ClientDetailPage() {
+const CURRENCY_SYMBOLS = {
+    INR: '₹',
+    AED: 'AED ',
+    USD: '$',
+    GBP: '£',
+    EUR: '€',
+};
+
+const formatDateShort = (iso) => {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return String(iso);
+    return d.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    });
+};
+
+const getInitials = (name) =>
+    String(name || '?')
+        .trim()
+        .split(/\s+/)
+        .map((w) => w[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase() || '?';
+
+export default function AdminClientDetailPage() {
     const params = useParams();
     const router = useRouter();
+    const clientId = params?.id;
+    const supabase = useMemo(() => createClient(), []);
 
     const [client, setClient] = useState(null);
     const [dietPlans, setDietPlans] = useState([]);
-    const [progressEntries, setProgressEntries] = useState([]);
+    const [invoices, setInvoices] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState('plans'); // 'plans' | 'invoices'
 
-    // Upload form
-    const [uploading, setUploading] = useState(false);
-    const [planFile, setPlanFile] = useState(null);
-    const [planName, setPlanName] = useState('');
-    const [planNotes, setPlanNotes] = useState('');
-    const [showUploadForm, setShowUploadForm] = useState(false);
+    // Edit Client Modal
+    const [isEditOpen, setIsEditOpen] = useState(false);
+    const [savingEdit, setSavingEdit] = useState(false);
+    const [editForm, setEditForm] = useState({
+        full_name: '',
+        phone: '',
+        age: '',
+        height: '',
+        initial_goals: '',
+        status: 'active',
+        notes: '',
+    });
 
-    // UI state
-    const [activeTab, setActiveTab] = useState('plans'); // 'plans' | 'progress'
-    const [activeMetrics, setActiveMetrics] = useState(['weight_kg']);
-    const [expandedEntries, setExpandedEntries] = useState({});
-
-    // Modals
-    const [selectedPhoto, setSelectedPhoto] = useState(null);
-    const [selectedPlan, setSelectedPlan] = useState(null);
-
-    const supabase = createClient();
-
-    /* ─── Helpers ─── */
-    const isImage = (url) => {
-        if (!url) return false;
-        const ext = url.split('?')[0].split('.').pop().toLowerCase();
-        return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext);
-    };
-    const isPdf = (url) => {
-        if (!url) return false;
-        return url.split('?')[0].split('.').pop().toLowerCase() === 'pdf';
-    };
-
-    /* ─── Data fetching ─── */
-    useEffect(() => {
-        if (params.id) fetchClientData();
-    }, [params.id]);
-
-    const fetchClientData = async () => {
+    const fetchClientDetails = useCallback(async () => {
+        if (!clientId) return;
+        setLoading(true);
         try {
-            const { data: clientData } = await supabase
-                .from('clients').select('*').eq('id', params.id).single();
-            setClient(clientData);
+            const [clientRes, plansRes, invoicesRes] = await Promise.all([
+                supabase.from('clients').select('*').eq('id', clientId).single(),
+                supabase
+                    .from('client_diet_plans')
+                    .select('*')
+                    .eq('client_id', clientId)
+                    .order('revision_number', { ascending: false })
+                    .order('updated_at', { ascending: false }),
+                supabase
+                    .from('client_invoices')
+                    .select('*')
+                    .eq('client_id', clientId)
+                    .order('updated_at', { ascending: false }),
+            ]);
 
-            const { data: plansData } = await supabase
-                .from('diet_plans').select('*').eq('client_id', params.id)
-                .order('uploaded_at', { ascending: false });
-            setDietPlans(plansData || []);
-
-            const { data: progressData } = await supabase
-                .from('progress_entries').select('*').eq('client_id', params.id)
-                .order('date', { ascending: false });
-            setProgressEntries(progressData || []);
-
-            // Auto-expand latest progress entry
-            if (progressData?.length > 0) {
-                setExpandedEntries({ [progressData[0].id]: true });
+            if (clientRes.error || !clientRes.data) {
+                setClient(null);
+                return;
             }
-        } catch (error) {
-            console.error('Error fetching client data:', error);
-        }
-    };
 
-    /* ─── Upload ─── */
-    const handleUploadPlan = async (e) => {
-        e.preventDefault();
-        if (!planFile || !planName) {
-            Swal.fire({ icon: 'warning', title: 'Missing Information', text: 'Please provide plan name and file', confirmButtonColor: '#fdbc00' });
-            return;
-        }
-        setUploading(true);
-        try {
-            const fileExt = planFile.name.split('.').pop();
-            const fileName = `${params.id}/${Date.now()}.${fileExt}`;
-            const { error: uploadError } = await supabase.storage.from('diet-plans').upload(fileName, planFile);
-            if (uploadError) throw uploadError;
-
-            const { data: { publicUrl } } = supabase.storage.from('diet-plans').getPublicUrl(fileName);
-            const { data: { user } } = await supabase.auth.getUser();
-            const { error: dbError } = await supabase.from('diet_plans').insert([{
-                client_id: params.id, plan_name: planName,
-                file_url: publicUrl, notes: planNotes || null, uploaded_by: user?.id,
-            }]);
-            if (dbError) throw dbError;
-
-            Swal.fire({ icon: 'success', title: 'Uploaded!', text: 'Diet plan uploaded successfully.', confirmButtonColor: '#fdbc00', timer: 2000 });
-            setPlanFile(null); setPlanName(''); setPlanNotes('');
-            setShowUploadForm(false);
-            fetchClientData();
-        } catch (error) {
-            Swal.fire({ icon: 'error', title: 'Upload Failed', text: error.message, confirmButtonColor: '#fdbc00' });
+            setClient(clientRes.data);
+            setDietPlans(plansRes.data || []);
+            setInvoices(invoicesRes.data || []);
+        } catch (err) {
+            console.error('Error loading client details:', err);
         } finally {
-            setUploading(false);
+            setLoading(false);
         }
-    };
+    }, [clientId, supabase]);
 
-    /* ─── Delete plan ─── */
-    const handleDeletePlan = async (planId, fileUrl) => {
-        const result = await Swal.fire({
-            title: 'Delete Diet Plan?', text: 'This action cannot be undone!', icon: 'warning',
-            showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#6b7280',
-            confirmButtonText: 'Delete', cancelButtonText: 'Cancel',
+    useEffect(() => {
+        fetchClientDetails();
+    }, [fetchClientDetails]);
+
+    const handleOpenEdit = () => {
+        if (!client) return;
+        setEditForm({
+            full_name: client.full_name || '',
+            phone: client.phone || '',
+            age: client.age || '',
+            height: client.height || '',
+            initial_goals: client.initial_goals || '',
+            status: client.status || 'active',
+            notes: client.notes || '',
         });
-        if (!result.isConfirmed) return;
+        setIsEditOpen(true);
+    };
+
+    const handleSaveEdit = async (e) => {
+        e.preventDefault();
+        if (!editForm.full_name.trim()) return;
+        setSavingEdit(true);
         try {
-            await supabase.from('diet_plans').delete().eq('id', planId);
-            if (fileUrl) {
-                const urlParts = fileUrl.split('/');
-                const filePath = urlParts.slice(-2).join('/');
-                await supabase.storage.from('diet-plans').remove([filePath]);
-            }
-            Swal.fire({ icon: 'success', title: 'Deleted!', confirmButtonColor: '#fdbc00', timer: 1500 });
-            fetchClientData();
-        } catch (error) {
-            Swal.fire({ icon: 'error', title: 'Failed', text: error.message, confirmButtonColor: '#fdbc00' });
+            const payload = {
+                full_name: editForm.full_name.trim(),
+                phone: editForm.phone.trim() || '',
+                age: editForm.age.trim() || null,
+                height: editForm.height.trim() || null,
+                initial_goals: editForm.initial_goals.trim() || null,
+                status: editForm.status || 'active',
+                notes: editForm.notes.trim() || null,
+                updated_at: new Date().toISOString(),
+            };
+
+            const { data, error } = await supabase
+                .from('clients')
+                .update(payload)
+                .eq('id', clientId)
+                .select()
+                .single();
+
+            if (error) throw error;
+            setClient(data);
+            setIsEditOpen(false);
+        } catch (err) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Update Failed',
+                text: err.message,
+                confirmButtonColor: '#2d6a4f',
+            });
+        } finally {
+            setSavingEdit(false);
         }
     };
 
-    /* ─── Delete progress ─── */
-    const handleDeleteProgress = async (progressId, photoUrl) => {
-        const result = await Swal.fire({
-            title: 'Delete Progress Entry?', text: 'This cannot be undone!', icon: 'warning',
-            showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#6b7280',
+    const handleDeleteClient = async () => {
+        if (!client) return;
+        const res = await Swal.fire({
+            icon: 'warning',
+            title: `Delete "${client.full_name}"?`,
+            text: `This will permanently delete this client along with ${dietPlans.length} saved diet plan(s) and ${invoices.length} invoice(s).`,
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            confirmButtonText: 'Yes, delete client',
+        });
+
+        if (!res.isConfirmed) return;
+
+        try {
+            const { error } = await supabase.from('clients').delete().eq('id', clientId);
+            if (error) throw error;
+            router.push('/admin/clients');
+        } catch (err) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Delete Failed',
+                text: err.message,
+                confirmButtonColor: '#2d6a4f',
+            });
+        }
+    };
+
+    const handleDeleteDietPlan = async (plan) => {
+        const res = await Swal.fire({
+            icon: 'warning',
+            title: `Delete Rev ${plan.revision_number}?`,
+            text: `"${plan.plan_title}" will be permanently deleted.`,
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
             confirmButtonText: 'Delete',
         });
-        if (!result.isConfirmed) return;
+        if (!res.isConfirmed) return;
+
         try {
-            await supabase.from('progress_entries').delete().eq('id', progressId);
-            if (photoUrl) {
-                const urlParts = photoUrl.split('/');
-                const filePath = `${urlParts[urlParts.length - 2]}/${urlParts[urlParts.length - 1]}`;
-                await supabase.storage.from('progress-photos').remove([filePath]);
-            }
-            Swal.fire({ icon: 'success', title: 'Deleted!', confirmButtonColor: '#fdbc00', timer: 1500 });
-            fetchClientData();
-        } catch (error) {
-            Swal.fire({ icon: 'error', title: 'Failed', text: error.message, confirmButtonColor: '#fdbc00' });
+            const { error } = await supabase
+                .from('client_diet_plans')
+                .delete()
+                .eq('id', plan.id);
+            if (error) throw error;
+            setDietPlans((prev) => prev.filter((p) => p.id !== plan.id));
+        } catch (err) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Delete Failed',
+                text: err.message,
+                confirmButtonColor: '#2d6a4f',
+            });
         }
     };
 
-    /* ─── Chart data ─── */
-    const sortedProgress = [...progressEntries].reverse();
-    const chartLabels = sortedProgress.map(e =>
-        new Date(e.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    );
-    const chartDatasets = METRICS
-        .filter(m => activeMetrics.includes(m.key) && sortedProgress.some(e => e[m.key]))
-        .map(m => ({
-            label: `${m.label} (${m.unit})`,
-            data: sortedProgress.map(e => e[m.key] || null),
-            borderColor: m.color,
-            backgroundColor: m.color + '18',
-            borderWidth: 2.5,
-            tension: 0.4,
-            pointRadius: 5,
-            pointHoverRadius: 7,
-            pointBackgroundColor: m.color,
-            fill: activeMetrics.length === 1,
-            spanGaps: true,
-        }));
+    const handleDeleteInvoice = async (inv) => {
+        const res = await Swal.fire({
+            icon: 'warning',
+            title: `Delete Invoice ${inv.invoice_number}?`,
+            text: 'This invoice record will be permanently deleted.',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            confirmButtonText: 'Delete',
+        });
+        if (!res.isConfirmed) return;
 
-    const chartOptions = {
-        responsive: true,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-            legend: { display: false },
-            tooltip: {
-                backgroundColor: '#fff', titleColor: '#0a0a1a', bodyColor: '#6b7280',
-                borderColor: '#e5e7eb', borderWidth: 1, padding: 12, cornerRadius: 12,
-                callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y ?? '—'}` },
-            },
-        },
-        scales: {
-            y: { grid: { color: '#f3f4f6' }, ticks: { color: '#9ca3af', font: { size: 11 } }, border: { display: false } },
-            x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 11 } }, border: { display: false } },
-        },
+        try {
+            const { error } = await supabase
+                .from('client_invoices')
+                .delete()
+                .eq('id', inv.id);
+            if (error) throw error;
+            setInvoices((prev) => prev.filter((i) => i.id !== inv.id));
+        } catch (err) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Delete Failed',
+                text: err.message,
+                confirmButtonColor: '#2d6a4f',
+            });
+        }
     };
 
-    /* ─── Stat helpers ─── */
-    const getProgressStats = (key) => {
-        const values = [...progressEntries].reverse().map(e => e[key]).filter(Boolean).map(Number);
-        if (!values.length) return null;
-        const diff = (values[values.length - 1] - values[0]).toFixed(1);
-        return { latest: values[values.length - 1], diff };
-    };
-
-    /* ─── Loading ─── */
-    if (!client) {
+    if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                    <p className="text-gray-500 font-medium">Loading client profile...</p>
-                </div>
+            <div className="max-w-6xl mx-auto py-20 text-center text-sm text-gray-500">
+                <RefreshCw size={22} className="animate-spin mx-auto mb-3 text-primary" />
+                Loading client profile &amp; records...
             </div>
         );
     }
 
-    const status = STATUS_STYLES[client.status] || STATUS_STYLES.inactive;
-    const initials = client.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+    if (!client) {
+        return (
+            <div className="max-w-xl mx-auto py-20 text-center space-y-4">
+                <h2 className="text-xl font-bold text-heading">Client not found</h2>
+                <p className="text-sm text-gray-500">
+                    This client profile may have been deleted or does not exist.
+                </p>
+                <Link
+                    href="/admin/clients"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold"
+                >
+                    <ArrowLeft size={14} />
+                    <span>Back to Clients</span>
+                </Link>
+            </div>
+        );
+    }
 
-    const daysRemaining = client.plan_end_date
-        ? Math.max(0, Math.ceil((new Date(client.plan_end_date) - new Date()) / (1000 * 60 * 60 * 24)))
-        : null;
+    const statusUi = STATUS_STYLES[client.status] || STATUS_STYLES.active;
+    const cleanPhoneDigits = String(client.phone || '').replace(/\D/g, '');
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            {/* ── Top Nav Bar ── */}
-            <div className="bg-white border-b border-gray-200 sticky top-0 z-30">
-                <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <Link
-                            href="/admin/clients"
-                            className="p-2 hover:bg-gray-100 border border-gray-200 rounded-xl transition"
-                        >
-                            <ArrowLeft size={18} className="text-gray-600" />
-                        </Link>
-                        <div>
-                            <h1 className="text-xl font-bold text-heading leading-none">{client.full_name}</h1>
-                            <p className="text-xs text-gray-400 mt-0.5">Client ID: {params.id.slice(0, 8)}…</p>
-                        </div>
-                    </div>
-                    <Link
-                        href={`/admin/clients/${params.id}/edit`}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-heading text-white font-bold rounded-xl hover:bg-gray-800 transition text-sm"
-                    >
-                        <Edit2 size={15} />
-                        Edit Client
-                    </Link>
-                </div>
+        <div className="max-w-6xl mx-auto px-0.5 sm:px-2 py-1 sm:py-4 space-y-4 sm:space-y-6">
+            {/* ── Top Breadcrumb ── */}
+            <div className="flex items-center justify-between gap-3">
+                <Link
+                    href="/admin/clients"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-heading transition"
+                >
+                    <ArrowLeft size={15} />
+                    <span>All Clients</span>
+                </Link>
             </div>
 
-            <div className="max-w-7xl mx-auto px-6 py-8">
-                <div className="flex flex-col xl:flex-row gap-6">
-
-                    {/* ════ LEFT SIDEBAR ════ */}
-                    <div className="xl:w-80 shrink-0 space-y-5">
-
-                        {/* Profile Card */}
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                            {/* Color banner */}
-                            <div className="h-20 bg-linear-to-r from-primary/30 via-primary/10 to-blue-100" />
-                            <div className="px-6 pb-6 -mt-10">
-                                {/* Avatar */}
-                                <div className="w-20 h-20 rounded-2xl bg-heading text-white flex items-center justify-center text-2xl font-bold shadow-lg mb-4 border-4 border-white">
-                                    {initials}
-                                </div>
-                                <h2 className="text-xl font-bold text-heading mb-1">{client.full_name}</h2>
-
-                                {/* Status badge */}
-                                <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${status.bg} ${status.text} mb-4`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
-                                    {status.label}
-                                </div>
-
-                                <div className="space-y-3">
-                                    {client.phone && (
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-gray-50 rounded-lg shrink-0">
-                                                <Phone size={14} className="text-gray-400" />
-                                            </div>
-                                            <div>
-                                                <p className="text-xs text-gray-400">Phone</p>
-                                                <p className="text-sm font-semibold text-heading">{client.phone}</p>
-                                            </div>
-                                        </div>
-                                    )}
-                                    {client.instagram && (
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-gray-50 rounded-lg shrink-0">
-                                                <Instagram size={14} className="text-gray-400" />
-                                            </div>
-                                            <div>
-                                                <p className="text-xs text-gray-400">Instagram</p>
-                                                <a
-                                                    href={`https://www.instagram.com/${client.instagram}`}
-                                                    target="_blank" rel="noopener noreferrer"
-                                                    className="text-sm font-semibold text-primary hover:underline"
-                                                >
-                                                    @{client.instagram}
-                                                </a>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+            {/* ── Client Profile Summary Card ── */}
+            <div className="bg-white rounded-2xl border border-gray-200/80 p-4 sm:p-6 shadow-2xs space-y-4">
+                <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-3.5 sm:gap-4">
+                    <div className="flex items-start gap-3 sm:gap-4 min-w-0">
+                        <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-primary/10 text-primary font-bold text-sm sm:text-lg flex items-center justify-center shrink-0">
+                            {getInitials(client.full_name)}
                         </div>
-
-                        {/* Plan Info Card */}
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
-                            <h3 className="text-sm font-bold text-heading flex items-center gap-2">
-                                <Target size={15} className="text-primary" />
-                                Plan Details
-                            </h3>
-
-                            {client.assigned_plan_type && (
-                                <div>
-                                    <p className="text-xs text-gray-400 mb-1">Plan Type</p>
-                                    <span className="inline-block px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full">
-                                        {client.assigned_plan_type}
-                                    </span>
-                                </div>
-                            )}
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-gray-50 rounded-xl p-3">
-                                    <p className="text-xs text-gray-400 mb-1 flex items-center gap-1">
-                                        <Calendar size={10} /> Start
-                                    </p>
-                                    <p className="text-sm font-bold text-heading">
-                                        {client.plan_start_date
-                                            ? new Date(client.plan_start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                                            : '—'}
-                                    </p>
-                                </div>
-                                <div className="bg-gray-50 rounded-xl p-3">
-                                    <p className="text-xs text-gray-400 mb-1 flex items-center gap-1">
-                                        <Calendar size={10} /> End
-                                    </p>
-                                    <p className="text-sm font-bold text-heading">
-                                        {client.plan_end_date
-                                            ? new Date(client.plan_end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                                            : '—'}
-                                    </p>
-                                </div>
-                            </div>
-
-                            {daysRemaining !== null && client.status === 'active' && (
-                                <div className={`flex items-center gap-2 p-3 rounded-xl ${daysRemaining <= 7 ? 'bg-red-50 border border-red-100' : 'bg-green-50 border border-green-100'}`}>
-                                    <Clock size={14} className={daysRemaining <= 7 ? 'text-red-500' : 'text-green-600'} />
-                                    <span className={`text-xs font-bold ${daysRemaining <= 7 ? 'text-red-600' : 'text-green-700'}`}>
-                                        {daysRemaining === 0 ? 'Ends today!' : `${daysRemaining} days remaining`}
-                                    </span>
-                                </div>
-                            )}
-
-                            {client.initial_goals && (
-                                <div className="pt-3 border-t border-gray-100">
-                                    <p className="text-xs text-gray-400 mb-1.5 font-semibold uppercase tracking-wide">Goals</p>
-                                    <p className="text-sm text-gray-600 leading-relaxed">{client.initial_goals}</p>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Quick Stats */}
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 text-center">
-                                <p className="text-2xl font-bold text-heading">{dietPlans.length}</p>
-                                <p className="text-xs text-gray-400 mt-1">Diet Plans</p>
-                            </div>
-                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 text-center">
-                                <p className="text-2xl font-bold text-heading">{progressEntries.length}</p>
-                                <p className="text-xs text-gray-400 mt-1">Progress Logs</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* ════ MAIN CONTENT ════ */}
-                    <div className="flex-1 min-w-0">
-
-                        {/* Tabs */}
-                        <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl mb-6 w-fit">
-                            {[
-                                { id: 'plans', icon: FileText, label: 'Diet Plans', count: dietPlans.length },
-                                { id: 'progress', icon: TrendingUp, label: 'Progress', count: progressEntries.length },
-                            ].map(tab => (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
-                                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer ${activeTab === tab.id
-                                        ? 'bg-white text-heading shadow-sm'
-                                        : 'text-gray-400 hover:text-gray-600'
-                                        }`}
+                        <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <h1 className="text-lg sm:text-2xl font-bold text-heading truncate">
+                                    {client.full_name}
+                                </h1>
+                                <span
+                                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs font-semibold border shrink-0 ${statusUi.bg} ${statusUi.text} ${statusUi.border}`}
                                 >
-                                    <tab.icon size={16} />
-                                    {tab.label}
-                                    <span className={`px-1.5 py-0.5 rounded-full text-xs ${activeTab === tab.id ? 'bg-primary/10 text-primary' : 'bg-gray-200 text-gray-500'}`}>
-                                        {tab.count}
-                                    </span>
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* ── DIET PLANS TAB ── */}
-                        {activeTab === 'plans' && (
-                            <div className="space-y-5">
-                                {/* Upload toggle */}
-                                <div className="flex items-center justify-between">
-                                    <h2 className="text-lg font-bold text-heading">Diet Plans</h2>
-                                    <button
-                                        onClick={() => setShowUploadForm(v => !v)}
-                                        className="flex items-center gap-2 px-4 py-2.5 bg-primary text-black font-bold rounded-xl hover:bg-primary-dark transition text-sm cursor-pointer"
-                                    >
-                                        <Plus size={16} />
-                                        Upload Plan
-                                    </button>
-                                </div>
-
-                                {/* Upload form (collapsible) */}
-                                {showUploadForm && (
-                                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                                        <h3 className="font-bold text-heading mb-4 flex items-center gap-2">
-                                            <Upload size={16} className="text-primary" />
-                                            New Diet Plan
-                                        </h3>
-                                        <form onSubmit={handleUploadPlan} className="space-y-4">
-                                            <input
-                                                type="text"
-                                                placeholder="Plan name (e.g. Week 1 – High Protein)"
-                                                value={planName}
-                                                onChange={e => setPlanName(e.target.value)}
-                                                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition text-sm"
-                                                required
-                                            />
-                                            <textarea
-                                                placeholder="Notes for the client (optional)"
-                                                value={planNotes}
-                                                onChange={e => setPlanNotes(e.target.value)}
-                                                rows={2}
-                                                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition text-sm resize-none"
-                                            />
-                                            <label className="flex items-center gap-3 px-4 py-3 bg-gray-50 hover:bg-gray-100 border border-dashed border-gray-300 hover:border-primary rounded-xl cursor-pointer transition">
-                                                <FileText size={18} className="text-gray-400 shrink-0" />
-                                                <span className="text-sm text-gray-500 font-medium truncate">
-                                                    {planFile ? planFile.name : 'Choose PDF, JPG or PNG…'}
-                                                </span>
-                                                <input
-                                                    type="file"
-                                                    accept=".pdf,.jpg,.jpeg,.png"
-                                                    onChange={e => e.target.files?.[0] && setPlanFile(e.target.files[0])}
-                                                    className="hidden"
-                                                    required
-                                                />
-                                            </label>
-                                            <div className="flex gap-3">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowUploadForm(false)}
-                                                    className="flex-1 py-3 border-2 border-gray-200 text-gray-600 font-bold rounded-xl hover:bg-gray-50 transition text-sm cursor-pointer"
-                                                >
-                                                    Cancel
-                                                </button>
-                                                <button
-                                                    type="submit"
-                                                    disabled={uploading}
-                                                    className="flex-1 py-3 bg-primary text-black font-bold rounded-xl hover:bg-primary-dark transition text-sm flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
-                                                >
-                                                    {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-                                                    {uploading ? 'Uploading…' : 'Upload'}
-                                                </button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                )}
-
-                                {/* Plans list */}
-                                {dietPlans.length === 0 ? (
-                                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
-                                        <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                            <FileText size={28} className="text-gray-300" />
-                                        </div>
-                                        <p className="text-gray-400 font-medium">No diet plans uploaded yet</p>
-                                        <p className="text-gray-300 text-sm mt-1">Upload the first plan using the button above</p>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-3">
-                                        {dietPlans.map((plan, idx) => (
-                                            <div key={plan.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:border-gray-200 transition">
-                                                <div className="flex items-start gap-4">
-                                                    {/* Icon */}
-                                                    <div className="p-3 bg-primary/10 rounded-xl shrink-0">
-                                                        <FileText size={20} className="text-primary" />
-                                                    </div>
-                                                    {/* Info */}
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-start justify-between gap-3">
-                                                            <div>
-                                                                <h4 className="font-bold text-heading mb-0.5">{plan.plan_name}</h4>
-                                                                <p className="text-xs text-gray-400 flex items-center gap-1">
-                                                                    <Calendar size={10} />
-                                                                    {new Date(plan.uploaded_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                                                                </p>
-                                                            </div>
-                                                            {/* Latest badge */}
-                                                            {idx === 0 && (
-                                                                <span className="shrink-0 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">
-                                                                    Latest
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        {plan.notes && (
-                                                            <p className="mt-2 text-sm text-gray-600 italic bg-blue-50 px-3 py-2 rounded-lg border border-blue-100">
-                                                                {plan.notes}
-                                                            </p>
-                                                        )}
-                                                        <div className="flex items-center gap-2 mt-3">
-                                                            <button
-                                                                onClick={() => setSelectedPlan(plan)}
-                                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold rounded-lg transition cursor-pointer"
-                                                            >
-                                                                <ZoomIn size={13} /> View
-                                                            </button>
-                                                            <a
-                                                                href={plan.file_url}
-                                                                download
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold rounded-lg transition"
-                                                            >
-                                                                <Download size={13} /> Download
-                                                            </a>
-                                                            <button
-                                                                onClick={() => handleDeletePlan(plan.id, plan.file_url)}
-                                                                className="ml-auto p-1.5 hover:bg-red-50 rounded-lg transition text-gray-300 hover:text-red-500 cursor-pointer"
-                                                                title="Delete"
-                                                            >
-                                                                <Trash2 size={16} />
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+                                    <span className={`w-1.5 h-1.5 rounded-full ${statusUi.dot}`} />
+                                    {statusUi.label}
+                                </span>
                             </div>
-                        )}
 
-                        {/* ── PROGRESS TAB ── */}
-                        {activeTab === 'progress' && (
-                            <div className="space-y-6">
-                                <h2 className="text-lg font-bold text-heading">Progress History</h2>
-
-                                {progressEntries.length === 0 ? (
-                                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
-                                        <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                            <Activity size={28} className="text-gray-300" />
-                                        </div>
-                                        <p className="text-gray-400 font-medium">No progress logged yet</p>
-                                        <p className="text-gray-300 text-sm mt-1">Progress entries will appear here once the client logs them</p>
-                                    </div>
-                                ) : (
-                                    <>
-                                        {/* Stat summary */}
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                            {METRICS.map(m => {
-                                                const stats = getProgressStats(m.key);
-                                                if (!stats) return null;
-                                                const isLoss = parseFloat(stats.diff) < 0;
-                                                const isGain = parseFloat(stats.diff) > 0;
-                                                const Icon = m.icon;
-                                                return (
-                                                    <div key={m.key} className={`bg-white rounded-2xl border ${m.border} p-4 shadow-sm`}>
-                                                        <div className="flex items-center justify-between mb-2">
-                                                            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{m.label}</span>
-                                                            <div className={`p-1.5 ${m.bg} rounded-lg`}><Icon size={12} className={m.text} /></div>
-                                                        </div>
-                                                        <p className={`text-xl font-bold ${m.text}`}>
-                                                            {stats.latest} <span className="text-xs font-semibold">{m.unit}</span>
-                                                        </p>
-                                                        <p className={`text-xs font-semibold ${isLoss ? 'text-green-600' : isGain ? 'text-red-500' : 'text-gray-400'}`}>
-                                                            {isGain ? '+' : ''}{stats.diff} {m.unit}
-                                                        </p>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-
-                                        {/* Chart */}
-                                        {sortedProgress.some(e => METRICS.some(m => e[m.key])) && (
-                                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                                                <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-                                                    <div>
-                                                        <h3 className="font-bold text-heading">Progress Chart</h3>
-                                                        <p className="text-xs text-gray-400">{progressEntries.length} entries</p>
-                                                    </div>
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {METRICS.map(m => {
-                                                            if (!sortedProgress.some(e => e[m.key])) return null;
-                                                            const isActive = activeMetrics.includes(m.key);
-                                                            return (
-                                                                <button
-                                                                    key={m.key}
-                                                                    onClick={() => setActiveMetrics(prev =>
-                                                                        isActive ? prev.filter(k => k !== m.key) : [...prev, m.key]
-                                                                    )}
-                                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer ${isActive ? 'text-white border-transparent' : 'bg-white text-gray-400 border-gray-200'}`}
-                                                                    style={isActive ? { backgroundColor: m.color, borderColor: m.color } : {}}
-                                                                >
-                                                                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: isActive ? 'white' : m.color }} />
-                                                                    {m.label}
-                                                                </button>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                                <Line data={{ labels: chartLabels, datasets: chartDatasets }} options={chartOptions} />
-                                            </div>
+                            <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 mt-1.5 sm:mt-2 text-xs text-gray-500">
+                                {client.phone && (
+                                    <span className="inline-flex items-center gap-1.5">
+                                        <Phone size={12} className="text-gray-400" />
+                                        <span>{client.phone}</span>
+                                        {cleanPhoneDigits.length >= 8 && (
+                                            <a
+                                                href={`https://wa.me/${cleanPhoneDigits}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1 text-emerald-700 hover:underline font-semibold ml-0.5"
+                                            >
+                                                <MessageCircle size={12} />
+                                                WhatsApp
+                                            </a>
                                         )}
-
-                                        {/* Progress entries */}
-                                        <div>
-                                            <h3 className="font-bold text-heading mb-3 flex items-center gap-2 text-sm">
-                                                <Calendar size={14} className="text-primary" />
-                                                All Entries
-                                                <span className="px-1.5 py-0.5 bg-gray-100 text-gray-400 text-xs rounded-full">{progressEntries.length}</span>
-                                            </h3>
-
-                                            <div className="space-y-3">
-                                                {progressEntries.map((entry, idx) => {
-                                                    const isExpanded = expandedEntries[entry.id];
-                                                    const isLatest = idx === 0;
-                                                    const entryDate = new Date(entry.date);
-                                                    const hasMetrics = METRICS.some(m => entry[m.key]);
-                                                    return (
-                                                        <div key={entry.id} className={`bg-white rounded-2xl border shadow-sm transition-all ${isLatest ? 'border-primary/30 ring-1 ring-primary/10' : 'border-gray-100'}`}>
-                                                            {/* Row header */}
-                                                            <div className="flex items-center gap-2 pr-4">
-                                                                <button
-                                                                    onClick={() => setExpandedEntries(prev => ({ ...prev, [entry.id]: !prev[entry.id] }))}
-                                                                    className="flex-1 flex items-center gap-4 p-4 text-left cursor-pointer min-w-0"
-                                                                >
-                                                                    <div className={`flex flex-col items-center justify-center w-11 h-11 rounded-xl shrink-0 ${isLatest ? 'bg-primary/10' : 'bg-gray-50'}`}>
-                                                                        <span className={`text-base font-bold leading-none ${isLatest ? 'text-primary' : 'text-heading'}`}>{entryDate.getDate()}</span>
-                                                                        <span className="text-xs text-gray-400">{entryDate.toLocaleDateString('en-US', { month: 'short' })}</span>
-                                                                    </div>
-                                                                    <div className="min-w-0">
-                                                                        <div className="flex items-center gap-2 flex-wrap">
-                                                                            <span className="font-bold text-heading text-sm">
-                                                                                {entryDate.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' })}
-                                                                            </span>
-                                                                            {isLatest && <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs font-bold rounded-full">Latest</span>}
-                                                                        </div>
-                                                                        <div className="flex flex-wrap gap-1.5 mt-1">
-                                                                            {METRICS.map(m => entry[m.key] ? (
-                                                                                <span key={m.key} className={`px-2 py-0.5 ${m.bg} ${m.text} text-xs font-semibold rounded-full`}>
-                                                                                    {m.label}: {entry[m.key]} {m.unit}
-                                                                                </span>
-                                                                            ) : null)}
-                                                                            {entry.photo_url && <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-xs font-semibold rounded-full">📷 Photo</span>}
-                                                                        </div>
-                                                                    </div>
-                                                                </button>
-                                                                <div className="flex items-center gap-1">
-                                                                    <button
-                                                                        onClick={() => handleDeleteProgress(entry.id, entry.photo_url)}
-                                                                        className="p-2 hover:bg-red-50 rounded-xl transition text-gray-300 hover:text-red-500 cursor-pointer"
-                                                                        title="Delete entry"
-                                                                    >
-                                                                        <Trash2 size={15} />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => setExpandedEntries(prev => ({ ...prev, [entry.id]: !prev[entry.id] }))}
-                                                                        className="p-2 hover:bg-gray-100 rounded-xl transition text-gray-400 cursor-pointer"
-                                                                    >
-                                                                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Expanded */}
-                                                            {isExpanded && (
-                                                                <div className="px-4 pb-4 border-t border-gray-50">
-                                                                    {hasMetrics && (
-                                                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-                                                                            {METRICS.map(m => entry[m.key] ? (
-                                                                                <div key={m.key} className={`${m.bg} rounded-xl p-3 border ${m.border}`}>
-                                                                                    <p className="text-xs text-gray-500 font-semibold mb-1">{m.label}</p>
-                                                                                    <p className={`text-lg font-bold ${m.text}`}>{entry[m.key]} <span className="text-xs">{m.unit}</span></p>
-                                                                                </div>
-                                                                            ) : null)}
-                                                                        </div>
-                                                                    )}
-                                                                    {entry.photo_url && (
-                                                                        <div className="mt-4">
-                                                                            <button
-                                                                                onClick={() => setSelectedPhoto(entry.photo_url)}
-                                                                                className="group relative block w-full overflow-hidden rounded-xl border border-gray-100"
-                                                                            >
-                                                                                <img src={entry.photo_url} alt="Progress" className="w-full max-h-48 object-cover group-hover:opacity-90 transition" />
-                                                                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition bg-black/30 rounded-xl cursor-pointer">
-                                                                                    <span className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl text-sm font-bold text-heading shadow">
-                                                                                        <ImageIcon size={14} /> View Full
-                                                                                    </span>
-                                                                                </div>
-                                                                            </button>
-                                                                        </div>
-                                                                    )}
-                                                                    {entry.notes && (
-                                                                        <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-xl">
-                                                                            <p className="text-xs font-bold text-heading mb-1">Note</p>
-                                                                            <p className="text-sm text-gray-700 italic">{entry.notes}</p>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    </>
+                                    </span>
+                                )}
+                                {client.age && <span>Age: {client.age}</span>}
+                                {client.height && <span>Height: {client.height}</span>}
+                                {client.initial_goals && (
+                                    <span className="inline-flex items-center gap-1 text-heading font-medium">
+                                        <Target size={12} className="text-primary shrink-0" />
+                                        <span>{client.initial_goals}</span>
+                                    </span>
                                 )}
                             </div>
-                        )}
+
+                            {client.notes && (
+                                <p className="mt-2.5 text-xs text-gray-600 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 max-w-2xl">
+                                    {client.notes}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Primary Actions: Launch Generators + Edit/Delete */}
+                    <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto pt-3 lg:pt-0 border-t lg:border-t-0 border-gray-100 shrink-0">
+                        <Link
+                            href={`/admin/diet-plan-generator?clientId=${client.id}&new=1`}
+                            className="flex-1 sm:flex-initial min-h-[42px] inline-flex items-center justify-center gap-1.5 px-3.5 sm:px-4 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold shadow-xs whitespace-nowrap transition active:scale-[0.98]"
+                        >
+                            <Plus size={15} className="shrink-0" />
+                            <span>New Diet Plan</span>
+                        </Link>
+
+                        <Link
+                            href={`/admin/invoice-generator?clientId=${client.id}&new=1`}
+                            className="flex-1 sm:flex-initial min-h-[42px] inline-flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-2.5 rounded-xl bg-white hover:bg-gray-50 text-heading border border-gray-200 text-xs font-bold whitespace-nowrap transition active:scale-[0.98]"
+                        >
+                            <Receipt size={14} className="text-primary shrink-0" />
+                            <span>New Invoice</span>
+                        </Link>
+
+                        <button
+                            type="button"
+                            onClick={handleOpenEdit}
+                            className="min-h-[42px] w-[42px] inline-flex items-center justify-center rounded-xl border border-gray-200 text-gray-600 hover:text-heading hover:bg-gray-50 transition cursor-pointer shrink-0"
+                            title="Edit client profile"
+                            aria-label="Edit client profile"
+                        >
+                            <Edit3 size={15} />
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={handleDeleteClient}
+                            className="min-h-[42px] w-[42px] inline-flex items-center justify-center rounded-xl border border-gray-200 text-gray-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition cursor-pointer shrink-0"
+                            title="Delete client"
+                            aria-label="Delete client"
+                        >
+                            <Trash2 size={15} />
+                        </button>
                     </div>
                 </div>
             </div>
 
-            {/* ════ DIET PLAN FILE VIEWER ════ */}
-            {selectedPlan && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm" onClick={() => setSelectedPlan(null)}>
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
-                            <div className="flex items-center gap-3 min-w-0">
-                                <div className="p-2 bg-blue-50 rounded-xl shrink-0"><FileText size={20} className="text-primary" /></div>
-                                <div className="min-w-0">
-                                    <h2 className="text-lg font-bold text-heading truncate">{selectedPlan.plan_name}</h2>
-                                    <p className="text-xs text-gray-400">
-                                        Uploaded {new Date(selectedPlan.uploaded_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                                    </p>
-                                </div>
+            {/* ── Segmented Tabs: Diet Plans vs Invoices ── */}
+            <div className="flex items-center justify-between border-b border-gray-200 overflow-x-auto scrollbar-none">
+                <div className="flex items-center gap-4 sm:gap-6">
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('plans')}
+                        className={`pb-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 border-b-2 whitespace-nowrap transition cursor-pointer ${
+                            activeTab === 'plans'
+                                ? 'border-primary text-primary'
+                                : 'border-transparent text-gray-500 hover:text-heading'
+                        }`}
+                    >
+                        <FileText size={15} className="shrink-0" />
+                        <span className="sm:hidden">Diet Plans</span>
+                        <span className="hidden sm:inline">Diet Plan Revisions</span>
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-heading">
+                            {dietPlans.length}
+                        </span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('invoices')}
+                        className={`pb-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 border-b-2 whitespace-nowrap transition cursor-pointer ${
+                            activeTab === 'invoices'
+                                ? 'border-primary text-primary'
+                                : 'border-transparent text-gray-500 hover:text-heading'
+                        }`}
+                    >
+                        <Receipt size={15} className="shrink-0" />
+                        <span>Invoices</span>
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-heading">
+                            {invoices.length}
+                        </span>
+                    </button>
+                </div>
+            </div>
+
+            {/* ── Tab 1: Diet Plan Revisions (1 -> Many) ── */}
+            {activeTab === 'plans' && (
+                <div className="space-y-3">
+                    {dietPlans.length === 0 ? (
+                        <div className="bg-white rounded-2xl border border-gray-200/80 py-14 px-6 text-center">
+                            <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-primary flex items-center justify-center mx-auto mb-3">
+                                <FileText size={22} />
                             </div>
-                            <div className="flex items-center gap-2 shrink-0 ml-4">
-                                <a href={selectedPlan.file_url} target="_blank" rel="noopener noreferrer"
-                                    className="flex items-center gap-1.5 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition">
-                                    <ExternalLink size={15} /> Open
-                                </a>
-                                <a href={selectedPlan.file_url} download target="_blank" rel="noopener noreferrer"
-                                    className="flex items-center gap-1.5 px-3 py-2 text-sm bg-primary hover:bg-primary-dark text-black font-semibold rounded-xl transition">
-                                    <Download size={15} /> Download
-                                </a>
-                                <button onClick={() => setSelectedPlan(null)} className="p-2 hover:bg-gray-100 rounded-xl transition text-gray-500 cursor-pointer">
-                                    <X size={20} />
-                                </button>
-                            </div>
+                            <h3 className="text-base font-bold text-heading">
+                                No diet plans saved yet for {client.full_name}
+                            </h3>
+                            <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
+                                Create a personalized clinical diet plan in the generator — every phase or revision saved will appear here.
+                            </p>
+                            <Link
+                                href={`/admin/diet-plan-generator?clientId=${client.id}&new=1`}
+                                className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover transition"
+                            >
+                                <Plus size={14} />
+                                <span>Create First Diet Plan</span>
+                            </Link>
                         </div>
-                        {selectedPlan.notes && (
-                            <div className="px-6 py-3 bg-blue-50 border-b border-blue-100 shrink-0">
-                                <p className="text-sm text-blue-800 italic">{selectedPlan.notes}</p>
-                            </div>
-                        )}
-                        <div className="flex-1 overflow-auto min-h-0 bg-gray-50">
-                            {isImage(selectedPlan.file_url) ? (
-                                <div className="flex items-center justify-center p-6 h-full">
-                                    <img src={selectedPlan.file_url} alt={selectedPlan.plan_name} className="max-w-full max-h-full object-contain rounded-xl shadow-lg" />
+                    ) : (
+                        dietPlans.map((plan) => {
+                            const mealCount = Array.isArray(plan.plan_data?.meals)
+                                ? plan.plan_data.meals.length
+                                : 0;
+                            const recipeCount = Array.isArray(plan.plan_data?.recipes)
+                                ? plan.plan_data.recipes.length
+                                : 0;
+
+                            return (
+                                <div
+                                    key={plan.id}
+                                    className="bg-white rounded-2xl border border-gray-200/80 hover:border-primary/40 p-4 sm:p-5 shadow-2xs transition flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                                >
+                                    <div className="space-y-1.5 min-w-0">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-primary/10 text-primary">
+                                                Rev {plan.revision_number}
+                                            </span>
+                                            <h3 className="text-sm sm:text-base font-bold text-heading truncate">
+                                                {plan.plan_title || 'Diet Plan'}
+                                            </h3>
+                                            {plan.pdf_theme === 'senior' && (
+                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                                                    Senior Print
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+                                            {plan.calories && (
+                                                <span className="font-semibold text-emerald-800">
+                                                    {plan.calories} kcal
+                                                </span>
+                                            )}
+                                            {plan.goal && <span>• {plan.goal}</span>}
+                                            {mealCount > 0 && <span>• {mealCount} Meals</span>}
+                                            {recipeCount > 0 && <span>• {recipeCount} Recipes</span>}
+                                            {(plan.start_date || plan.end_date) && (
+                                                <span className="inline-flex items-center gap-1">
+                                                    • <Calendar size={11} />
+                                                    {plan.start_date || '—'} → {plan.end_date || '—'}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <p className="text-[11px] text-gray-400">
+                                            Last updated {formatDateShort(plan.updated_at || plan.created_at)}
+                                        </p>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 w-full sm:w-auto pt-2.5 sm:pt-0 border-t sm:border-t-0 border-gray-100 shrink-0">
+                                        <Link
+                                            href={`/admin/diet-plan-generator?clientId=${client.id}&planId=${plan.id}`}
+                                            className="flex-1 sm:flex-initial min-h-[40px] inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold shadow-2xs whitespace-nowrap transition active:scale-[0.98]"
+                                        >
+                                            <span>Open &amp; Revise</span>
+                                            <ArrowRight size={14} />
+                                        </Link>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDeleteDietPlan(plan)}
+                                            className="min-h-[40px] w-[40px] inline-flex items-center justify-center rounded-xl border border-gray-200 text-gray-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition cursor-pointer shrink-0"
+                                            title="Delete revision"
+                                            aria-label="Delete revision"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
                                 </div>
-                            ) : isPdf(selectedPlan.file_url) ? (
-                                <iframe src={selectedPlan.file_url} title={selectedPlan.plan_name} className="w-full h-full min-h-[60vh]" style={{ border: 'none' }} />
-                            ) : (
-                                <div className="flex flex-col items-center justify-center h-full py-20 text-center">
-                                    <FileText size={64} className="text-gray-300 mb-4" />
-                                    <p className="text-gray-500 mb-6">This file type cannot be previewed.</p>
-                                    <a href={selectedPlan.file_url} target="_blank" rel="noopener noreferrer"
-                                        className="flex items-center gap-2 px-6 py-3 bg-primary text-black font-bold rounded-xl hover:bg-primary-dark transition">
-                                        <ExternalLink size={18} /> Open File
-                                    </a>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                            );
+                        })
+                    )}
                 </div>
             )}
 
-            {/* ════ PHOTO LIGHTBOX ════ */}
-            {selectedPhoto && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm" onClick={() => setSelectedPhoto(null)}>
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 shrink-0">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-blue-50 rounded-xl"><ImageIcon size={18} className="text-primary" /></div>
-                                <span className="font-bold text-heading">Progress Photo</span>
+            {/* ── Tab 2: Client Invoices (1 -> Many) ── */}
+            {activeTab === 'invoices' && (
+                <div className="space-y-3">
+                    {invoices.length === 0 ? (
+                        <div className="bg-white rounded-2xl border border-gray-200/80 py-14 px-6 text-center">
+                            <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-primary flex items-center justify-center mx-auto mb-3">
+                                <Receipt size={22} />
                             </div>
-                            <div className="flex items-center gap-2">
-                                <a href={selectedPhoto} target="_blank" rel="noopener noreferrer"
-                                    className="flex items-center gap-1.5 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition">
-                                    <ExternalLink size={15} /> Full size
-                                </a>
-                                <button onClick={() => setSelectedPhoto(null)} className="p-2 hover:bg-gray-100 rounded-xl transition text-gray-500 cursor-pointer">
-                                    <X size={20} />
+                            <h3 className="text-base font-bold text-heading">
+                                No invoices saved yet for {client.full_name}
+                            </h3>
+                            <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
+                                Create an invoice in Invoice Generator — saved invoices can be opened anytime to update payment status or line items.
+                            </p>
+                            <Link
+                                href={`/admin/invoice-generator?clientId=${client.id}&new=1`}
+                                className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover transition"
+                            >
+                                <Plus size={14} />
+                                <span>Create First Invoice</span>
+                            </Link>
+                        </div>
+                    ) : (
+                        invoices.map((inv) => {
+                            const sym = CURRENCY_SYMBOLS[inv.currency] || '₹';
+                            const statusBadge =
+                                inv.status === 'paid'
+                                    ? {
+                                        cls: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+                                        label: 'PAID',
+                                    }
+                                    : inv.status === 'partly_paid'
+                                        ? {
+                                            cls: 'bg-amber-50 text-amber-800 border-amber-200',
+                                            label: 'PARTLY PAID',
+                                        }
+                                        : {
+                                            cls: 'bg-rose-50 text-rose-700 border-rose-200',
+                                            label: 'UNPAID',
+                                        };
+
+                            return (
+                                <div
+                                    key={inv.id}
+                                    className="bg-white rounded-2xl border border-gray-200/80 hover:border-primary/40 p-4 sm:p-5 shadow-2xs transition flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                                >
+                                    <div className="space-y-1.5 min-w-0">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-gray-100 text-heading font-mono">
+                                                {inv.invoice_number}
+                                            </span>
+                                            <span
+                                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusBadge.cls}`}
+                                            >
+                                                {statusBadge.label}
+                                            </span>
+                                            <span className="text-sm font-bold text-heading">
+                                                {sym}
+                                                {Number(inv.total_amount || 0).toLocaleString('en-IN', {
+                                                    minimumFractionDigits: 2,
+                                                    maximumFractionDigits: 2,
+                                                })}
+                                            </span>
+                                            {inv.status === 'partly_paid' && (
+                                                <span className="text-xs font-semibold text-amber-700">
+                                                    (Balance: {sym}
+                                                    {Number(inv.balance_amount || 0).toLocaleString(
+                                                        'en-IN',
+                                                        {
+                                                            minimumFractionDigits: 2,
+                                                            maximumFractionDigits: 2,
+                                                        }
+                                                    )}
+                                                    )
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+                                            {inv.goal && <span>{inv.goal}</span>}
+                                            <span>
+                                                • Date: {formatDateShort(inv.invoice_date || inv.created_at)}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 w-full sm:w-auto pt-2.5 sm:pt-0 border-t sm:border-t-0 border-gray-100 shrink-0">
+                                        <Link
+                                            href={`/admin/invoice-generator?clientId=${client.id}&invoiceId=${inv.id}`}
+                                            className="flex-1 sm:flex-initial min-h-[40px] inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold shadow-2xs whitespace-nowrap transition active:scale-[0.98]"
+                                        >
+                                            <span>Open &amp; Revise</span>
+                                            <ArrowRight size={14} />
+                                        </Link>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDeleteInvoice(inv)}
+                                            className="min-h-[40px] w-[40px] inline-flex items-center justify-center rounded-xl border border-gray-200 text-gray-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition cursor-pointer shrink-0"
+                                            title="Delete invoice"
+                                            aria-label="Delete invoice"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+            )}
+
+            {/* ── Edit Client Modal ── */}
+            {isEditOpen && (
+                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/45 backdrop-blur-xs">
+                    <div
+                        className="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full p-4 sm:p-6 shadow-2xl border border-gray-100 max-h-[92dvh] overflow-y-auto"
+                        style={{ animation: 'modalIn 180ms cubic-bezier(0.23, 1, 0.32, 1)' }}
+                    >
+                        <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-100">
+                            <h2 className="text-base font-bold text-heading">Edit Client Profile</h2>
+                            <button
+                                type="button"
+                                onClick={() => setIsEditOpen(false)}
+                                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSaveEdit} className="space-y-3.5">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="sm:col-span-2">
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                                        Full Name *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={editForm.full_name}
+                                        onChange={(e) =>
+                                            setEditForm((prev) => ({
+                                                ...prev,
+                                                full_name: e.target.value,
+                                            }))
+                                        }
+                                        className="w-full text-sm px-3.5 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                                        Phone / WhatsApp
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={editForm.phone}
+                                        onChange={(e) =>
+                                            setEditForm((prev) => ({
+                                                ...prev,
+                                                phone: e.target.value,
+                                            }))
+                                        }
+                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                                        Status
+                                    </label>
+                                    <select
+                                        value={editForm.status}
+                                        onChange={(e) =>
+                                            setEditForm((prev) => ({
+                                                ...prev,
+                                                status: e.target.value,
+                                            }))
+                                        }
+                                        className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    >
+                                        <option value="active">Active</option>
+                                        <option value="paused">Paused</option>
+                                        <option value="completed">Completed</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                                        Age
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={editForm.age}
+                                        onChange={(e) =>
+                                            setEditForm((prev) => ({
+                                                ...prev,
+                                                age: e.target.value,
+                                            }))
+                                        }
+                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                                        Height
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={editForm.height}
+                                        onChange={(e) =>
+                                            setEditForm((prev) => ({
+                                                ...prev,
+                                                height: e.target.value,
+                                            }))
+                                        }
+                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    />
+                                </div>
+
+                                <div className="sm:col-span-2">
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                                        Primary Goal
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={editForm.initial_goals}
+                                        onChange={(e) =>
+                                            setEditForm((prev) => ({
+                                                ...prev,
+                                            initial_goals: e.target.value,
+                                            }))
+                                        }
+                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    />
+                                </div>
+
+                                <div className="sm:col-span-2">
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                                        Clinical Notes
+                                    </label>
+                                    <textarea
+                                        rows={2}
+                                        value={editForm.notes}
+                                        onChange={(e) =>
+                                            setEditForm((prev) => ({
+                                                ...prev,
+                                                notes: e.target.value,
+                                            }))
+                                        }
+                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-2 sm:gap-2.5 pt-3 border-t border-gray-100">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsEditOpen(false)}
+                                    className="w-full sm:w-auto min-h-[40px] px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={savingEdit}
+                                    className="w-full sm:w-auto min-h-[42px] px-5 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold shadow-xs transition cursor-pointer disabled:opacity-50"
+                                >
+                                    {savingEdit ? 'Saving...' : 'Save Changes'}
                                 </button>
                             </div>
-                        </div>
-                        <div className="flex-1 overflow-auto min-h-0 bg-gray-950 flex items-center justify-center p-4">
-                            <img src={selectedPhoto} alt="Progress" className="max-w-full max-h-[75vh] object-contain rounded-xl" />
-                        </div>
+                        </form>
                     </div>
                 </div>
             )}
         </div>
     );
 }
+

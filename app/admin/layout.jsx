@@ -12,9 +12,9 @@ import Image from 'next/image';
 const navItems = [
     { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/admin/clients', label: 'Clients', icon: Users },
-    { href: '/admin/recipes', label: 'Recipes', icon: ChefHat },
     { href: '/admin/diet-plan-generator', label: 'Diet Plan Generator', icon: FileDown },
     { href: '/admin/invoice-generator', label: 'Invoice Generator', icon: Receipt },
+    { href: '/admin/recipes', label: 'Recipes', icon: ChefHat },
     { href: '/admin/reviews', label: 'Reviews', icon: MessageSquareQuote },
     { href: '/admin/blog', label: 'Blog', icon: FileText },
     { href: '/admin/seo', label: 'SEO', icon: Settings },
@@ -39,17 +39,17 @@ export default function AdminLayout({ children }) {
     }
 
     return (
-        <div className="flex h-screen bg-gray-50" data-lenis-prevent>
+        <div className="flex h-dvh bg-gray-50" data-lenis-prevent>
 
             {/* ── Mobile top bar ───────────────────────────────────── */}
-            <div className="md:hidden fixed top-0 inset-x-0 h-14 bg-white border-b border-gray-100 z-40 flex items-center justify-between px-4 shadow-sm">
-                <div className="flex items-center gap-2.5">
-                    <Image src="/images/logo.png" width={28} height={28} alt="Logo" className="object-contain" />
-                    <span className="font-bold font-heading text-base text-heading">Admin Panel</span>
+            <div className="md:hidden fixed top-0 inset-x-0 h-14 bg-white/95 backdrop-blur-md border-b border-gray-100 z-40 flex items-center justify-between px-3.5 shadow-2xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <Image src="/images/logo.png" width={28} height={28} alt="Logo" className="object-contain shrink-0" />
+                    <span className="font-bold font-heading text-base text-heading truncate">Admin Panel</span>
                 </div>
                 <button
                     onClick={() => setIsSidebarOpen(true)}
-                    className="p-2 text-gray-600 hover:bg-gray-100 rounded-xl transition"
+                    className="p-2.5 -mr-1 text-gray-600 hover:bg-gray-100 rounded-xl transition cursor-pointer"
                     aria-label="Open menu"
                 >
                     <Menu size={22} />
@@ -91,16 +91,18 @@ export default function AdminLayout({ children }) {
                 <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
                     {navItems.map((item) => {
                         const Icon = item.icon;
-                        const isActive = pathname === item.href;
+                        const isActive =
+                            pathname === item.href ||
+                            (item.href !== '/admin' && pathname.startsWith(`${item.href}/`));
                         return (
                             <Link
                                 key={item.href}
                                 href={item.href}
                                 onClick={() => setIsSidebarOpen(false)}
                                 className={clsx(
-                                    "flex items-center gap-3 px-3 py-3 rounded-xl transition-all font-medium text-sm group",
+                                    "flex items-center gap-3 px-3 py-3 rounded-xl transition-colors font-medium text-sm group",
                                     isActive
-                                        ? "bg-primary text-black shadow-md shadow-primary/20"
+                                        ? "bg-primary text-white shadow-md shadow-primary/20"
                                         : "text-gray-500 hover:bg-gray-50 hover:text-heading"
                                 )}
                             >
@@ -125,7 +127,7 @@ export default function AdminLayout({ children }) {
             </aside>
 
             {/* ── Main ─────────────────────────────────────────────── */}
-            <main className="flex-1 overflow-y-auto pt-14 md:pt-0 p-4 md:p-8">
+            <main className="flex-1 overflow-y-auto overflow-x-hidden pt-16 pb-6 px-3.5 sm:px-5 md:p-8">
                 {children}
             </main>
         </div>

@@ -111,7 +111,7 @@ export default function Navbar() {
                             </li>
                         ))}
 
-                        {/* Client Portal CTA */}
+                        {/* Client Portal CTA — disabled while client portal (_portal) is inactive
                         <li ref={el => linksRef.current[navLinks.length] = el}>
                             <Link
                                 href="/portal/login"
@@ -121,6 +121,7 @@ export default function Navbar() {
                                 Client Portal
                             </Link>
                         </li>
+                        */}
                     </ul>
                 </div>
 

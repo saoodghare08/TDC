@@ -86,24 +86,24 @@ export default function AdminDashboard() {
 
     const quickActions = [
         {
+            label: 'Manage Clients',
+            desc: 'Diet plans & invoice history',
+            href: '/admin/clients',
+            icon: Users,
+            accent: 'bg-primary text-white hover:bg-primary-hover',
+        },
+        {
+            label: 'New Diet Plan',
+            desc: 'Open clinical plan builder',
+            href: '/admin/diet-plan-generator',
+            icon: FileDown,
+            accent: 'bg-white text-heading border border-gray-200 hover:bg-gray-50',
+        },
+        {
             label: 'Write Blog Post',
             desc: 'Publish new content',
             href: '/admin/blog/create',
             icon: PenLine,
-            accent: 'bg-heading text-white hover:bg-heading/90',
-        },
-        {
-            label: 'Approve Reviews',
-            desc: 'Manage pending reviews',
-            href: '/admin/reviews',
-            icon: CheckCircle,
-            accent: 'bg-white text-heading border border-gray-200 hover:bg-gray-50',
-        },
-        {
-            label: 'View Clients',
-            desc: 'Manage client portal',
-            href: '/admin/clients',
-            icon: Users,
             accent: 'bg-white text-heading border border-gray-200 hover:bg-gray-50',
         },
     ];
@@ -194,7 +194,7 @@ export default function AdminDashboard() {
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="font-bold text-heading">Clients</p>
-                            <p className="text-xs text-gray-400">Manage client diet plans & progress</p>
+                            <p className="text-xs text-gray-400">Client directory, diet plan revisions &amp; invoices</p>
                         </div>
                         <ArrowRight size={16} className="text-gray-300 group-hover:text-gray-500 group-hover:translate-x-0.5 transition-all" />
                     </Link>
