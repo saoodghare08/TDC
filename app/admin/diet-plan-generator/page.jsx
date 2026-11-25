@@ -182,6 +182,7 @@ const EMPTY_FORM_STATE = {
     goal: '',
     target_weight: '',
     start_date: new Date().toISOString().split('T')[0],
+    revision_date: '',
     end_date: '',
     next_review_date: '',
     calories: '',
@@ -210,6 +211,32 @@ const EMPTY_FORM_STATE = {
     special_instructions_warning: '',
     special_instructions_verified: true,
     calc_config: DEFAULT_CALC_CONFIG,
+};
+
+const addDaysToIsoDate = (baseIso, days) => {
+    const fallback = new Date().toISOString().split('T')[0];
+    const [y, m, d] = String(baseIso || fallback)
+        .split('-')
+        .map(Number);
+    if (!y || !m || !d) return '';
+    const dt = new Date(y, m - 1, d);
+    dt.setDate(dt.getDate() + days);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(
+        dt.getDate()
+    ).padStart(2, '0')}`;
+};
+
+const addMonthsToIsoDate = (baseIso, months) => {
+    const fallback = new Date().toISOString().split('T')[0];
+    const [y, m, d] = String(baseIso || fallback)
+        .split('-')
+        .map(Number);
+    if (!y || !m || !d) return '';
+    const dt = new Date(y, m - 1, d);
+    dt.setMonth(dt.getMonth() + months);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(
+        dt.getDate()
+    ).padStart(2, '0')}`;
 };
 
 function AdminDietPlanGeneratorContent() {
@@ -395,10 +422,12 @@ function AdminDietPlanGeneratorContent() {
                                 : [],
                             donts: Array.isArray(draft.donts) ? draft.donts : [],
                             recipes: Array.isArray(draft.recipes) ? draft.recipes : [],
+                            revision_date:
+                                draft.revision_date ?? draft.next_review_date ?? '',
                             calc_config: {
                                 ...DEFAULT_CALC_CONFIG,
                                 ...(draft.calc_config &&
-                                typeof draft.calc_config === 'object'
+                                    typeof draft.calc_config === 'object'
                                     ? draft.calc_config
                                     : {}),
                             },
@@ -499,7 +528,9 @@ function AdminDietPlanGeneratorContent() {
             try {
                 const { data } = await supabase
                     .from('clients')
-                    .select('id, full_name, phone, age, height, initial_goals')
+                    .select(
+                        'id, full_name, phone, age, height, initial_goals, plan_start_date, plan_end_date, next_revision_date'
+                    )
                     .order('updated_at', { ascending: false })
                     .limit(300);
                 if (active && Array.isArray(data)) {
@@ -519,6 +550,11 @@ function AdminDietPlanGeneratorContent() {
             record?.plan_data && typeof record.plan_data === 'object'
                 ? record.plan_data
                 : {};
+        const resolvedRevisionDate =
+            snap.revision_date || record?.revision_date || snap.next_review_date || '';
+        const resolvedEndDate =
+            snap.end_date || record?.end_date || ownerClient?.plan_end_date || '';
+
         const hydrated = {
             ...EMPTY_FORM_STATE,
             ...snap,
@@ -531,7 +567,9 @@ function AdminDietPlanGeneratorContent() {
                 snap.start_date ||
                 record?.start_date ||
                 new Date().toISOString().split('T')[0],
-            end_date: snap.end_date || record?.end_date || '',
+            revision_date: resolvedRevisionDate,
+            next_review_date: resolvedRevisionDate,
+            end_date: resolvedEndDate,
             pdf_theme: snap.pdf_theme || record?.pdf_theme || 'clinical',
             measurements: Array.isArray(snap.measurements)
                 ? JSON.parse(JSON.stringify(snap.measurements))
@@ -618,6 +656,8 @@ function AdminDietPlanGeneratorContent() {
                         client_height: clientRow.height || '',
                         goal: clientRow.initial_goals || '',
                         start_date: new Date().toISOString().split('T')[0],
+                        revision_date: '',
+                        end_date: clientRow.plan_end_date || '',
                     };
                     setFormData(freshForClient);
                     setEditingRecipeId(null);
@@ -717,15 +757,15 @@ function AdminDietPlanGeneratorContent() {
         };
     }, [recipeSearch, recipeCategoryFilter, supabase]);
 
-    // ─── Clear Form ───
+    // ─── Clear Form (Full Clean Slate — Detaches Client & Revision) ───
     const handleClearForm = () => {
         Swal.fire({
-            title: 'Clear Form?',
-            text: 'This will reset all fields, meals, and targets back to an empty state.',
+            title: 'Reset Diet Plan Form?',
+            text: 'This will detach any selected client and reset all fields, meals, targets, and recipes to a clean slate.',
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#ef4444',
-            confirmButtonText: 'Yes, clear all'
+            confirmButtonText: 'Yes, reset all'
         }).then((res) => {
             if (res.isConfirmed) {
                 if (autoSaveTimerRef.current) {
@@ -733,8 +773,13 @@ function AdminDietPlanGeneratorContent() {
                     autoSaveTimerRef.current = null;
                 }
                 hasPendingSaveRef.current = false;
+                dbMetaRef.current = { selectedClient: null, loadedPlanRecord: null };
+
                 try {
                     window.localStorage.removeItem(DIET_PLAN_DRAFT_STORAGE_KEY);
+                    if (typeof window !== 'undefined') {
+                        window.history.replaceState({}, '', '/admin/diet-plan-generator');
+                    }
                 } catch {
                     // Ignore storage removal errors
                 }
@@ -742,14 +787,42 @@ function AdminDietPlanGeneratorContent() {
                 const freshEmpty = {
                     ...EMPTY_FORM_STATE,
                     start_date: new Date().toISOString().split('T')[0],
+                    measurements: [],
+                    meals: [],
+                    supplements: [],
+                    workouts: [],
+                    guidelines: [],
+                    donts: [],
+                    recipes: [],
+                    calc_config: { ...DEFAULT_CALC_CONFIG },
                 };
                 lastSavedDataRef.current = freshEmpty;
                 latestFormDataRef.current = freshEmpty;
                 pendingHydratedDataRef.current = freshEmpty;
 
-                setFormData(freshEmpty);
+                setSelectedClient(null);
                 setLoadedPlanRecord(null);
+                setClientPastPlans([]);
+                setFormData(freshEmpty);
                 setEditingRecipeId(null);
+                setRecipeSearch('');
+                setRecipeCategoryFilter('All');
+                setAvailableRecipes([]);
+                setShowHeightConverter(false);
+                setShowPresetsPopover(false);
+                setShowSaveMenu(false);
+                setAllExpanded(false);
+                setCollapsed({
+                    profile: false,
+                    targets: false,
+                    measurements: true,
+                    meals: false,
+                    supplements: true,
+                    workouts: true,
+                    special: true,
+                    rules: true,
+                    recipes: true,
+                });
                 setLastSavedAt(null);
                 setSaveStatus('idle');
                 setPreviewKey(k => k + 1);
@@ -806,7 +879,7 @@ function AdminDietPlanGeneratorContent() {
                 const { data, error } = await supabase
                     .from('client_diet_plans')
                     .select(
-                        'id, client_id, revision_number, plan_title, start_date, end_date, updated_at, plan_data'
+                        'id, client_id, revision_number, plan_title, start_date, revision_date, end_date, updated_at, plan_data'
                     )
                     .eq('client_id', targetClientId)
                     .order('revision_number', { ascending: false });
@@ -844,6 +917,7 @@ function AdminDietPlanGeneratorContent() {
                 client_age: prev.client_age?.trim() ? prev.client_age : matched.age || '',
                 client_height: prev.client_height?.trim() ? prev.client_height : matched.height || '',
                 goal: prev.goal?.trim() ? prev.goal : matched.initial_goals || '',
+                end_date: prev.end_date || matched.plan_end_date || '',
             }));
         } else {
             setFormData((prev) => ({ ...prev, client_name: typedVal }));
@@ -940,17 +1014,38 @@ function AdminDietPlanGeneratorContent() {
                 }
             }
 
-            // Update parent client timestamp & profile metadata
-            const clientPatch = { updated_at: new Date().toISOString() };
+            const cleanStartDate = formData.start_date || null;
+            const cleanRevisionDate =
+                formData.revision_date || formData.next_review_date || null;
+            const cleanEndDate = formData.end_date || null;
+
+            // Update parent client timestamp, profile metadata & timeline dates
+            const clientPatch = {
+                updated_at: new Date().toISOString(),
+                next_revision_date: cleanRevisionDate,
+            };
+            if (cleanStartDate && !targetClient.plan_start_date) {
+                clientPatch.plan_start_date = cleanStartDate;
+            }
+            if (cleanEndDate !== null || targetClient.plan_end_date) {
+                clientPatch.plan_end_date = cleanEndDate;
+            }
             if (typedPhone) clientPatch.phone = typedPhone;
             if (formData.client_age?.trim()) clientPatch.age = formData.client_age.trim();
             if (formData.client_height?.trim()) clientPatch.height = formData.client_height.trim();
             if (formData.goal?.trim()) clientPatch.initial_goals = formData.goal.trim();
             await supabase.from('clients').update(clientPatch).eq('id', targetClient.id);
+            targetClient = { ...targetClient, ...clientPatch };
+            setAllClients((prev) =>
+                prev.map((c) => (c.id === targetClient.id ? { ...c, ...clientPatch } : c))
+            );
 
             const cleanSnapshot = {
                 ...formData,
                 client_name: typedName || targetClient.full_name,
+                revision_date: cleanRevisionDate || '',
+                next_review_date: cleanRevisionDate || '',
+                end_date: cleanEndDate || '',
             };
 
             if (action === 'update' && loadedPlanRecord?.id && loadedPlanRecord.client_id === targetClient.id) {
@@ -965,8 +1060,9 @@ function AdminDietPlanGeneratorContent() {
                         plan_title: resolvedTitle,
                         goal: formData.goal?.trim() || null,
                         calories: formData.calories?.trim() || null,
-                        start_date: formData.start_date || null,
-                        end_date: formData.end_date || null,
+                        start_date: cleanStartDate,
+                        revision_date: cleanRevisionDate,
+                        end_date: cleanEndDate,
                         pdf_theme: formData.pdf_theme || 'clinical',
                         plan_data: { ...cleanSnapshot, plan_title: resolvedTitle },
                         updated_at: new Date().toISOString(),
@@ -1015,8 +1111,9 @@ function AdminDietPlanGeneratorContent() {
                             plan_title: resolvedTitle,
                             goal: formData.goal?.trim() || null,
                             calories: formData.calories?.trim() || null,
-                            start_date: formData.start_date || null,
-                            end_date: formData.end_date || null,
+                            start_date: cleanStartDate,
+                            revision_date: cleanRevisionDate,
+                            end_date: cleanEndDate,
                             pdf_theme: formData.pdf_theme || 'clinical',
                             plan_data: { ...cleanSnapshot, plan_title: resolvedTitle },
                             updated_at: new Date().toISOString(),
@@ -2100,8 +2197,7 @@ function AdminDietPlanGeneratorContent() {
         return usages
             .map(
                 (u) =>
-                    `Rev ${u.revisionNumber || '—'}: ${u.planTitle}${
-                        u.startDate ? ` (${u.startDate})` : ''
+                    `Rev ${u.revisionNumber || '—'}: ${u.planTitle}${u.startDate ? ` (${u.startDate})` : ''
                     }`
             )
             .join(' • ');
@@ -2205,14 +2301,43 @@ function AdminDietPlanGeneratorContent() {
         }));
     };
 
-    const handleSoftEditIngredientsText = (recipeId, text) => {
-        const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-        handleSoftEditRecipe(recipeId, 'ingredients', lines);
+    const handleSoftEditIngredientsText = (recipeId, rawText) => {
+        const normalized = String(rawText ?? '').replace(/\r\n/g, '\n');
+        handleSoftEditRecipe(recipeId, 'ingredients', normalized.split('\n'));
     };
 
-    const handleSoftEditInstructionsText = (recipeId, text) => {
-        const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-        handleSoftEditRecipe(recipeId, 'instructions', lines);
+    const handleSoftEditInstructionsText = (recipeId, rawText) => {
+        const normalized = String(rawText ?? '').replace(/\r\n/g, '\n');
+        handleSoftEditRecipe(recipeId, 'instructions', normalized.split('\n'));
+    };
+
+    const handleFinishSoftEditRecipe = (recipeId) => {
+        setFormData((prev) => ({
+            ...prev,
+            recipes: (prev.recipes || []).map((r) => {
+                if (r.id !== recipeId) return r;
+                const cleanIngs = Array.isArray(r.ingredients)
+                    ? r.ingredients.map((l) => String(l || '').trim()).filter(Boolean)
+                    : String(r.ingredients || '')
+                        .split('\n')
+                        .map((l) => l.trim())
+                        .filter(Boolean);
+                const cleanInst = Array.isArray(r.instructions)
+                    ? r.instructions.map((l) => String(l || '').trim()).filter(Boolean)
+                    : String(r.instructions || '')
+                        .split('\n')
+                        .map((l) => l.trim())
+                        .filter(Boolean);
+                return {
+                    ...r,
+                    name: String(r.name || '').trim() || 'Custom Dish',
+                    category: String(r.category || '').trim() || 'General',
+                    ingredients: cleanIngs,
+                    instructions: cleanInst,
+                };
+            }),
+        }));
+        setEditingRecipeId(null);
     };
 
     const handleResetRecipeToMaster = async (recipeId) => {
@@ -2489,7 +2614,20 @@ function AdminDietPlanGeneratorContent() {
     // ─── WhatsApp Direct Link ───
     const handleOpenWhatsApp = () => {
         const phone = (formData.client_phone || '').replace(/[^0-9]/g, '');
-        const greeting = `Hello ${formData.client_name || ''}! 👋\n\nYour personalized nutrition protocol is ready: *${formData.plan_title}*.\n\nValidity: ${formData.start_date} to ${formData.end_date}\nDaily Target: ${formData.calories} kcal | ${formData.water}L Water | ${formData.steps} Steps.\n\nBest regards,\n*Dt. Sabah Ghare*\nThe Diet Cascade`;
+        const dateLines = [];
+        if (formData.start_date && formData.end_date) {
+            dateLines.push(`Program Validity: ${formData.start_date} to ${formData.end_date}`);
+        } else if (formData.start_date) {
+            dateLines.push(`Start Date: ${formData.start_date}`);
+        } else if (formData.end_date) {
+            dateLines.push(`Program End Date: ${formData.end_date}`);
+        }
+        if (formData.revision_date) {
+            dateLines.push(`Next Revision: ${formData.revision_date}`);
+        }
+
+        const timelineBlock = dateLines.length > 0 ? `${dateLines.join('\n')}\n` : '';
+        const greeting = `Hello ${formData.client_name || ''}! 👋\n\nYour personalized nutrition protocol is ready: *${formData.plan_title || 'Diet Plan'}*.\n\n${timelineBlock}Daily Target: ${formData.calories || '—'} kcal | ${formData.water || '—'}L Water | ${formData.steps || '—'} Steps.\n\nBest regards,\n*Dt. Sabah Ghare*\nThe Diet Cascade`;
 
         const encoded = encodeURIComponent(greeting);
         const url = phone ? `https://wa.me/${phone}?text=${encoded}` : `https://wa.me/?text=${encoded}`;
@@ -2563,17 +2701,16 @@ function AdminDietPlanGeneratorContent() {
                 </div>
 
                 {/* ════════════════ SINGLE UNIFIED STICKY WORKSPACE BAR ════════════════ */}
-                <div className="sticky top-[3.75rem] md:top-2 z-30 bg-white/95 backdrop-blur-md rounded-2xl p-2 sm:p-2.5 mb-4 sm:mb-5 border border-gray-200/90 shadow-sm flex flex-wrap items-center gap-x-2 gap-y-2">
+                <div className="sticky top-15 md:top-2 z-30 bg-white/95 backdrop-blur-md rounded-2xl p-2 sm:p-2.5 mb-4 sm:mb-5 border border-gray-200/90 shadow-sm flex flex-wrap items-center gap-x-2 gap-y-2">
                     {/* 1. View Switcher (Mobile Row 1 Left | Desktop Left) */}
                     <div className="order-1 bg-gray-100 p-0.5 rounded-xl flex items-center">
                         <button
                             type="button"
                             onClick={() => setActiveView('editor')}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                                activeView === 'editor'
-                                    ? 'bg-white text-heading shadow-2xs font-bold'
-                                    : 'text-gray-500 hover:text-heading'
-                            }`}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${activeView === 'editor'
+                                ? 'bg-white text-heading shadow-2xs font-bold'
+                                : 'text-gray-500 hover:text-heading'
+                                }`}
                         >
                             <FileText size={13} />
                             <span>Form</span>
@@ -2584,11 +2721,10 @@ function AdminDietPlanGeneratorContent() {
                                 setActiveView('split');
                                 setPreviewKey((k) => k + 1);
                             }}
-                            className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                                activeView === 'split'
-                                    ? 'bg-white text-heading shadow-2xs font-bold'
-                                    : 'text-gray-500 hover:text-heading'
-                            }`}
+                            className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${activeView === 'split'
+                                ? 'bg-white text-heading shadow-2xs font-bold'
+                                : 'text-gray-500 hover:text-heading'
+                                }`}
                         >
                             <Sliders size={13} />
                             <span>Split</span>
@@ -2599,11 +2735,10 @@ function AdminDietPlanGeneratorContent() {
                                 setActiveView('preview');
                                 setPreviewKey((k) => k + 1);
                             }}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                                activeView === 'preview'
-                                    ? 'bg-white text-heading shadow-2xs font-bold'
-                                    : 'text-gray-500 hover:text-heading'
-                            }`}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${activeView === 'preview'
+                                ? 'bg-white text-heading shadow-2xs font-bold'
+                                : 'text-gray-500 hover:text-heading'
+                                }`}
                         >
                             <Eye size={13} />
                             <span>Preview</span>
@@ -2621,11 +2756,10 @@ function AdminDietPlanGeneratorContent() {
                                 setFormData((prev) => ({ ...prev, pdf_theme: 'clinical' }));
                                 setPreviewKey((k) => k + 1);
                             }}
-                            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition cursor-pointer ${
-                                formData.pdf_theme !== 'senior'
-                                    ? 'bg-white text-emerald-900 shadow-2xs font-bold'
-                                    : 'text-gray-500 hover:text-heading'
-                            }`}
+                            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition cursor-pointer ${formData.pdf_theme !== 'senior'
+                                ? 'bg-white text-emerald-900 shadow-2xs font-bold'
+                                : 'text-gray-500 hover:text-heading'
+                                }`}
                         >
                             Clinical
                         </button>
@@ -2635,11 +2769,10 @@ function AdminDietPlanGeneratorContent() {
                                 setFormData((prev) => ({ ...prev, pdf_theme: 'senior' }));
                                 setPreviewKey((k) => k + 1);
                             }}
-                            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition cursor-pointer ${
-                                formData.pdf_theme === 'senior'
-                                    ? 'bg-white text-amber-900 shadow-2xs font-bold'
-                                    : 'text-gray-500 hover:text-heading'
-                            }`}
+                            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition cursor-pointer ${formData.pdf_theme === 'senior'
+                                ? 'bg-white text-amber-900 shadow-2xs font-bold'
+                                : 'text-gray-500 hover:text-heading'
+                                }`}
                         >
                             <span className="sm:hidden">Senior</span>
                             <span className="hidden sm:inline">Senior Print</span>
@@ -2769,9 +2902,8 @@ function AdminDietPlanGeneratorContent() {
                                 type="button"
                                 disabled={savingToClientDb}
                                 onClick={() => handleSavePlanToDb('auto')}
-                                className={`inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-primary border border-emerald-200 font-bold text-xs whitespace-nowrap transition active:scale-[0.98] cursor-pointer disabled:opacity-50 ${
-                                    loadedPlanRecord ? 'rounded-l-xl border-r-0' : 'rounded-xl'
-                                }`}
+                                className={`inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-primary border border-emerald-200 font-bold text-xs whitespace-nowrap transition active:scale-[0.98] cursor-pointer disabled:opacity-50 ${loadedPlanRecord ? 'rounded-l-xl border-r-0' : 'rounded-xl'
+                                    }`}
                             >
                                 {savingToClientDb ? (
                                     <RefreshCw size={13} className="animate-spin shrink-0" />
@@ -2996,11 +3128,10 @@ function AdminDietPlanGeneratorContent() {
                                                     readOnly={fieldsLocked}
                                                     onChange={(e) => setFormData({ ...formData, client_height: e.target.value })}
                                                     placeholder="e.g., 165 cm (65 in)"
-                                                    className={`w-full text-xs px-3 py-2 rounded-xl border focus:outline-none ${
-                                                        fieldsLocked
-                                                            ? 'bg-gray-50 border-gray-200 text-gray-600 cursor-not-allowed'
-                                                            : 'border-gray-200 focus:ring-2 focus:ring-primary/20'
-                                                    }`}
+                                                    className={`w-full text-xs px-3 py-2 rounded-xl border focus:outline-none ${fieldsLocked
+                                                        ? 'bg-gray-50 border-gray-200 text-gray-600 cursor-not-allowed'
+                                                        : 'border-gray-200 focus:ring-2 focus:ring-primary/20'
+                                                        }`}
                                                 />
                                             </div>
 
@@ -3020,11 +3151,10 @@ function AdminDietPlanGeneratorContent() {
                                                     readOnly={fieldsLocked}
                                                     onChange={(e) => handleManualIbwChange(e.target.value)}
                                                     placeholder="e.g., 60 kg"
-                                                    className={`w-full text-xs font-semibold px-3 py-2 rounded-xl border focus:outline-none ${
-                                                        fieldsLocked
-                                                            ? 'bg-gray-50 border-gray-200 text-emerald-800 cursor-not-allowed'
-                                                            : 'border-gray-200 text-emerald-900 focus:ring-2 focus:ring-primary/20'
-                                                    }`}
+                                                    className={`w-full text-xs font-semibold px-3 py-2 rounded-xl border focus:outline-none ${fieldsLocked
+                                                        ? 'bg-gray-50 border-gray-200 text-emerald-800 cursor-not-allowed'
+                                                        : 'border-gray-200 text-emerald-900 focus:ring-2 focus:ring-primary/20'
+                                                        }`}
                                                 />
                                             </div>
 
@@ -3210,18 +3340,6 @@ function AdminDietPlanGeneratorContent() {
                                                 </datalist>
                                             </div>
 
-                                            {/* Plan Title */}
-                                            <div>
-                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Plan Title / Phase *</label>
-                                                <input
-                                                    type="text"
-                                                    value={formData.plan_title}
-                                                    onChange={(e) => setFormData({ ...formData, plan_title: e.target.value })}
-                                                    placeholder="e.g., Phase 1: Metabolic Reset"
-                                                    className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                                />
-                                            </div>
-
                                             {/* Target Goal */}
                                             <div>
                                                 <label className="block text-xs font-semibold text-gray-700 mb-1">Target Goal</label>
@@ -3233,10 +3351,29 @@ function AdminDietPlanGeneratorContent() {
                                                     className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
                                                 />
                                             </div>
+                                        </div>
+
+                                        {/* Plan Title & Timeline Row (Start Date, Revision Date, Program End Date) */}
+                                        <div className="pt-3 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                            {/* Plan Title */}
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                                    Plan Title / Phase *
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.plan_title}
+                                                    onChange={(e) => setFormData({ ...formData, plan_title: e.target.value })}
+                                                    placeholder="e.g., Phase 1: Metabolic Reset"
+                                                    className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                />
+                                            </div>
 
                                             {/* Start Date */}
                                             <div>
-                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Plan Start Date</label>
+                                                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                                    Plan Start Date
+                                                </label>
                                                 <input
                                                     type="date"
                                                     value={formData.start_date}
@@ -3245,13 +3382,74 @@ function AdminDietPlanGeneratorContent() {
                                                 />
                                             </div>
 
-                                            {/* End / Review Date */}
+                                            {/* Revision Date (+15d quick link) */}
                                             <div>
-                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Plan End / Review Date</label>
+                                                <label className="flex items-center justify-between gap-1 text-xs font-semibold text-gray-700 mb-1">
+                                                    <span>Revision Date</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const nextRev = addDaysToIsoDate(formData.start_date, 15);
+                                                            setFormData((prev) => ({
+                                                                ...prev,
+                                                                revision_date: nextRev,
+                                                                next_review_date: nextRev,
+                                                            }));
+                                                        }}
+                                                        className="text-[10px] font-bold text-amber-700 hover:text-amber-900 hover:underline cursor-pointer"
+                                                        title="Set revision date to +15 days from Plan Start Date"
+                                                    >
+                                                        +15d
+                                                    </button>
+                                                </label>
+                                                <input
+                                                    type="date"
+                                                    value={formData.revision_date || ''}
+                                                    onChange={(e) =>
+                                                        setFormData({
+                                                            ...formData,
+                                                            revision_date: e.target.value,
+                                                            next_review_date: e.target.value,
+                                                        })
+                                                    }
+                                                    className="w-full text-xs px-3 py-2 rounded-xl border border-amber-200/90 bg-amber-50/20 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-300/40"
+                                                />
+                                            </div>
+
+                                            {/* Program End Date (+1M · +3M · +6M quick links) */}
+                                            <div>
+                                                <label className="flex items-center justify-between gap-1 text-xs font-semibold text-gray-700 mb-1">
+                                                    <span>Program End Date</span>
+                                                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-primary">
+                                                        {[
+                                                            { label: '+1M', months: 1 },
+                                                            { label: '+3M', months: 3 },
+                                                            { label: '+6M', months: 6 },
+                                                        ].map((opt) => (
+                                                            <button
+                                                                key={opt.label}
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    setFormData((prev) => ({
+                                                                        ...prev,
+                                                                        end_date: addMonthsToIsoDate(
+                                                                            prev.start_date,
+                                                                            opt.months
+                                                                        ),
+                                                                    }))
+                                                                }
+                                                                className="hover:underline cursor-pointer"
+                                                                title={`Set Program End Date to ${opt.label} from Start Date`}
+                                                            >
+                                                                {opt.label}
+                                                            </button>
+                                                        ))}
+                                                    </span>
+                                                </label>
                                                 <input
                                                     type="date"
                                                     value={formData.end_date}
-                                                    onChange={(e) => setFormData({ ...formData, end_date: e.target.value, next_review_date: e.target.value })}
+                                                    onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
                                                     className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
                                                 />
                                             </div>
@@ -3342,11 +3540,10 @@ function AdminDietPlanGeneratorContent() {
                                                     readOnly={fieldsLocked}
                                                     onChange={(e) => handleManualCaloriesChange(e.target.value)}
                                                     placeholder="e.g. 1500"
-                                                    className={`w-full text-xs font-bold text-emerald-800 px-2.5 py-2 rounded-xl border focus:outline-none ${
-                                                        fieldsLocked
-                                                            ? 'bg-gray-50 border-gray-200 cursor-not-allowed'
-                                                            : 'border-gray-200 focus:ring-2 focus:ring-primary/20'
-                                                    }`}
+                                                    className={`w-full text-xs font-bold text-emerald-800 px-2.5 py-2 rounded-xl border focus:outline-none ${fieldsLocked
+                                                        ? 'bg-gray-50 border-gray-200 cursor-not-allowed'
+                                                        : 'border-gray-200 focus:ring-2 focus:ring-primary/20'
+                                                        }`}
                                                 />
                                             </div>
                                             <div>
@@ -3360,11 +3557,10 @@ function AdminDietPlanGeneratorContent() {
                                                     readOnly={fieldsLocked}
                                                     onChange={(e) => setFormData({ ...formData, protein: e.target.value })}
                                                     placeholder="e.g. 85g"
-                                                    className={`w-full text-xs font-semibold px-2.5 py-2 rounded-xl border focus:outline-none ${
-                                                        fieldsLocked
-                                                            ? 'bg-gray-50 border-gray-200 text-gray-600 cursor-not-allowed'
-                                                            : 'border-gray-200 focus:ring-2 focus:ring-primary/20'
-                                                    }`}
+                                                    className={`w-full text-xs font-semibold px-2.5 py-2 rounded-xl border focus:outline-none ${fieldsLocked
+                                                        ? 'bg-gray-50 border-gray-200 text-gray-600 cursor-not-allowed'
+                                                        : 'border-gray-200 focus:ring-2 focus:ring-primary/20'
+                                                        }`}
                                                 />
                                             </div>
                                             <div>
@@ -3378,11 +3574,10 @@ function AdminDietPlanGeneratorContent() {
                                                     readOnly={fieldsLocked}
                                                     onChange={(e) => setFormData({ ...formData, carbs: e.target.value })}
                                                     placeholder="e.g. 145g"
-                                                    className={`w-full text-xs font-semibold px-2.5 py-2 rounded-xl border focus:outline-none ${
-                                                        fieldsLocked
-                                                            ? 'bg-gray-50 border-gray-200 text-gray-600 cursor-not-allowed'
-                                                            : 'border-gray-200 focus:ring-2 focus:ring-primary/20'
-                                                    }`}
+                                                    className={`w-full text-xs font-semibold px-2.5 py-2 rounded-xl border focus:outline-none ${fieldsLocked
+                                                        ? 'bg-gray-50 border-gray-200 text-gray-600 cursor-not-allowed'
+                                                        : 'border-gray-200 focus:ring-2 focus:ring-primary/20'
+                                                        }`}
                                                 />
                                             </div>
                                             <div>
@@ -3396,11 +3591,10 @@ function AdminDietPlanGeneratorContent() {
                                                     readOnly={fieldsLocked}
                                                     onChange={(e) => setFormData({ ...formData, fats: e.target.value })}
                                                     placeholder="e.g. 42g"
-                                                    className={`w-full text-xs font-semibold px-2.5 py-2 rounded-xl border focus:outline-none ${
-                                                        fieldsLocked
-                                                            ? 'bg-gray-50 border-gray-200 text-gray-600 cursor-not-allowed'
-                                                            : 'border-gray-200 focus:ring-2 focus:ring-primary/20'
-                                                    }`}
+                                                    className={`w-full text-xs font-semibold px-2.5 py-2 rounded-xl border focus:outline-none ${fieldsLocked
+                                                        ? 'bg-gray-50 border-gray-200 text-gray-600 cursor-not-allowed'
+                                                        : 'border-gray-200 focus:ring-2 focus:ring-primary/20'
+                                                        }`}
                                                 />
                                             </div>
                                             <div>
@@ -4744,7 +4938,7 @@ function AdminDietPlanGeneratorContent() {
                                                                         <div>
                                                                             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                                                                                 <h4 className="font-bold text-xs sm:text-sm text-heading">
-                                                                                    {recipe.name}
+                                                                                    {recipe.name || 'Untitled Dish'}
                                                                                 </h4>
                                                                                 <span className="text-[10px] font-semibold bg-gray-100 text-gray-700 px-2 py-0.2 rounded-md">
                                                                                     {recipe.category || 'General'}
@@ -4819,6 +5013,56 @@ function AdminDietPlanGeneratorContent() {
                                                                                     <span>Reset to Master</span>
                                                                                 </button>
                                                                             )}
+                                                                        </div>
+
+                                                                        {/* Dish Name & Category */}
+                                                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                                                            <div className="sm:col-span-2">
+                                                                                <label className="block text-[10px] font-bold text-gray-700 mb-0.5">
+                                                                                    Recipe / Dish Name
+                                                                                </label>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={recipe.name ?? ''}
+                                                                                    onChange={(e) =>
+                                                                                        handleSoftEditRecipe(
+                                                                                            recipe.id,
+                                                                                            'name',
+                                                                                            e.target.value
+                                                                                        )
+                                                                                    }
+                                                                                    placeholder="e.g., High-Protein Moong Dal Chilla"
+                                                                                    className="w-full text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                                                                />
+                                                                            </div>
+                                                                            <div>
+                                                                                <label className="block text-[10px] font-bold text-gray-700 mb-0.5">
+                                                                                    Category
+                                                                                </label>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    list="soft-edit-recipe-categories"
+                                                                                    value={recipe.category ?? ''}
+                                                                                    onChange={(e) =>
+                                                                                        handleSoftEditRecipe(
+                                                                                            recipe.id,
+                                                                                            'category',
+                                                                                            e.target.value
+                                                                                        )
+                                                                                    }
+                                                                                    placeholder="e.g., Breakfast"
+                                                                                    className="w-full text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                                                                />
+                                                                                <datalist id="soft-edit-recipe-categories">
+                                                                                    <option value="Breakfast" />
+                                                                                    <option value="Lunch" />
+                                                                                    <option value="Dinner" />
+                                                                                    <option value="Snack" />
+                                                                                    <option value="Beverage" />
+                                                                                    <option value="Soup & Salad" />
+                                                                                    <option value="General" />
+                                                                                </datalist>
+                                                                            </div>
                                                                         </div>
 
                                                                         {/* Portions, Timing, Macros */}
@@ -4912,11 +5156,20 @@ function AdminDietPlanGeneratorContent() {
                                                                                     Ingredients (one per line)
                                                                                 </label>
                                                                                 <textarea
-                                                                                    rows={4}
-                                                                                    value={Array.isArray(recipe.ingredients) ? recipe.ingredients.join('\n') : (recipe.ingredients || '')}
-                                                                                    onChange={(e) => handleSoftEditIngredientsText(recipe.id, e.target.value)}
-                                                                                    placeholder="100g Chicken breast&#10;1 tsp Olive oil"
-                                                                                    className="w-full text-xs p-2.5 rounded-lg border border-gray-200 bg-white font-mono leading-relaxed"
+                                                                                    rows={5}
+                                                                                    value={
+                                                                                        Array.isArray(recipe.ingredients)
+                                                                                            ? recipe.ingredients.join('\n')
+                                                                                            : String(recipe.ingredients ?? '')
+                                                                                    }
+                                                                                    onChange={(e) =>
+                                                                                        handleSoftEditIngredientsText(
+                                                                                            recipe.id,
+                                                                                            e.target.value
+                                                                                        )
+                                                                                    }
+                                                                                    placeholder={'100g Chicken breast\n1 tsp Olive oil'}
+                                                                                    className="w-full text-xs p-2.5 rounded-lg border border-gray-200 bg-white font-mono leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                                                                                 />
                                                                             </div>
 
@@ -4925,11 +5178,20 @@ function AdminDietPlanGeneratorContent() {
                                                                                     Instructions (one per line)
                                                                                 </label>
                                                                                 <textarea
-                                                                                    rows={4}
-                                                                                    value={Array.isArray(recipe.instructions) ? recipe.instructions.join('\n') : (recipe.instructions || '')}
-                                                                                    onChange={(e) => handleSoftEditInstructionsText(recipe.id, e.target.value)}
-                                                                                    placeholder="Sauté spices in olive oil.&#10;Add vegetables and simmer covered."
-                                                                                    className="w-full text-xs p-2.5 rounded-lg border border-gray-200 bg-white font-mono leading-relaxed"
+                                                                                    rows={5}
+                                                                                    value={
+                                                                                        Array.isArray(recipe.instructions)
+                                                                                            ? recipe.instructions.join('\n')
+                                                                                            : String(recipe.instructions ?? '')
+                                                                                    }
+                                                                                    onChange={(e) =>
+                                                                                        handleSoftEditInstructionsText(
+                                                                                            recipe.id,
+                                                                                            e.target.value
+                                                                                        )
+                                                                                    }
+                                                                                    placeholder={'Sauté spices in olive oil.\nAdd vegetables and simmer covered.'}
+                                                                                    className="w-full text-xs p-2.5 rounded-lg border border-gray-200 bg-white font-mono leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                                                                                 />
                                                                             </div>
                                                                         </div>
@@ -4944,15 +5206,15 @@ function AdminDietPlanGeneratorContent() {
                                                                                 value={recipe.dietitian_tip || ''}
                                                                                 onChange={(e) => handleSoftEditRecipe(recipe.id, 'dietitian_tip', e.target.value)}
                                                                                 placeholder="e.g. Rich in prebiotic fibers. Consume within 20 mins of cooking."
-                                                                                className="w-full text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white"
+                                                                                className="w-full text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                                                                             />
                                                                         </div>
 
                                                                         <div className="flex justify-end pt-1">
                                                                             <button
                                                                                 type="button"
-                                                                                onClick={() => setEditingRecipeId(null)}
-                                                                                className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-lg shadow-2xs cursor-pointer"
+                                                                                onClick={() => handleFinishSoftEditRecipe(recipe.id)}
+                                                                                className="px-3.5 py-1.5 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-lg shadow-2xs transition cursor-pointer"
                                                                             >
                                                                                 Done
                                                                             </button>
@@ -5219,9 +5481,8 @@ function AdminDietPlanGeneratorContent() {
                             type="button"
                             disabled={savingToClientDb}
                             onClick={() => handleSavePlanToDb('auto')}
-                            className={`flex-1 min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3 bg-emerald-50 active:bg-emerald-100 text-primary border border-emerald-200 font-bold text-xs whitespace-nowrap transition active:scale-[0.98] cursor-pointer disabled:opacity-50 ${
-                                loadedPlanRecord ? 'rounded-l-xl border-r-0' : 'rounded-xl'
-                            }`}
+                            className={`flex-1 min-h-11 inline-flex items-center justify-center gap-1.5 px-3 bg-emerald-50 active:bg-emerald-100 text-primary border border-emerald-200 font-bold text-xs whitespace-nowrap transition active:scale-[0.98] cursor-pointer disabled:opacity-50 ${loadedPlanRecord ? 'rounded-l-xl border-r-0' : 'rounded-xl'
+                                }`}
                         >
                             {savingToClientDb ? (
                                 <RefreshCw size={14} className="animate-spin shrink-0" />
@@ -5240,7 +5501,7 @@ function AdminDietPlanGeneratorContent() {
                                 type="button"
                                 disabled={savingToClientDb}
                                 onClick={() => setShowSaveMenu((o) => !o)}
-                                className="min-h-[44px] px-2.5 bg-emerald-50 active:bg-emerald-100 text-primary border border-emerald-200 rounded-r-xl flex items-center justify-center transition cursor-pointer disabled:opacity-50"
+                                className="min-h-11 px-2.5 bg-emerald-50 active:bg-emerald-100 text-primary border border-emerald-200 rounded-r-xl flex items-center justify-center transition cursor-pointer disabled:opacity-50"
                                 title="More save options"
                                 aria-label="More save options"
                             >
@@ -5278,7 +5539,7 @@ function AdminDietPlanGeneratorContent() {
                         type="button"
                         onClick={handleDownloadPdf}
                         disabled={generating}
-                        className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3 bg-primary hover:bg-primary-hover text-white font-bold text-xs rounded-xl shadow-xs whitespace-nowrap transition active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                        className="flex-1 min-h-11 inline-flex items-center justify-center gap-1.5 px-3 bg-primary hover:bg-primary-hover text-white font-bold text-xs rounded-xl shadow-xs whitespace-nowrap transition active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                     >
                         {generating ? (
                             <RefreshCw size={14} className="animate-spin shrink-0" />
@@ -5669,7 +5930,7 @@ function AdminDietPlanGeneratorContent() {
                                     <button
                                         type="button"
                                         onClick={() => setIsNewRecipeModalOpen(false)}
-                                        className="w-full sm:w-auto min-h-[40px] px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition cursor-pointer"
+                                        className="w-full sm:w-auto min-h-10 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition cursor-pointer"
                                     >
                                         Cancel
                                     </button>

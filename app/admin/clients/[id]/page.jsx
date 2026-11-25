@@ -15,6 +15,8 @@ import {
     Trash2,
     ArrowRight,
     Calendar,
+    Clock,
+    AlertCircle,
     RefreshCw,
     X,
     MessageCircle,
@@ -53,15 +55,79 @@ const CURRENCY_SYMBOLS = {
     EUR: '€',
 };
 
+const addMonthsToIsoDate = (baseIso, months) => {
+    const fallback = new Date().toISOString().split('T')[0];
+    const [y, m, d] = String(baseIso || fallback)
+        .split('-')
+        .map(Number);
+    if (!y || !m || !d) return '';
+    const dt = new Date(y, m - 1, d);
+    dt.setMonth(dt.getMonth() + months);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(
+        dt.getDate()
+    ).padStart(2, '0')}`;
+};
+
 const formatDateShort = (iso) => {
     if (!iso) return '—';
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return String(iso);
+    const str = String(iso).trim();
+    const ymd = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const d = ymd
+        ? new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]))
+        : new Date(str);
+    if (Number.isNaN(d.getTime())) return str;
     return d.toLocaleDateString('en-IN', {
         day: '2-digit',
         month: 'short',
         year: 'numeric',
     });
+};
+
+const getRevisionAlertMeta = (isoDate, clientStatus = 'active') => {
+    if (!isoDate) return null;
+    const m = String(isoDate).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return null;
+    const target = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diffDays = Math.round((target.getTime() - today.getTime()) / 86400000);
+    const formatted = formatDateShort(isoDate);
+
+    if ((clientStatus || 'active') !== 'active') {
+        return {
+            label: `Revision: ${formatted}`,
+            cls: 'bg-gray-100 text-gray-600 border-gray-200',
+            urgent: false,
+        };
+    }
+
+    if (diffDays < 0) {
+        const overdueDays = Math.abs(diffDays);
+        return {
+            label: `Revision Overdue (${overdueDays}d) • ${formatted}`,
+            cls: 'bg-rose-50 text-rose-700 border-rose-200',
+            urgent: true,
+        };
+    }
+    if (diffDays === 0) {
+        return {
+            label: `Revision Due Today (${formatted})`,
+            cls: 'bg-amber-100 text-amber-900 border-amber-300',
+            urgent: true,
+        };
+    }
+    if (diffDays <= 2) {
+        return {
+            label: `Revision in ${diffDays}d (${formatted})`,
+            cls: 'bg-amber-50 text-amber-800 border-amber-200',
+            urgent: true,
+        };
+    }
+    return {
+        label: `Next Revision: ${formatted}`,
+        cls: 'bg-emerald-50/70 text-emerald-800 border-emerald-200',
+        urgent: false,
+    };
 };
 
 const getInitials = (name) =>
@@ -95,6 +161,8 @@ export default function AdminClientDetailPage() {
         height: '',
         initial_goals: '',
         status: 'active',
+        plan_start_date: '',
+        plan_end_date: '',
         notes: '',
     });
 
@@ -138,6 +206,15 @@ export default function AdminClientDetailPage() {
 
     const handleOpenEdit = () => {
         if (!client) return;
+        const fallbackStartDate =
+            client.plan_start_date ||
+            dietPlans[dietPlans.length - 1]?.start_date ||
+            '';
+        const fallbackEndDate =
+            client.plan_end_date ||
+            dietPlans[0]?.end_date ||
+            dietPlans[0]?.plan_data?.end_date ||
+            '';
         setEditForm({
             full_name: client.full_name || '',
             phone: client.phone || '',
@@ -145,6 +222,8 @@ export default function AdminClientDetailPage() {
             height: client.height || '',
             initial_goals: client.initial_goals || '',
             status: client.status || 'active',
+            plan_start_date: fallbackStartDate,
+            plan_end_date: fallbackEndDate,
             notes: client.notes || '',
         });
         setIsEditOpen(true);
@@ -162,6 +241,8 @@ export default function AdminClientDetailPage() {
                 height: editForm.height.trim() || null,
                 initial_goals: editForm.initial_goals.trim() || null,
                 status: editForm.status || 'active',
+                plan_start_date: editForm.plan_start_date || null,
+                plan_end_date: editForm.plan_end_date || null,
                 notes: editForm.notes.trim() || null,
                 updated_at: new Date().toISOString(),
             };
@@ -300,6 +381,21 @@ export default function AdminClientDetailPage() {
 
     const statusUi = STATUS_STYLES[client.status] || STATUS_STYLES.active;
     const cleanPhoneDigits = String(client.phone || '').replace(/\D/g, '');
+    const activeRevisionDate =
+        client.next_revision_date ||
+        dietPlans[0]?.revision_date ||
+        dietPlans[0]?.plan_data?.revision_date ||
+        '';
+    const activeProgramStartDate =
+        client.plan_start_date ||
+        dietPlans[dietPlans.length - 1]?.start_date ||
+        '';
+    const activeProgramEndDate =
+        client.plan_end_date ||
+        dietPlans[0]?.end_date ||
+        dietPlans[0]?.plan_data?.end_date ||
+        '';
+    const revisionAlert = getRevisionAlertMeta(activeRevisionDate, client.status);
 
     return (
         <div className="max-w-6xl mx-auto px-0.5 sm:px-2 py-1 sm:py-4 space-y-4 sm:space-y-6">
@@ -362,6 +458,35 @@ export default function AdminClientDetailPage() {
                                 )}
                             </div>
 
+                            {(revisionAlert || activeProgramStartDate || activeProgramEndDate) && (
+                                <div className="flex flex-wrap items-center gap-2 mt-2">
+                                    {revisionAlert && (
+                                        <span
+                                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-bold border ${revisionAlert.cls}`}
+                                        >
+                                            {revisionAlert.urgent ? (
+                                                <AlertCircle size={11} className="shrink-0" />
+                                            ) : (
+                                                <Clock size={11} className="shrink-0" />
+                                            )}
+                                            <span>{revisionAlert.label}</span>
+                                        </span>
+                                    )}
+                                    {(activeProgramStartDate || activeProgramEndDate) && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-semibold bg-gray-100 text-gray-700 border border-gray-200">
+                                            <Calendar size={11} className="shrink-0 text-gray-500" />
+                                            <span>
+                                                {activeProgramStartDate && activeProgramEndDate
+                                                    ? `Plan: ${formatDateShort(activeProgramStartDate)} → ${formatDateShort(activeProgramEndDate)}`
+                                                    : activeProgramEndDate
+                                                        ? `Plan Ends: ${formatDateShort(activeProgramEndDate)}`
+                                                        : `Plan Starts: ${formatDateShort(activeProgramStartDate)}`}
+                                            </span>
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+
                             {client.notes && (
                                 <p className="mt-2.5 text-xs text-gray-600 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 max-w-2xl">
                                     {client.notes}
@@ -417,11 +542,10 @@ export default function AdminClientDetailPage() {
                     <button
                         type="button"
                         onClick={() => setActiveTab('plans')}
-                        className={`pb-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 border-b-2 whitespace-nowrap transition cursor-pointer ${
-                            activeTab === 'plans'
-                                ? 'border-primary text-primary'
-                                : 'border-transparent text-gray-500 hover:text-heading'
-                        }`}
+                        className={`pb-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 border-b-2 whitespace-nowrap transition cursor-pointer ${activeTab === 'plans'
+                            ? 'border-primary text-primary'
+                            : 'border-transparent text-gray-500 hover:text-heading'
+                            }`}
                     >
                         <FileText size={15} className="shrink-0" />
                         <span className="sm:hidden">Diet Plans</span>
@@ -434,11 +558,10 @@ export default function AdminClientDetailPage() {
                     <button
                         type="button"
                         onClick={() => setActiveTab('invoices')}
-                        className={`pb-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 border-b-2 whitespace-nowrap transition cursor-pointer ${
-                            activeTab === 'invoices'
-                                ? 'border-primary text-primary'
-                                : 'border-transparent text-gray-500 hover:text-heading'
-                        }`}
+                        className={`pb-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 border-b-2 whitespace-nowrap transition cursor-pointer ${activeTab === 'invoices'
+                            ? 'border-primary text-primary'
+                            : 'border-transparent text-gray-500 hover:text-heading'
+                            }`}
                     >
                         <Receipt size={15} className="shrink-0" />
                         <span>Invoices</span>
@@ -509,10 +632,21 @@ export default function AdminClientDetailPage() {
                                             {plan.goal && <span>• {plan.goal}</span>}
                                             {mealCount > 0 && <span>• {mealCount} Meals</span>}
                                             {recipeCount > 0 && <span>• {recipeCount} Recipes</span>}
-                                            {(plan.start_date || plan.end_date) && (
+                                            {plan.start_date && (
                                                 <span className="inline-flex items-center gap-1">
                                                     • <Calendar size={11} />
-                                                    {plan.start_date || '—'} → {plan.end_date || '—'}
+                                                    Start: {formatDateShort(plan.start_date)}
+                                                </span>
+                                            )}
+                                            {(plan.revision_date || plan.plan_data?.revision_date) && (
+                                                <span className="inline-flex items-center gap-1 font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.2 rounded-md">
+                                                    <Clock size={10} />
+                                                    Rev: {formatDateShort(plan.revision_date || plan.plan_data?.revision_date)}
+                                                </span>
+                                            )}
+                                            {(plan.end_date || plan.plan_data?.end_date) && (
+                                                <span className="inline-flex items-center gap-1 text-gray-600">
+                                                    • Ends: {formatDateShort(plan.end_date || plan.plan_data?.end_date)}
                                                 </span>
                                             )}
                                         </div>
@@ -525,7 +659,7 @@ export default function AdminClientDetailPage() {
                                     <div className="flex items-center gap-2 w-full sm:w-auto pt-2.5 sm:pt-0 border-t sm:border-t-0 border-gray-100 shrink-0">
                                         <Link
                                             href={`/admin/diet-plan-generator?clientId=${client.id}&planId=${plan.id}`}
-                                            className="flex-1 sm:flex-initial min-h-[40px] inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold shadow-2xs whitespace-nowrap transition active:scale-[0.98]"
+                                            className="flex-1 sm:flex-initial min-h-10 inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold shadow-2xs whitespace-nowrap transition active:scale-[0.98]"
                                         >
                                             <span>Open &amp; Revise</span>
                                             <ArrowRight size={14} />
@@ -534,7 +668,7 @@ export default function AdminClientDetailPage() {
                                         <button
                                             type="button"
                                             onClick={() => handleDeleteDietPlan(plan)}
-                                            className="min-h-[40px] w-[40px] inline-flex items-center justify-center rounded-xl border border-gray-200 text-gray-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition cursor-pointer shrink-0"
+                                            className="min-h-10 w-10 inline-flex items-center justify-center rounded-xl border border-gray-200 text-gray-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition cursor-pointer shrink-0"
                                             title="Delete revision"
                                             aria-label="Delete revision"
                                         >
@@ -637,7 +771,7 @@ export default function AdminClientDetailPage() {
                                     <div className="flex items-center gap-2 w-full sm:w-auto pt-2.5 sm:pt-0 border-t sm:border-t-0 border-gray-100 shrink-0">
                                         <Link
                                             href={`/admin/invoice-generator?clientId=${client.id}&invoiceId=${inv.id}`}
-                                            className="flex-1 sm:flex-initial min-h-[40px] inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold shadow-2xs whitespace-nowrap transition active:scale-[0.98]"
+                                            className="flex-1 sm:flex-initial min-h-10 inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold shadow-2xs whitespace-nowrap transition active:scale-[0.98]"
                                         >
                                             <span>Open &amp; Revise</span>
                                             <ArrowRight size={14} />
@@ -646,7 +780,7 @@ export default function AdminClientDetailPage() {
                                         <button
                                             type="button"
                                             onClick={() => handleDeleteInvoice(inv)}
-                                            className="min-h-[40px] w-[40px] inline-flex items-center justify-center rounded-xl border border-gray-200 text-gray-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition cursor-pointer shrink-0"
+                                            className="min-h-10 w-10 inline-flex items-center justify-center rounded-xl border border-gray-200 text-gray-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition cursor-pointer shrink-0"
                                             title="Delete invoice"
                                             aria-label="Delete invoice"
                                         >
@@ -769,6 +903,65 @@ export default function AdminClientDetailPage() {
                                     />
                                 </div>
 
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                                        Plan Start Date
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={editForm.plan_start_date}
+                                        onChange={(e) =>
+                                            setEditForm((prev) => ({
+                                                ...prev,
+                                                plan_start_date: e.target.value,
+                                            }))
+                                        }
+                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="flex items-center justify-between gap-1 text-xs font-bold text-gray-700 mb-1">
+                                        <span>Plan End Date</span>
+                                        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-primary">
+                                            {[
+                                                { label: '+1M', months: 1 },
+                                                { label: '+3M', months: 3 },
+                                                { label: '+6M', months: 6 },
+                                            ].map((opt) => (
+                                                <button
+                                                    key={opt.label}
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setEditForm((prev) => ({
+                                                            ...prev,
+                                                            plan_end_date: addMonthsToIsoDate(
+                                                                prev.plan_start_date,
+                                                                opt.months
+                                                            ),
+                                                        }))
+                                                    }
+                                                    className="hover:underline cursor-pointer"
+                                                    title={`Set Plan End Date to ${opt.label} from Plan Start Date`}
+                                                >
+                                                    {opt.label}
+                                                </button>
+                                            ))}
+                                        </span>
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={editForm.plan_end_date}
+                                        onChange={(e) =>
+                                            setEditForm((prev) => ({
+                                                ...prev,
+                                                plan_end_date: e.target.value,
+                                            }))
+                                        }
+                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    />
+                                </div>
+
                                 <div className="sm:col-span-2">
                                     <label className="block text-xs font-bold text-gray-700 mb-1">
                                         Primary Goal
@@ -779,7 +972,7 @@ export default function AdminClientDetailPage() {
                                         onChange={(e) =>
                                             setEditForm((prev) => ({
                                                 ...prev,
-                                            initial_goals: e.target.value,
+                                                initial_goals: e.target.value,
                                             }))
                                         }
                                         className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -808,7 +1001,7 @@ export default function AdminClientDetailPage() {
                                 <button
                                     type="button"
                                     onClick={() => setIsEditOpen(false)}
-                                    className="w-full sm:w-auto min-h-[40px] px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
+                                    className="w-full sm:w-auto min-h-10 px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
                                 >
                                     Cancel
                                 </button>

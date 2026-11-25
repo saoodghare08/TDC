@@ -1334,11 +1334,64 @@ export default function DietPlanPdfDocument({ plan: rawPlan, theme }) {
                             <Text style={styles.planTitleText}>{plan?.plan_title || 'Diet Regimen Protocol'}</Text>
                             <Text style={styles.planGoalText}>Target Goal: {plan?.goal || 'General Health & Wellness'}</Text>
                         </View>
-                        <View style={{ alignItems: 'flex-end' }}>
-                            <Text style={styles.infoLabel}>Validity Period</Text>
-                            <Text style={styles.infoValue}>
-                                {plan?.start_date && plan?.end_date ? `${plan.start_date} to ${plan.end_date}` : (plan?.start_date || '-')}
-                            </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            {(() => {
+                                const hasStart = Boolean(plan?.start_date && plan.start_date !== '-');
+                                const hasEnd = Boolean(plan?.end_date && plan.end_date !== '-');
+                                const hasRev = Boolean(plan?.revision_date && plan.revision_date !== '-');
+
+                                return (
+                                    <>
+                                        {(hasStart || hasEnd) && (
+                                            <View style={{ alignItems: 'flex-end' }}>
+                                                <Text style={styles.infoLabel}>
+                                                    {hasStart && hasEnd
+                                                        ? 'Program Validity'
+                                                        : hasEnd
+                                                            ? 'Program End Date'
+                                                            : 'Start Date'}
+                                                </Text>
+                                                <Text style={styles.infoValue}>
+                                                    {hasStart && hasEnd
+                                                        ? `${plan.start_date} to ${plan.end_date}`
+                                                        : hasEnd
+                                                            ? plan.end_date
+                                                            : plan.start_date}
+                                                </Text>
+                                            </View>
+                                        )}
+
+                                        {(hasStart || hasEnd) && hasRev && (
+                                            <View
+                                                style={{
+                                                    width: 1,
+                                                    height: 18,
+                                                    backgroundColor: '#cbd5e1',
+                                                    marginHorizontal: 8,
+                                                }}
+                                            />
+                                        )}
+
+                                        {hasRev && (
+                                            <View style={{ alignItems: 'flex-end' }}>
+                                                <Text style={[styles.infoLabel, { color: '#b45309' }]}>
+                                                    Next Revision
+                                                </Text>
+                                                <Text style={[styles.infoValue, { color: '#92400e' }]}>
+                                                    {plan.revision_date}
+                                                </Text>
+                                            </View>
+                                        )}
+
+                                        {!hasStart && !hasEnd && !hasRev && (
+                                            <View style={{ alignItems: 'flex-end' }}>
+                                                <Text style={styles.infoLabel}>Program Validity</Text>
+                                                <Text style={styles.infoValue}>-</Text>
+                                            </View>
+                                        )}
+                                    </>
+                                );
+                            })()}
                         </View>
                     </View>
 

@@ -69,6 +69,7 @@ export const cleanPlanData = (plan) => {
         goal: sanitizeVal(plan.goal, 'General Health & Wellness'),
         start_date: sanitizeVal(plan.start_date, '-'),
         end_date: sanitizeVal(plan.end_date, '-'),
+        revision_date: sanitizeVal(plan.revision_date || plan.next_review_date, ''),
         client_name: sanitizeVal(plan.client_name, '-'),
         client_age: sanitizeVal(plan.client_age, '-'),
         start_weight: sanitizeVal(plan.start_weight, '-'),

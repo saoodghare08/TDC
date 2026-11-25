@@ -14,6 +14,9 @@ import {
     Phone,
     ChevronRight,
     RefreshCw,
+    Clock,
+    Calendar,
+    AlertCircle,
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 
@@ -48,18 +51,91 @@ const EMPTY_CLIENT_FORM = {
     height: '',
     initial_goals: '',
     status: 'active',
+    plan_start_date: '',
+    plan_end_date: '',
     notes: '',
+};
+
+const addMonthsToIsoDate = (baseIso, months) => {
+    const fallback = new Date().toISOString().split('T')[0];
+    const [y, m, d] = String(baseIso || fallback)
+        .split('-')
+        .map(Number);
+    if (!y || !m || !d) return '';
+    const dt = new Date(y, m - 1, d);
+    dt.setMonth(dt.getMonth() + months);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(
+        dt.getDate()
+    ).padStart(2, '0')}`;
 };
 
 const formatDateShort = (iso) => {
     if (!iso) return '—';
-    const d = new Date(iso);
+    const str = String(iso).trim();
+    const ymd = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const d = ymd
+        ? new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]))
+        : new Date(str);
     if (Number.isNaN(d.getTime())) return '—';
     return d.toLocaleDateString('en-IN', {
         day: '2-digit',
         month: 'short',
         year: 'numeric',
     });
+};
+
+const getRevisionBadgeMeta = (isoDate, clientStatus = 'active') => {
+    if (!isoDate) return null;
+    const m = String(isoDate).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return null;
+    const target = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diffDays = Math.round((target.getTime() - today.getTime()) / 86400000);
+    const shortDate = target.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+    });
+
+    if ((clientStatus || 'active') !== 'active') {
+        return {
+            label: `Rev: ${shortDate}`,
+            cls: 'bg-gray-100 text-gray-600 border-gray-200',
+            isDueAlert: false,
+            diffDays,
+        };
+    }
+
+    if (diffDays < 0) {
+        return {
+            label: `Overdue ${Math.abs(diffDays)}d • ${shortDate}`,
+            cls: 'bg-rose-50 text-rose-700 border-rose-200',
+            isDueAlert: true,
+            diffDays,
+        };
+    }
+    if (diffDays === 0) {
+        return {
+            label: `Due Today • ${shortDate}`,
+            cls: 'bg-amber-100 text-amber-900 border-amber-300',
+            isDueAlert: true,
+            diffDays,
+        };
+    }
+    if (diffDays <= 2) {
+        return {
+            label: `Due in ${diffDays}d • ${shortDate}`,
+            cls: 'bg-amber-50 text-amber-800 border-amber-200',
+            isDueAlert: true,
+            diffDays,
+        };
+    }
+    return {
+        label: `Rev: ${shortDate}`,
+        cls: 'bg-emerald-50/70 text-emerald-800 border-emerald-200/80',
+        isDueAlert: false,
+        diffDays,
+    };
 };
 
 const getInitials = (name) =>
@@ -108,10 +184,16 @@ export default function AdminClientsListingPage() {
 
     const filteredClients = useMemo(() => {
         const q = searchQuery.trim().toLowerCase();
-        return clients.filter((c) => {
-            const matchesStatus =
-                statusFilter === 'all' || (c.status || 'active') === statusFilter;
-            if (!matchesStatus) return false;
+        const list = clients.filter((c) => {
+            if (statusFilter === 'revision_due') {
+                const revMeta = getRevisionBadgeMeta(c.next_revision_date, c.status);
+                if (!revMeta?.isDueAlert) return false;
+            } else {
+                const matchesStatus =
+                    statusFilter === 'all' || (c.status || 'active') === statusFilter;
+                if (!matchesStatus) return false;
+            }
+
             if (!q) return true;
             return (
                 c.full_name?.toLowerCase().includes(q) ||
@@ -119,24 +201,35 @@ export default function AdminClientsListingPage() {
                 c.initial_goals?.toLowerCase().includes(q)
             );
         });
+
+        if (statusFilter === 'revision_due') {
+            return [...list].sort((a, b) => {
+                const da = getRevisionBadgeMeta(a.next_revision_date, a.status)?.diffDays ?? 9999;
+                const db = getRevisionBadgeMeta(b.next_revision_date, b.status)?.diffDays ?? 9999;
+                return da - db;
+            });
+        }
+
+        return list;
     }, [clients, searchQuery, statusFilter]);
 
     const stats = useMemo(() => {
         let totalPlans = 0;
-        let totalInvoices = 0;
         let activeCount = 0;
+        let revisionDueCount = 0;
 
         for (const c of clients) {
             if ((c.status || 'active') === 'active') activeCount += 1;
+            const revMeta = getRevisionBadgeMeta(c.next_revision_date, c.status);
+            if (revMeta?.isDueAlert) revisionDueCount += 1;
             totalPlans += Number(c.client_diet_plans?.[0]?.count || 0);
-            totalInvoices += Number(c.client_invoices?.[0]?.count || 0);
         }
 
         return {
             totalClients: clients.length,
             activeCount,
+            revisionDueCount,
             totalPlans,
-            totalInvoices,
         };
     }, [clients]);
 
@@ -154,6 +247,8 @@ export default function AdminClientsListingPage() {
                 height: clientForm.height.trim() || null,
                 initial_goals: clientForm.initial_goals.trim() || null,
                 status: clientForm.status || 'active',
+                plan_start_date: clientForm.plan_start_date || null,
+                plan_end_date: clientForm.plan_end_date || null,
                 notes: clientForm.notes.trim() || null,
                 updated_at: new Date().toISOString(),
             };
@@ -199,7 +294,7 @@ export default function AdminClientsListingPage() {
                             setClientForm(EMPTY_CLIENT_FORM);
                             setIsModalOpen(true);
                         }}
-                        className="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 min-h-[40px] rounded-xl bg-primary hover:bg-primary-hover text-white text-xs sm:text-sm font-bold shadow-xs whitespace-nowrap transition active:scale-[0.98] cursor-pointer shrink-0"
+                        className="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 min-h-10 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs sm:text-sm font-bold shadow-xs whitespace-nowrap transition active:scale-[0.98] cursor-pointer shrink-0"
                     >
                         <Plus size={16} />
                         <span>Add Client</span>
@@ -220,13 +315,36 @@ export default function AdminClientsListingPage() {
                     <p className="text-[11px] sm:text-xs font-medium text-gray-500">Active Clients</p>
                     <p className="text-xl sm:text-2xl font-bold text-emerald-700 mt-0.5 sm:mt-1">{stats.activeCount}</p>
                 </div>
+                <button
+                    type="button"
+                    onClick={() =>
+                        setStatusFilter((prev) =>
+                            prev === 'revision_due' ? 'all' : 'revision_due'
+                        )
+                    }
+                    className={`text-left rounded-2xl border p-3 sm:p-4 shadow-2xs transition cursor-pointer ${statusFilter === 'revision_due'
+                        ? 'bg-amber-50 border-amber-300 ring-2 ring-amber-200/60'
+                        : stats.revisionDueCount > 0
+                            ? 'bg-amber-50/40 border-amber-200 hover:bg-amber-50/80'
+                            : 'bg-white border-gray-200/80 hover:bg-gray-50/60'
+                        }`}
+                >
+                    <p className="text-[11px] sm:text-xs font-medium text-gray-600 flex items-center justify-between gap-1">
+                        <span>Revision Due</span>
+                        {stats.revisionDueCount > 0 && (
+                            <AlertCircle size={13} className="text-amber-600 shrink-0" />
+                        )}
+                    </p>
+                    <p
+                        className={`text-xl sm:text-2xl font-bold mt-0.5 sm:mt-1 ${stats.revisionDueCount > 0 ? 'text-amber-800' : 'text-heading'
+                            }`}
+                    >
+                        {stats.revisionDueCount}
+                    </p>
+                </button>
                 <div className="bg-white rounded-2xl border border-gray-200/80 p-3 sm:p-4 shadow-2xs">
                     <p className="text-[11px] sm:text-xs font-medium text-gray-500">Saved Diet Plans</p>
                     <p className="text-xl sm:text-2xl font-bold text-heading mt-0.5 sm:mt-1">{stats.totalPlans}</p>
-                </div>
-                <div className="bg-white rounded-2xl border border-gray-200/80 p-3 sm:p-4 shadow-2xs">
-                    <p className="text-[11px] sm:text-xs font-medium text-gray-500">Saved Invoices</p>
-                    <p className="text-xl sm:text-2xl font-bold text-heading mt-0.5 sm:mt-1">{stats.totalInvoices}</p>
                 </div>
             </div>
 
@@ -255,9 +373,16 @@ export default function AdminClientsListingPage() {
                     )}
                 </div>
 
-                <div className="flex items-center gap-1.5 overflow-x-auto">
+                <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
                     {[
                         { key: 'all', label: 'All' },
+                        {
+                            key: 'revision_due',
+                            label:
+                                stats.revisionDueCount > 0
+                                    ? `Revision Due (${stats.revisionDueCount})`
+                                    : 'Revision Due',
+                        },
                         { key: 'active', label: 'Active' },
                         { key: 'paused', label: 'Paused' },
                         { key: 'completed', label: 'Completed' },
@@ -266,13 +391,17 @@ export default function AdminClientsListingPage() {
                             key={tab.key}
                             type="button"
                             onClick={() => setStatusFilter(tab.key)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
-                                statusFilter === tab.key
-                                    ? 'bg-primary text-white shadow-2xs'
+                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer whitespace-nowrap inline-flex items-center gap-1 ${statusFilter === tab.key
+                                ? tab.key === 'revision_due'
+                                    ? 'bg-amber-600 text-white shadow-2xs'
+                                    : 'bg-primary text-white shadow-2xs'
+                                : tab.key === 'revision_due' && stats.revisionDueCount > 0
+                                    ? 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
                                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200/70'
-                            }`}
+                                }`}
                         >
-                            {tab.label}
+                            {tab.key === 'revision_due' && <Clock size={12} />}
+                            <span>{tab.label}</span>
                         </button>
                     ))}
                 </div>
@@ -320,8 +449,8 @@ export default function AdminClientsListingPage() {
                                     <th className="py-3.5 px-5">Client</th>
                                     <th className="py-3.5 px-4">Goal</th>
                                     <th className="py-3.5 px-4">Status</th>
+                                    <th className="py-3.5 px-4">Timeline</th>
                                     <th className="py-3.5 px-4">Records</th>
-                                    <th className="py-3.5 px-4">Last Updated</th>
                                     <th className="py-3.5 px-5 text-right">Actions</th>
                                 </tr>
                             </thead>
@@ -335,6 +464,10 @@ export default function AdminClientsListingPage() {
                                     );
                                     const st =
                                         STATUS_STYLES[client.status] || STATUS_STYLES.active;
+                                    const revMeta = getRevisionBadgeMeta(
+                                        client.next_revision_date,
+                                        client.status
+                                    );
 
                                     return (
                                         <tr
@@ -366,7 +499,7 @@ export default function AdminClientsListingPage() {
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="py-3.5 px-4 text-xs text-gray-600 max-w-[200px] truncate">
+                                            <td className="py-3.5 px-4 text-xs text-gray-600 max-w-[180px] truncate">
                                                 {client.initial_goals || '—'}
                                             </td>
                                             <td className="py-3.5 px-4">
@@ -380,8 +513,34 @@ export default function AdminClientsListingPage() {
                                                 </span>
                                             </td>
                                             <td className="py-3.5 px-4">
+                                                <div className="flex flex-col items-start gap-1 text-[11px]">
+                                                    {revMeta ? (
+                                                        <span
+                                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold border whitespace-nowrap ${revMeta.cls}`}
+                                                        >
+                                                            {revMeta.isDueAlert ? (
+                                                                <AlertCircle size={10} />
+                                                            ) : (
+                                                                <Clock size={10} />
+                                                            )}
+                                                            <span>{revMeta.label}</span>
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-gray-400">No revision set</span>
+                                                    )}
+                                                    {client.plan_end_date && (
+                                                        <span className="inline-flex items-center gap-1 text-gray-500 whitespace-nowrap">
+                                                            <Calendar size={10} />
+                                                            <span>
+                                                                Ends: {formatDateShort(client.plan_end_date)}
+                                                            </span>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="py-3.5 px-4">
                                                 <div className="flex items-center gap-2 text-xs">
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 font-semibold">
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 font-semibold whitespace-nowrap">
                                                         <FileText size={11} />
                                                         {planCount} {planCount === 1 ? 'Plan' : 'Plans'}
                                                     </span>
@@ -390,11 +549,6 @@ export default function AdminClientsListingPage() {
                                                         {invoiceCount}
                                                     </span>
                                                 </div>
-                                            </td>
-                                            <td className="py-3.5 px-4 text-xs text-gray-500">
-                                                {formatDateShort(
-                                                    client.updated_at || client.created_at
-                                                )}
                                             </td>
                                             <td
                                                 className="py-3.5 px-5 text-right"
@@ -431,9 +585,13 @@ export default function AdminClientsListingPage() {
                             const planCount = Number(client.client_diet_plans?.[0]?.count || 0);
                             const invoiceCount = Number(client.client_invoices?.[0]?.count || 0);
                             const st = STATUS_STYLES[client.status] || STATUS_STYLES.active;
+                            const revMeta = getRevisionBadgeMeta(
+                                client.next_revision_date,
+                                client.status
+                            );
 
                             return (
-                                <div key={client.id} className="p-4 space-y-3">
+                                <div key={client.id} className="p-4 space-y-2.5">
                                     <div
                                         onClick={() => router.push(`/admin/clients/${client.id}`)}
                                         className="flex items-start justify-between gap-3 cursor-pointer"
@@ -458,6 +616,29 @@ export default function AdminClientsListingPage() {
                                         </span>
                                     </div>
 
+                                    {(revMeta || client.plan_end_date) && (
+                                        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                                            {revMeta && (
+                                                <span
+                                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold border ${revMeta.cls}`}
+                                                >
+                                                    {revMeta.isDueAlert ? (
+                                                        <AlertCircle size={10} />
+                                                    ) : (
+                                                        <Clock size={10} />
+                                                    )}
+                                                    <span>{revMeta.label}</span>
+                                                </span>
+                                            )}
+                                            {client.plan_end_date && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-50 text-gray-600 border border-gray-200">
+                                                    <Calendar size={10} />
+                                                    <span>Ends: {formatDateShort(client.plan_end_date)}</span>
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+
                                     <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-50">
                                         <div className="flex items-center gap-1.5 text-[11px]">
                                             <span className="font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md whitespace-nowrap">
@@ -470,13 +651,13 @@ export default function AdminClientsListingPage() {
                                         <div className="flex items-center gap-1.5 shrink-0">
                                             <Link
                                                 href={`/admin/diet-plan-generator?clientId=${client.id}&new=1`}
-                                                className="inline-flex items-center min-h-[36px] px-3 py-1.5 rounded-xl bg-emerald-50 active:bg-emerald-100 text-primary border border-emerald-200/80 text-xs font-bold whitespace-nowrap"
+                                                className="inline-flex items-center min-h-9 px-3 py-1.5 rounded-xl bg-emerald-50 active:bg-emerald-100 text-primary border border-emerald-200/80 text-xs font-bold whitespace-nowrap"
                                             >
                                                 + Plan
                                             </Link>
                                             <Link
                                                 href={`/admin/clients/${client.id}`}
-                                                className="inline-flex items-center min-h-[36px] px-3 py-1.5 rounded-xl bg-gray-100 active:bg-gray-200 text-heading text-xs font-semibold whitespace-nowrap"
+                                                className="inline-flex items-center min-h-9 px-3 py-1.5 rounded-xl bg-gray-100 active:bg-gray-200 text-heading text-xs font-semibold whitespace-nowrap"
                                             >
                                                 Details →
                                             </Link>
@@ -607,6 +788,65 @@ export default function AdminClientsListingPage() {
                                     />
                                 </div>
 
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                                        Plan Start Date
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={clientForm.plan_start_date}
+                                        onChange={(e) =>
+                                            setClientForm((prev) => ({
+                                                ...prev,
+                                                plan_start_date: e.target.value,
+                                            }))
+                                        }
+                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="flex items-center justify-between gap-1 text-xs font-bold text-gray-700 mb-1">
+                                        <span>Plan End Date</span>
+                                        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-primary">
+                                            {[
+                                                { label: '+1M', months: 1 },
+                                                { label: '+3M', months: 3 },
+                                                { label: '+6M', months: 6 },
+                                            ].map((opt) => (
+                                                <button
+                                                    key={opt.label}
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setClientForm((prev) => ({
+                                                            ...prev,
+                                                            plan_end_date: addMonthsToIsoDate(
+                                                                prev.plan_start_date,
+                                                                opt.months
+                                                            ),
+                                                        }))
+                                                    }
+                                                    className="hover:underline cursor-pointer"
+                                                    title={`Set Plan End Date to ${opt.label} from Plan Start Date`}
+                                                >
+                                                    {opt.label}
+                                                </button>
+                                            ))}
+                                        </span>
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={clientForm.plan_end_date}
+                                        onChange={(e) =>
+                                            setClientForm((prev) => ({
+                                                ...prev,
+                                                plan_end_date: e.target.value,
+                                            }))
+                                        }
+                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    />
+                                </div>
+
                                 <div className="sm:col-span-2">
                                     <label className="block text-xs font-bold text-gray-700 mb-1">
                                         Primary Goal
@@ -648,7 +888,7 @@ export default function AdminClientsListingPage() {
                                 <button
                                     type="button"
                                     onClick={() => setIsModalOpen(false)}
-                                    className="w-full sm:w-auto min-h-[40px] px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
+                                    className="w-full sm:w-auto min-h-10 px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
                                 >
                                     Cancel
                                 </button>

@@ -605,10 +605,14 @@ function AdminInvoiceGeneratorContent() {
                     autoSaveTimerRef.current = null;
                 }
                 hasPendingSaveRef.current = false;
+                dbMetaRef.current = { selectedClient: null, loadedInvoiceRecord: null };
 
                 let savedPayment = null;
                 try {
                     window.localStorage.removeItem(INVOICE_DRAFT_STORAGE_KEY);
+                    if (typeof window !== 'undefined') {
+                        window.history.replaceState({}, '', '/admin/invoice-generator');
+                    }
                     const rawPayment = window.localStorage.getItem(PAYMENT_STORAGE_KEY);
                     if (rawPayment) {
                         savedPayment = JSON.parse(rawPayment);
@@ -631,9 +635,11 @@ function AdminInvoiceGeneratorContent() {
                 latestFormDataRef.current = freshInvoice;
                 pendingHydratedDataRef.current = freshInvoice;
 
+                setSelectedClient(null);
+                setLoadedInvoiceRecord(null);
+                setShowSaveMenu(false);
                 setFormData(freshInvoice);
                 setDebouncedInvoice(freshInvoice);
-                setLoadedInvoiceRecord(null);
                 setLastSavedAt(null);
                 setSaveStatus('idle');
                 setPreviewKey((k) => k + 1);
@@ -1036,24 +1042,24 @@ function AdminInvoiceGeneratorContent() {
 
     const statusBadgeUi = isPaid
         ? {
-              pill: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-              dot: 'bg-emerald-600',
-              previewPill: 'bg-emerald-100 text-emerald-800',
-              label: 'Paid',
-          }
+            pill: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+            dot: 'bg-emerald-600',
+            previewPill: 'bg-emerald-100 text-emerald-800',
+            label: 'Paid',
+        }
         : isPartlyPaid
             ? {
-                  pill: 'bg-amber-50 text-amber-800 border-amber-300',
-                  dot: 'bg-amber-500',
-                  previewPill: 'bg-amber-100 text-amber-800',
-                  label: 'Partly Paid',
-              }
+                pill: 'bg-amber-50 text-amber-800 border-amber-300',
+                dot: 'bg-amber-500',
+                previewPill: 'bg-amber-100 text-amber-800',
+                label: 'Partly Paid',
+            }
             : {
-                  pill: 'bg-red-50 text-red-600 border-red-200',
-                  dot: 'bg-red-500',
-                  previewPill: 'bg-red-100 text-red-700',
-                  label: 'Unpaid',
-              };
+                pill: 'bg-red-50 text-red-600 border-red-200',
+                dot: 'bg-red-500',
+                previewPill: 'bg-red-100 text-red-700',
+                label: 'Unpaid',
+            };
 
     return (
         <div className="bg-gray-50 pb-24 md:pb-16 font-sans text-heading">
@@ -1068,7 +1074,7 @@ function AdminInvoiceGeneratorContent() {
                                 className="inline-flex items-center gap-1 font-semibold text-gray-500 hover:text-primary transition min-w-0"
                             >
                                 <ArrowLeft size={13} className="shrink-0" />
-                                <span className="truncate max-w-[160px] sm:max-w-xs">
+                                <span className="truncate max-w-40 sm:max-w-xs">
                                     {selectedClient ? selectedClient.full_name : 'All Clients'}
                                 </span>
                             </Link>
@@ -1121,18 +1127,17 @@ function AdminInvoiceGeneratorContent() {
                 </div>
 
                 {/* ── Single Unified Sticky Toolbar ── */}
-                <div className="sticky top-[3.75rem] md:top-2 z-30 bg-white/95 backdrop-blur-md rounded-2xl p-2 sm:p-2.5 mb-3.5 sm:mb-5 border border-gray-200/90 shadow-sm flex flex-wrap items-center justify-between gap-2">
+                <div className="sticky top-15 md:top-2 z-30 bg-white/95 backdrop-blur-md rounded-2xl p-2 sm:p-2.5 mb-3.5 sm:mb-5 border border-gray-200/90 shadow-sm flex flex-wrap items-center justify-between gap-2">
                     {/* Mode Switcher */}
                     <div className="flex items-center gap-2.5">
                         <div className="bg-gray-100 p-0.5 rounded-xl flex items-center">
                             <button
                                 type="button"
                                 onClick={() => setActiveView('editor')}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                                    activeView === 'editor'
-                                        ? 'bg-white text-heading shadow-2xs font-bold'
-                                        : 'text-gray-500 hover:text-heading'
-                                }`}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${activeView === 'editor'
+                                    ? 'bg-white text-heading shadow-2xs font-bold'
+                                    : 'text-gray-500 hover:text-heading'
+                                    }`}
                             >
                                 <FileText size={13} />
                                 <span>Form</span>
@@ -1144,11 +1149,10 @@ function AdminInvoiceGeneratorContent() {
                                     setActiveView('split');
                                     setPreviewKey((k) => k + 1);
                                 }}
-                                className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                                    activeView === 'split'
-                                        ? 'bg-white text-heading shadow-2xs font-bold'
-                                        : 'text-gray-500 hover:text-heading'
-                                }`}
+                                className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${activeView === 'split'
+                                    ? 'bg-white text-heading shadow-2xs font-bold'
+                                    : 'text-gray-500 hover:text-heading'
+                                    }`}
                             >
                                 <Sliders size={13} />
                                 <span>Split</span>
@@ -1160,11 +1164,10 @@ function AdminInvoiceGeneratorContent() {
                                     setActiveView('preview');
                                     setPreviewKey((k) => k + 1);
                                 }}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                                    activeView === 'preview'
-                                        ? 'bg-white text-heading shadow-2xs font-bold'
-                                        : 'text-gray-500 hover:text-heading'
-                                }`}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${activeView === 'preview'
+                                    ? 'bg-white text-heading shadow-2xs font-bold'
+                                    : 'text-gray-500 hover:text-heading'
+                                    }`}
                             >
                                 <Eye size={13} />
                                 <span>Preview</span>
@@ -1198,9 +1201,8 @@ function AdminInvoiceGeneratorContent() {
                                     type="button"
                                     disabled={savingToClientDb}
                                     onClick={() => handleSaveInvoiceToDb('auto')}
-                                    className={`inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-primary border border-emerald-200 font-bold text-xs whitespace-nowrap transition active:scale-[0.98] cursor-pointer disabled:opacity-50 ${
-                                        loadedInvoiceRecord ? 'rounded-l-xl border-r-0' : 'rounded-xl'
-                                    }`}
+                                    className={`inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-primary border border-emerald-200 font-bold text-xs whitespace-nowrap transition active:scale-[0.98] cursor-pointer disabled:opacity-50 ${loadedInvoiceRecord ? 'rounded-l-xl border-r-0' : 'rounded-xl'
+                                        }`}
                                 >
                                     {savingToClientDb ? (
                                         <RefreshCw size={13} className="animate-spin shrink-0" />
@@ -1309,16 +1311,14 @@ function AdminInvoiceGeneratorContent() {
 
                 {/* ── Main Content Grid (Editor / Split / Preview) ── */}
                 <div
-                    className={`grid gap-6 items-start ${
-                        activeView === 'split' ? 'lg:grid-cols-12' : 'grid-cols-1'
-                    }`}
+                    className={`grid gap-6 items-start ${activeView === 'split' ? 'lg:grid-cols-12' : 'grid-cols-1'
+                        }`}
                 >
                     {/* ═══════════════ LEFT: INVOICE FORM ═══════════════ */}
                     {(activeView === 'editor' || activeView === 'split') && (
                         <div
-                            className={`space-y-5 ${
-                                activeView === 'split' ? 'lg:col-span-6' : 'max-w-3xl mx-auto w-full'
-                            }`}
+                            className={`space-y-5 ${activeView === 'split' ? 'lg:col-span-6' : 'max-w-3xl mx-auto w-full'
+                                }`}
                         >
                             {/* ── CARD 1: Client Name, Goal & Status ── */}
                             <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden">
@@ -1429,11 +1429,10 @@ function AdminInvoiceGeneratorContent() {
                                                         status: 'unpaid',
                                                     }))
                                                 }
-                                                className={`flex items-center justify-center gap-1 sm:gap-1.5 py-2.5 px-1.5 sm:px-2.5 rounded-xl border text-[11px] sm:text-xs font-bold whitespace-nowrap transition cursor-pointer ${
-                                                    formData.status === 'unpaid'
-                                                        ? 'bg-red-50 border-red-400 text-red-700 ring-2 ring-red-200/70 shadow-2xs'
-                                                        : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
-                                                }`}
+                                                className={`flex items-center justify-center gap-1 sm:gap-1.5 py-2.5 px-1.5 sm:px-2.5 rounded-xl border text-[11px] sm:text-xs font-bold whitespace-nowrap transition cursor-pointer ${formData.status === 'unpaid'
+                                                    ? 'bg-red-50 border-red-400 text-red-700 ring-2 ring-red-200/70 shadow-2xs'
+                                                    : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                                                    }`}
                                             >
                                                 <Clock size={13} className="shrink-0" />
                                                 <span>Unpaid</span>
@@ -1447,11 +1446,10 @@ function AdminInvoiceGeneratorContent() {
                                                         status: 'partly_paid',
                                                     }))
                                                 }
-                                                className={`flex items-center justify-center gap-1 sm:gap-1.5 py-2.5 px-1.5 sm:px-2.5 rounded-xl border text-[11px] sm:text-xs font-bold whitespace-nowrap transition cursor-pointer ${
-                                                    isPartlyPaid
-                                                        ? 'bg-amber-50 border-amber-400 text-amber-800 ring-2 ring-amber-200/70 shadow-2xs'
-                                                        : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
-                                                }`}
+                                                className={`flex items-center justify-center gap-1 sm:gap-1.5 py-2.5 px-1.5 sm:px-2.5 rounded-xl border text-[11px] sm:text-xs font-bold whitespace-nowrap transition cursor-pointer ${isPartlyPaid
+                                                    ? 'bg-amber-50 border-amber-400 text-amber-800 ring-2 ring-amber-200/70 shadow-2xs'
+                                                    : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                                                    }`}
                                             >
                                                 <PieChart size={13} className="shrink-0" />
                                                 <span>Partly Paid</span>
@@ -1465,11 +1463,10 @@ function AdminInvoiceGeneratorContent() {
                                                         status: 'paid',
                                                     }))
                                                 }
-                                                className={`flex items-center justify-center gap-1 sm:gap-1.5 py-2.5 px-1.5 sm:px-2.5 rounded-xl border text-[11px] sm:text-xs font-bold whitespace-nowrap transition cursor-pointer ${
-                                                    isPaid
-                                                        ? 'bg-emerald-50 border-emerald-500 text-emerald-800 ring-2 ring-emerald-200/70 shadow-2xs'
-                                                        : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
-                                                }`}
+                                                className={`flex items-center justify-center gap-1 sm:gap-1.5 py-2.5 px-1.5 sm:px-2.5 rounded-xl border text-[11px] sm:text-xs font-bold whitespace-nowrap transition cursor-pointer ${isPaid
+                                                    ? 'bg-emerald-50 border-emerald-500 text-emerald-800 ring-2 ring-emerald-200/70 shadow-2xs'
+                                                    : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                                                    }`}
                                             >
                                                 <CheckCircle size={13} className="shrink-0" />
                                                 <span>Paid</span>
@@ -1530,9 +1527,8 @@ function AdminInvoiceGeneratorContent() {
                                                                         e.target.value
                                                                     )
                                                                 }
-                                                                placeholder={`Item ${
-                                                                    index + 1
-                                                                } (e.g., 3 Month Diet Program)`}
+                                                                placeholder={`Item ${index + 1
+                                                                    } (e.g., 3 Month Diet Program)`}
                                                                 className="w-full text-xs sm:text-sm px-3 py-2 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                                                             />
                                                         </div>
@@ -1589,25 +1585,22 @@ function AdminInvoiceGeneratorContent() {
 
                                         {/* Table Row: Total Amount */}
                                         <div
-                                            className={`border-t px-4 py-3 flex items-center justify-between ${
-                                                isPartlyPaid
-                                                    ? 'bg-gray-50 border-gray-200 py-2.5'
-                                                    : 'bg-emerald-50/80 border-emerald-200'
-                                            }`}
+                                            className={`border-t px-4 py-3 flex items-center justify-between ${isPartlyPaid
+                                                ? 'bg-gray-50 border-gray-200 py-2.5'
+                                                : 'bg-emerald-50/80 border-emerald-200'
+                                                }`}
                                         >
                                             <span
-                                                className={`text-xs font-bold uppercase tracking-wider ${
-                                                    isPartlyPaid ? 'text-gray-600' : 'text-emerald-900'
-                                                }`}
+                                                className={`text-xs font-bold uppercase tracking-wider ${isPartlyPaid ? 'text-gray-600' : 'text-emerald-900'
+                                                    }`}
                                             >
                                                 Total Amount
                                             </span>
                                             <span
-                                                className={`font-bold ${
-                                                    isPartlyPaid
-                                                        ? 'text-sm sm:text-base text-heading'
-                                                        : 'text-base sm:text-lg text-primary'
-                                                }`}
+                                                className={`font-bold ${isPartlyPaid
+                                                    ? 'text-sm sm:text-base text-heading'
+                                                    : 'text-base sm:text-lg text-primary'
+                                                    }`}
                                             >
                                                 ₹{formattedTotal}
                                             </span>
@@ -1803,11 +1796,10 @@ function AdminInvoiceGeneratorContent() {
                                                     const file = e.dataTransfer.files?.[0];
                                                     if (file) processQrFile(file);
                                                 }}
-                                                className={`border-2 border-dashed rounded-xl p-6 text-center transition cursor-pointer ${
-                                                    isDraggingQr
-                                                        ? 'border-primary bg-emerald-50/70'
-                                                        : 'border-gray-200 hover:border-primary/60 hover:bg-gray-50/80'
-                                                }`}
+                                                className={`border-2 border-dashed rounded-xl p-6 text-center transition cursor-pointer ${isDraggingQr
+                                                    ? 'border-primary bg-emerald-50/70'
+                                                    : 'border-gray-200 hover:border-primary/60 hover:bg-gray-50/80'
+                                                    }`}
                                             >
                                                 <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-2">
                                                     <Upload size={18} />
@@ -1848,9 +1840,8 @@ function AdminInvoiceGeneratorContent() {
                     {/* ═══════════════ RIGHT: LIVE PDF PREVIEW ═══════════════ */}
                     {(activeView === 'preview' || activeView === 'split') && (
                         <div
-                            className={`bg-white rounded-2xl p-3 sm:p-4 border border-gray-200/80 shadow-xs flex flex-col lg:sticky lg:top-16 ${
-                                activeView === 'split' ? 'lg:col-span-6' : 'w-full'
-                            }`}
+                            className={`bg-white rounded-2xl p-3 sm:p-4 border border-gray-200/80 shadow-xs flex flex-col lg:sticky lg:top-16 ${activeView === 'split' ? 'lg:col-span-6' : 'w-full'
+                                }`}
                         >
                             <div className="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-gray-100">
                                 <div className="flex items-center gap-2 flex-wrap min-w-0">
@@ -1923,9 +1914,8 @@ function AdminInvoiceGeneratorContent() {
                             type="button"
                             disabled={savingToClientDb}
                             onClick={() => handleSaveInvoiceToDb('auto')}
-                            className={`flex-1 min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3 bg-emerald-50 active:bg-emerald-100 text-primary border border-emerald-200 font-bold text-xs whitespace-nowrap transition active:scale-[0.98] cursor-pointer disabled:opacity-50 ${
-                                loadedInvoiceRecord ? 'rounded-l-xl border-r-0' : 'rounded-xl'
-                            }`}
+                            className={`flex-1 min-h-11 inline-flex items-center justify-center gap-1.5 px-3 bg-emerald-50 active:bg-emerald-100 text-primary border border-emerald-200 font-bold text-xs whitespace-nowrap transition active:scale-[0.98] cursor-pointer disabled:opacity-50 ${loadedInvoiceRecord ? 'rounded-l-xl border-r-0' : 'rounded-xl'
+                                }`}
                         >
                             {savingToClientDb ? (
                                 <RefreshCw size={14} className="animate-spin shrink-0" />
@@ -1942,7 +1932,7 @@ function AdminInvoiceGeneratorContent() {
                                 type="button"
                                 disabled={savingToClientDb}
                                 onClick={() => setShowSaveMenu((o) => !o)}
-                                className="min-h-[44px] px-2.5 bg-emerald-50 active:bg-emerald-100 text-primary border border-emerald-200 rounded-r-xl flex items-center justify-center transition cursor-pointer disabled:opacity-50"
+                                className="min-h-11 px-2.5 bg-emerald-50 active:bg-emerald-100 text-primary border border-emerald-200 rounded-r-xl flex items-center justify-center transition cursor-pointer disabled:opacity-50"
                                 title="More save options"
                                 aria-label="More save options"
                             >
@@ -1980,7 +1970,7 @@ function AdminInvoiceGeneratorContent() {
                         type="button"
                         onClick={handleDownloadPdf}
                         disabled={generating}
-                        className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3 bg-primary hover:bg-primary-hover text-white font-bold text-xs rounded-xl shadow-xs whitespace-nowrap transition active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                        className="flex-1 min-h-11 inline-flex items-center justify-center gap-1.5 px-3 bg-primary hover:bg-primary-hover text-white font-bold text-xs rounded-xl shadow-xs whitespace-nowrap transition active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                     >
                         {generating ? (
                             <RefreshCw size={14} className="animate-spin shrink-0" />
