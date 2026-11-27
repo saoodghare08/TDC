@@ -377,9 +377,8 @@ export function AdminNotificationBell({ notif }) {
 
             {count > 0 && (
                 <span
-                    className={`absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold text-white flex items-center justify-center shadow-2xs ${
-                        hasUrgent ? 'bg-rose-600' : 'bg-amber-500'
-                    }`}
+                    className={`absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold text-white flex items-center justify-center shadow-2xs ${hasUrgent ? 'bg-rose-600' : 'bg-amber-500'
+                        }`}
                 >
                     {count > 9 ? '9+' : count}
                 </span>
@@ -491,7 +490,7 @@ export function AdminNotificationModal({ notif }) {
                                         type="button"
                                         disabled={notif.busyAction !== ''}
                                         onClick={notif.handleSendTestPush}
-                                        className="flex-1 min-h-[36px] inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-primary border border-emerald-200 text-xs font-bold transition cursor-pointer disabled:opacity-50"
+                                        className="flex-1 min-h-9 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-primary border border-emerald-200 text-xs font-bold transition cursor-pointer disabled:opacity-50"
                                     >
                                         {notif.busyAction === 'testing' ? (
                                             <RefreshCw size={12} className="animate-spin" />
@@ -504,7 +503,7 @@ export function AdminNotificationModal({ notif }) {
                                         type="button"
                                         disabled={notif.busyAction !== ''}
                                         onClick={notif.handleDisablePush}
-                                        className="min-h-[36px] px-3 py-1.5 rounded-xl bg-white hover:bg-rose-50 text-gray-500 hover:text-rose-600 border border-gray-200 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+                                        className="min-h-9 px-3 py-1.5 rounded-xl bg-white hover:bg-rose-50 text-gray-500 hover:text-rose-600 border border-gray-200 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
                                     >
                                         Turn Off
                                     </button>
@@ -514,13 +513,12 @@ export function AdminNotificationModal({ notif }) {
 
                         {notif.feedback && (
                             <p
-                                className={`text-[11px] font-medium px-2.5 py-1.5 rounded-lg ${
-                                    notif.feedback.type === 'success'
-                                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                                        : notif.feedback.type === 'error'
-                                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                                            : 'bg-white text-gray-600 border border-gray-200'
-                                }`}
+                                className={`text-[11px] font-medium px-2.5 py-1.5 rounded-lg ${notif.feedback.type === 'success'
+                                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                    : notif.feedback.type === 'error'
+                                        ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                        : 'bg-white text-gray-600 border border-gray-200'
+                                    }`}
                             >
                                 {notif.feedback.text}
                             </p>
