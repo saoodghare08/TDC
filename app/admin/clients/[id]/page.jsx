@@ -116,7 +116,7 @@ const getRevisionAlertMeta = (isoDate, clientStatus = 'active') => {
             urgent: true,
         };
     }
-    if (diffDays <= 2) {
+    if (diffDays <= 3) {
         return {
             label: `Revision in ${diffDays}d (${formatted})`,
             cls: 'bg-amber-50 text-amber-800 border-amber-200',

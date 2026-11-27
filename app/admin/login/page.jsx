@@ -39,9 +39,13 @@ export default function AdminLoginPage() {
             setError(signInError.message);
             setLoading(false);
         } else {
-            // Set a cookie that expires in 2 days to track admin session length manually
+            // Extend session to 30 days inside an installed Home Screen PWA (2 days in normal browser tabs)
+            const isStandalonePwa =
+                typeof window !== 'undefined' &&
+                (window.matchMedia?.('(display-mode: standalone)')?.matches ||
+                    window.navigator.standalone === true);
             const expiryDate = new Date();
-            expiryDate.setDate(expiryDate.getDate() + 2);
+            expiryDate.setDate(expiryDate.getDate() + (isStandalonePwa ? 30 : 2));
             document.cookie = `admin_session_expiry=true; expires=${expiryDate.toUTCString()}; path=/; SameSite=Lax`;
 
             router.push('/admin');

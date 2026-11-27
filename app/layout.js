@@ -42,6 +42,7 @@ export async function generateMetadata() {
       template: `%s | The Diet Cascade`,
     },
     description: description,
+    manifest: '/manifest.webmanifest',
     keywords: seo?.keywords || "diet, nutrition, weight loss, health, wellness, clinical dietitian",
     icons: {
       icon: '/images/logo.png', // Main favicon

@@ -43,7 +43,7 @@ async function run() {
             SELECT table_name
             FROM information_schema.tables
             WHERE table_schema = 'public'
-              AND table_name IN ('clients', 'client_diet_plans', 'client_invoices')
+              AND table_name IN ('clients', 'client_diet_plans', 'client_invoices', 'admin_push_subscriptions', 'admin_notification_logs')
             ORDER BY table_name;
         `);
         console.log(

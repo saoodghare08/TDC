@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Swal from 'sweetalert2';
 import {
     Users,
@@ -122,7 +122,7 @@ const getRevisionBadgeMeta = (isoDate, clientStatus = 'active') => {
             diffDays,
         };
     }
-    if (diffDays <= 2) {
+    if (diffDays <= 3) {
         return {
             label: `Due in ${diffDays}d • ${shortDate}`,
             cls: 'bg-amber-50 text-amber-800 border-amber-200',
@@ -147,14 +147,18 @@ const getInitials = (name) =>
         .slice(0, 2)
         .toUpperCase() || '?';
 
-export default function AdminClientsListingPage() {
+const VALID_STATUS_FILTERS = new Set(['all', 'revision_due', 'active', 'paused', 'completed']);
+
+function AdminClientsListingContent({ initialFilter = 'all' }) {
     const router = useRouter();
     const supabase = useMemo(() => createClient(), []);
 
     const [clients, setClients] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState('all');
+    const [statusFilter, setStatusFilter] = useState(() =>
+        VALID_STATUS_FILTERS.has(initialFilter) ? initialFilter : 'all'
+    );
 
     // Add Client Modal
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -905,6 +909,27 @@ export default function AdminClientsListingPage() {
                 </div>
             )}
         </div>
+    );
+}
+
+function AdminClientsFilterRouter() {
+    const searchParams = useSearchParams();
+    const urlFilter = searchParams.get('filter') || 'all';
+    return <AdminClientsListingContent key={urlFilter} initialFilter={urlFilter} />;
+}
+
+export default function AdminClientsListingPage() {
+    return (
+        <Suspense
+            fallback={
+                <div className="max-w-7xl mx-auto px-2 py-16 text-center text-sm text-gray-500">
+                    <RefreshCw size={20} className="animate-spin mx-auto mb-2 text-primary" />
+                    Loading clients...
+                </div>
+            }
+        >
+            <AdminClientsFilterRouter />
+        </Suspense>
     );
 }
 
