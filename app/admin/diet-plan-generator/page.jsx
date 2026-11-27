@@ -43,6 +43,7 @@ import StepTargetsAndMeals from '@/components/admin/diet-generator/StepTargetsAn
 import StepExtrasAndRecipes from '@/components/admin/diet-generator/StepExtrasAndRecipes';
 import StepReviewAndShare from '@/components/admin/diet-generator/StepReviewAndShare';
 import NewRecipeModal from '@/components/admin/diet-generator/NewRecipeModal';
+import { cleanMultilineItems } from '@/components/admin/recipes/RecipeFormModal';
 
 // Dynamic import for React-PDF Viewer to prevent SSR issues
 const PDFViewer = dynamic(() => import('@react-pdf/renderer').then((mod) => mod.PDFViewer), {
@@ -96,10 +97,6 @@ function AdminDietPlanGeneratorContent() {
     const [newRecipeForm, setNewRecipeForm] = useState(EMPTY_NEW_RECIPE);
     const [savingNewRecipe, setSavingNewRecipe] = useState(false);
     const [saveNewRecipeToBank, setSaveNewRecipeToBank] = useState(true);
-    const [newRecipeBulkIngOpen, setNewRecipeBulkIngOpen] = useState(false);
-    const [newRecipeBulkIngText, setNewRecipeBulkIngText] = useState('');
-    const [newRecipeBulkInstOpen, setNewRecipeBulkInstOpen] = useState(false);
-    const [newRecipeBulkInstText, setNewRecipeBulkInstText] = useState('');
 
     // Client DB State
     const [allClients, setAllClients] = useState([]);
@@ -1803,54 +1800,15 @@ function AdminDietPlanGeneratorContent() {
             instructions: [''],
         });
         setSaveNewRecipeToBank(true);
-        setNewRecipeBulkIngOpen(false);
-        setNewRecipeBulkIngText('');
-        setNewRecipeBulkInstOpen(false);
-        setNewRecipeBulkInstText('');
         setIsNewRecipeModalOpen(true);
-    };
-
-    const handleApplyBulkIngredients = () => {
-        const lines = newRecipeBulkIngText
-            .split('\n')
-            .map((l) => l.replace(/^(?:[-*•✓·–—\u2022]\s*|\(?\d+[.)]\s+)/, '').trim())
-            .filter(Boolean);
-        if (lines.length > 0) {
-            setNewRecipeForm((prev) => ({ ...prev, ingredients: lines }));
-        }
-        setNewRecipeBulkIngOpen(false);
-        setNewRecipeBulkIngText('');
-    };
-
-    const handleApplyBulkInstructions = () => {
-        const lines = newRecipeBulkInstText
-            .split('\n')
-            .map((l) =>
-                l
-                    .replace(
-                        /^(?:Step\s*\d+[:.]?\s*|[-*•✓·–—\u2022]\s*|\(?\d+[.)]\s+)/i,
-                        ''
-                    )
-                    .trim()
-            )
-            .filter(Boolean);
-        if (lines.length > 0) {
-            setNewRecipeForm((prev) => ({ ...prev, instructions: lines }));
-        }
-        setNewRecipeBulkInstOpen(false);
-        setNewRecipeBulkInstText('');
     };
 
     const handleCreateAndAttachRecipe = async (e) => {
         e.preventDefault();
         if (!newRecipeForm.name.trim()) return;
 
-        const cleanIngredients = (newRecipeForm.ingredients || [])
-            .map((i) => String(i || '').trim())
-            .filter(Boolean);
-        const cleanInstructions = (newRecipeForm.instructions || [])
-            .map((i) => String(i || '').trim())
-            .filter(Boolean);
+        const cleanIngredients = cleanMultilineItems(newRecipeForm.ingredients, false);
+        const cleanInstructions = cleanMultilineItems(newRecipeForm.instructions, true);
 
         if (cleanIngredients.length === 0) {
             Swal.fire({
@@ -2437,6 +2395,7 @@ function AdminDietPlanGeneratorContent() {
 
             {/* ── CREATE & ATTACH NEW RECIPE MODAL ── */}
             <NewRecipeModal
+                key={isNewRecipeModalOpen ? 'new-recipe-open' : 'new-recipe-closed'}
                 isOpen={isNewRecipeModalOpen}
                 onClose={() => setIsNewRecipeModalOpen(false)}
                 newRecipeForm={newRecipeForm}
@@ -2444,16 +2403,6 @@ function AdminDietPlanGeneratorContent() {
                 savingNewRecipe={savingNewRecipe}
                 saveNewRecipeToBank={saveNewRecipeToBank}
                 setSaveNewRecipeToBank={setSaveNewRecipeToBank}
-                newRecipeBulkIngOpen={newRecipeBulkIngOpen}
-                setNewRecipeBulkIngOpen={setNewRecipeBulkIngOpen}
-                newRecipeBulkIngText={newRecipeBulkIngText}
-                setNewRecipeBulkIngText={setNewRecipeBulkIngText}
-                onApplyBulkIngredients={handleApplyBulkIngredients}
-                newRecipeBulkInstOpen={newRecipeBulkInstOpen}
-                setNewRecipeBulkInstOpen={setNewRecipeBulkInstOpen}
-                newRecipeBulkInstText={newRecipeBulkInstText}
-                setNewRecipeBulkInstText={setNewRecipeBulkInstText}
-                onApplyBulkInstructions={handleApplyBulkInstructions}
                 onSubmit={handleCreateAndAttachRecipe}
             />
         </div>

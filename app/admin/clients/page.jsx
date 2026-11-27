@@ -19,6 +19,7 @@ import {
     AlertCircle,
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import ClientFormModal from '@/components/admin/clients/ClientFormModal';
 
 const STATUS_STYLES = {
     active: {
@@ -54,19 +55,6 @@ const EMPTY_CLIENT_FORM = {
     plan_start_date: '',
     plan_end_date: '',
     notes: '',
-};
-
-const addMonthsToIsoDate = (baseIso, months) => {
-    const fallback = new Date().toISOString().split('T')[0];
-    const [y, m, d] = String(baseIso || fallback)
-        .split('-')
-        .map(Number);
-    if (!y || !m || !d) return '';
-    const dt = new Date(y, m - 1, d);
-    dt.setMonth(dt.getMonth() + months);
-    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(
-        dt.getDate()
-    ).padStart(2, '0')}`;
 };
 
 const formatDateShort = (iso) => {
@@ -237,8 +225,8 @@ function AdminClientsListingContent({ initialFilter = 'all' }) {
         };
     }, [clients]);
 
-    const handleCreateClient = async (e) => {
-        e.preventDefault();
+    const handleCreateClient = async (e, opts = { openDietBuilderAfter: false }) => {
+        if (e?.preventDefault) e.preventDefault();
         const name = clientForm.full_name.trim();
         if (!name) return;
 
@@ -267,7 +255,11 @@ function AdminClientsListingContent({ initialFilter = 'all' }) {
 
             setIsModalOpen(false);
             setClientForm(EMPTY_CLIENT_FORM);
-            router.push(`/admin/clients/${data.id}`);
+            if (opts?.openDietBuilderAfter) {
+                router.push(`/admin/diet-plan-generator?clientId=${data.id}&new=1`);
+            } else {
+                router.push(`/admin/clients/${data.id}`);
+            }
         } catch (err) {
             Swal.fire({
                 icon: 'error',
@@ -674,240 +666,17 @@ function AdminClientsListingContent({ initialFilter = 'all' }) {
                 </div>
             )}
 
-            {/* ── Add Client Modal ── */}
-            {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/45 backdrop-blur-xs">
-                    <div
-                        className="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full p-4 sm:p-6 shadow-2xl border border-gray-100 max-h-[92dvh] overflow-y-auto"
-                        style={{ animation: 'modalIn 180ms cubic-bezier(0.23, 1, 0.32, 1)' }}
-                    >
-                        <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-100">
-                            <div>
-                                <h2 className="text-base font-bold text-heading">Add New Client</h2>
-                                <p className="text-xs text-gray-500">
-                                    Create a client profile to organize their diet plans and invoices
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setIsModalOpen(false)}
-                                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition cursor-pointer"
-                            >
-                                <X size={18} />
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleCreateClient} className="space-y-3.5">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div className="sm:col-span-2">
-                                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                                        Full Name *
-                                    </label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={clientForm.full_name}
-                                        onChange={(e) =>
-                                            setClientForm((prev) => ({
-                                                ...prev,
-                                                full_name: e.target.value,
-                                            }))
-                                        }
-                                        placeholder="e.g., Ananya Sharma"
-                                        className="w-full text-sm px-3.5 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                                        Phone / WhatsApp
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={clientForm.phone}
-                                        onChange={(e) =>
-                                            setClientForm((prev) => ({
-                                                ...prev,
-                                                phone: e.target.value,
-                                            }))
-                                        }
-                                        placeholder="+91 98765 43210"
-                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                                        Status
-                                    </label>
-                                    <select
-                                        value={clientForm.status}
-                                        onChange={(e) =>
-                                            setClientForm((prev) => ({
-                                                ...prev,
-                                                status: e.target.value,
-                                            }))
-                                        }
-                                        className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                    >
-                                        <option value="active">Active</option>
-                                        <option value="paused">Paused</option>
-                                        <option value="completed">Completed</option>
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                                        Age
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={clientForm.age}
-                                        onChange={(e) =>
-                                            setClientForm((prev) => ({
-                                                ...prev,
-                                                age: e.target.value,
-                                            }))
-                                        }
-                                        placeholder="e.g., 29 yrs"
-                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                                        Height
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={clientForm.height}
-                                        onChange={(e) =>
-                                            setClientForm((prev) => ({
-                                                ...prev,
-                                                height: e.target.value,
-                                            }))
-                                        }
-                                        placeholder="e.g., 165 cm"
-                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                                        Plan Start Date
-                                    </label>
-                                    <input
-                                        type="date"
-                                        value={clientForm.plan_start_date}
-                                        onChange={(e) =>
-                                            setClientForm((prev) => ({
-                                                ...prev,
-                                                plan_start_date: e.target.value,
-                                            }))
-                                        }
-                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="flex items-center justify-between gap-1 text-xs font-bold text-gray-700 mb-1">
-                                        <span>Plan End Date</span>
-                                        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-primary">
-                                            {[
-                                                { label: '+1M', months: 1 },
-                                                { label: '+3M', months: 3 },
-                                                { label: '+6M', months: 6 },
-                                            ].map((opt) => (
-                                                <button
-                                                    key={opt.label}
-                                                    type="button"
-                                                    onClick={() =>
-                                                        setClientForm((prev) => ({
-                                                            ...prev,
-                                                            plan_end_date: addMonthsToIsoDate(
-                                                                prev.plan_start_date,
-                                                                opt.months
-                                                            ),
-                                                        }))
-                                                    }
-                                                    className="hover:underline cursor-pointer"
-                                                    title={`Set Plan End Date to ${opt.label} from Plan Start Date`}
-                                                >
-                                                    {opt.label}
-                                                </button>
-                                            ))}
-                                        </span>
-                                    </label>
-                                    <input
-                                        type="date"
-                                        value={clientForm.plan_end_date}
-                                        onChange={(e) =>
-                                            setClientForm((prev) => ({
-                                                ...prev,
-                                                plan_end_date: e.target.value,
-                                            }))
-                                        }
-                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                    />
-                                </div>
-
-                                <div className="sm:col-span-2">
-                                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                                        Primary Goal
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={clientForm.initial_goals}
-                                        onChange={(e) =>
-                                            setClientForm((prev) => ({
-                                                ...prev,
-                                                initial_goals: e.target.value,
-                                            }))
-                                        }
-                                        placeholder="e.g., Fat Loss & PCOS Management"
-                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                    />
-                                </div>
-
-                                <div className="sm:col-span-2">
-                                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                                        Clinical Notes (Optional)
-                                    </label>
-                                    <textarea
-                                        rows={2}
-                                        value={clientForm.notes}
-                                        onChange={(e) =>
-                                            setClientForm((prev) => ({
-                                                ...prev,
-                                                notes: e.target.value,
-                                            }))
-                                        }
-                                        placeholder="Any allergies, medical context, or consultation notes..."
-                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-2 sm:gap-2.5 pt-3 border-t border-gray-100">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsModalOpen(false)}
-                                    className="w-full sm:w-auto min-h-10 px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={saving}
-                                    className="w-full sm:w-auto min-h-[42px] px-5 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold shadow-xs transition cursor-pointer disabled:opacity-50"
-                                >
-                                    {saving ? 'Creating...' : 'Create Client'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+            {/* ── Simplified Add Client Modal ── */}
+            <ClientFormModal
+                key={isModalOpen ? 'create-open' : 'create-closed'}
+                isOpen={isModalOpen}
+                mode="create"
+                form={clientForm}
+                setForm={setClientForm}
+                saving={saving}
+                onClose={() => setIsModalOpen(false)}
+                onSubmit={handleCreateClient}
+            />
         </div>
     );
 }

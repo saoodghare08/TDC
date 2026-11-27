@@ -18,10 +18,10 @@ import {
     Clock,
     AlertCircle,
     RefreshCw,
-    X,
     MessageCircle,
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import ClientFormModal from '@/components/admin/clients/ClientFormModal';
 
 const STATUS_STYLES = {
     active: {
@@ -53,19 +53,6 @@ const CURRENCY_SYMBOLS = {
     USD: '$',
     GBP: '£',
     EUR: '€',
-};
-
-const addMonthsToIsoDate = (baseIso, months) => {
-    const fallback = new Date().toISOString().split('T')[0];
-    const [y, m, d] = String(baseIso || fallback)
-        .split('-')
-        .map(Number);
-    if (!y || !m || !d) return '';
-    const dt = new Date(y, m - 1, d);
-    dt.setMonth(dt.getMonth() + months);
-    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(
-        dt.getDate()
-    ).padStart(2, '0')}`;
 };
 
 const formatDateShort = (iso) => {
@@ -794,229 +781,17 @@ export default function AdminClientDetailPage() {
                 </div>
             )}
 
-            {/* ── Edit Client Modal ── */}
-            {isEditOpen && (
-                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/45 backdrop-blur-xs">
-                    <div
-                        className="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full p-4 sm:p-6 shadow-2xl border border-gray-100 max-h-[92dvh] overflow-y-auto"
-                        style={{ animation: 'modalIn 180ms cubic-bezier(0.23, 1, 0.32, 1)' }}
-                    >
-                        <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-100">
-                            <h2 className="text-base font-bold text-heading">Edit Client Profile</h2>
-                            <button
-                                type="button"
-                                onClick={() => setIsEditOpen(false)}
-                                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition cursor-pointer"
-                            >
-                                <X size={18} />
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleSaveEdit} className="space-y-3.5">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div className="sm:col-span-2">
-                                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                                        Full Name *
-                                    </label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={editForm.full_name}
-                                        onChange={(e) =>
-                                            setEditForm((prev) => ({
-                                                ...prev,
-                                                full_name: e.target.value,
-                                            }))
-                                        }
-                                        className="w-full text-sm px-3.5 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                                        Phone / WhatsApp
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={editForm.phone}
-                                        onChange={(e) =>
-                                            setEditForm((prev) => ({
-                                                ...prev,
-                                                phone: e.target.value,
-                                            }))
-                                        }
-                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                                        Status
-                                    </label>
-                                    <select
-                                        value={editForm.status}
-                                        onChange={(e) =>
-                                            setEditForm((prev) => ({
-                                                ...prev,
-                                                status: e.target.value,
-                                            }))
-                                        }
-                                        className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                    >
-                                        <option value="active">Active</option>
-                                        <option value="paused">Paused</option>
-                                        <option value="completed">Completed</option>
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                                        Age
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={editForm.age}
-                                        onChange={(e) =>
-                                            setEditForm((prev) => ({
-                                                ...prev,
-                                                age: e.target.value,
-                                            }))
-                                        }
-                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                                        Height
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={editForm.height}
-                                        onChange={(e) =>
-                                            setEditForm((prev) => ({
-                                                ...prev,
-                                                height: e.target.value,
-                                            }))
-                                        }
-                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                                        Plan Start Date
-                                    </label>
-                                    <input
-                                        type="date"
-                                        value={editForm.plan_start_date}
-                                        onChange={(e) =>
-                                            setEditForm((prev) => ({
-                                                ...prev,
-                                                plan_start_date: e.target.value,
-                                            }))
-                                        }
-                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="flex items-center justify-between gap-1 text-xs font-bold text-gray-700 mb-1">
-                                        <span>Plan End Date</span>
-                                        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-primary">
-                                            {[
-                                                { label: '+1M', months: 1 },
-                                                { label: '+3M', months: 3 },
-                                                { label: '+6M', months: 6 },
-                                            ].map((opt) => (
-                                                <button
-                                                    key={opt.label}
-                                                    type="button"
-                                                    onClick={() =>
-                                                        setEditForm((prev) => ({
-                                                            ...prev,
-                                                            plan_end_date: addMonthsToIsoDate(
-                                                                prev.plan_start_date,
-                                                                opt.months
-                                                            ),
-                                                        }))
-                                                    }
-                                                    className="hover:underline cursor-pointer"
-                                                    title={`Set Plan End Date to ${opt.label} from Plan Start Date`}
-                                                >
-                                                    {opt.label}
-                                                </button>
-                                            ))}
-                                        </span>
-                                    </label>
-                                    <input
-                                        type="date"
-                                        value={editForm.plan_end_date}
-                                        onChange={(e) =>
-                                            setEditForm((prev) => ({
-                                                ...prev,
-                                                plan_end_date: e.target.value,
-                                            }))
-                                        }
-                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                    />
-                                </div>
-
-                                <div className="sm:col-span-2">
-                                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                                        Primary Goal
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={editForm.initial_goals}
-                                        onChange={(e) =>
-                                            setEditForm((prev) => ({
-                                                ...prev,
-                                                initial_goals: e.target.value,
-                                            }))
-                                        }
-                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                    />
-                                </div>
-
-                                <div className="sm:col-span-2">
-                                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                                        Clinical Notes
-                                    </label>
-                                    <textarea
-                                        rows={2}
-                                        value={editForm.notes}
-                                        onChange={(e) =>
-                                            setEditForm((prev) => ({
-                                                ...prev,
-                                                notes: e.target.value,
-                                            }))
-                                        }
-                                        className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-2 sm:gap-2.5 pt-3 border-t border-gray-100">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsEditOpen(false)}
-                                    className="w-full sm:w-auto min-h-10 px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={savingEdit}
-                                    className="w-full sm:w-auto min-h-[42px] px-5 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold shadow-xs transition cursor-pointer disabled:opacity-50"
-                                >
-                                    {savingEdit ? 'Saving...' : 'Save Changes'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+            {/* ── Simplified Edit Client Modal ── */}
+            <ClientFormModal
+                key={isEditOpen ? 'edit-open' : 'edit-closed'}
+                isOpen={isEditOpen}
+                mode="edit"
+                form={editForm}
+                setForm={setEditForm}
+                saving={savingEdit}
+                onClose={() => setIsEditOpen(false)}
+                onSubmit={handleSaveEdit}
+            />
         </div>
     );
 }
